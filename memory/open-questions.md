@@ -25,7 +25,6 @@ Move an item to [decisions.md](decisions.md) once it is decided, and delete it h
 - **Box weights are not in the pound total.** The review page's "lb" counts furniture only; George's table has a packed weight per box. (Track A, after the join)
 - **Not tried on a phone:** everything this session merged was checked on copies of moves, on the live server with a test move, or in a desktop browser at 375 px. (Chris)
 - **From the 13:10 review, not started:** `?api=` on the real pages; `GET /analysis/runs` lists every move's id to anyone; a move interrupted by an API restart stays "still working" for good; two phones adding to one move can clash on file names; tap targets under 44 px, no visible focus on the two pick buttons, and progress not announced to screen readers. (Track A)
-- **Branches that can be deleted on GitHub:** `feature/review-server-fixes`, `feature/edit-checks`, `feature/box-table`, `feature/belongings-mock`. All four are in `main`. (Chris)
 
 ## Left by the phone test session (13:55)
 - **A clip over 95 MB has not been tried on a phone.** The capture page refuses it at the demo address (Cloudflare's 100 MB limit); seen only with stubbed sends in the desktop browser. To check: film about 90 seconds in the Camera app and pick it. Chris chose to skip it. (Chris)
