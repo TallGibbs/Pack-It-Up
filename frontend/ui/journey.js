@@ -1307,11 +1307,27 @@
       }
     }
 
+    // One plan reaches setPlan twice: from the /solve hook below and from index.html's own call.
+    // Ask for the route brief once per distinct plan, not once per caller (FAILURES.md 15:18).
+    function planSignature(p) {
+      const s = p.summary || {};
+      return JSON.stringify([
+        p.run_id, p.strategy || null, (p.trucks || []).map((t) => [t.truck_id, (t.items || []).length]),
+        s.total_items, s.total_weight_lb, p.score && p.score.total,
+      ]);
+    }
+    let briefPlanSig = null;
+    let firstBriefTimer = null;
+
     function setPlan(newPlan) {
       if (!newPlan || !Array.isArray(newPlan.trucks)) return;
       state.plan = newPlan;
       renderCompanionStrip();
       syncJourneyTabLabel();
+      const sig = planSignature(newPlan);
+      if (sig === briefPlanSig) return;
+      briefPlanSig = sig;
+      clearTimeout(firstBriefTimer);
       fetchLiveRouteBrief(false);
     }
 
@@ -1344,9 +1360,11 @@
       }
     });
 
-    // Initial render + immediate live route fetch
+    // Initial render. The first plan normally arrives within a second or two and asks for the brief
+    // itself (setPlan); asking here as well sent a second, plan-less request on every page load.
+    // If no plan has come after 4 s (inventory still processing), ask without one.
     renderCompanionStrip();
-    fetchLiveRouteBrief(false);
+    firstBriefTimer = setTimeout(() => { if (!briefPlanSig) fetchLiveRouteBrief(false); }, 4000);
 
     window.PIU_JOURNEY = { setPlan, refreshRoute: () => fetchLiveRouteBrief(true), openTab: activateJourneyTab };
   }
