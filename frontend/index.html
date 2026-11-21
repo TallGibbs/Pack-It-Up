@@ -1031,15 +1031,18 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(42, 16 / 10, 2, 8000);
+const camera = new THREE.PerspectiveCamera(44, 16 / 10, 3, 28000);
 camera.position.set(340, 240, 340);
 
 const controls = new OrbitControls(camera, canvasEl);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 60;
-controls.maxDistance = 2600;
+controls.maxPolarAngle = Math.PI * 0.68;
+controls.minDistance = 36;
+controls.maxDistance = 10500;
+controls.addEventListener("change", () => {
+  if (camera.position.y < 18) camera.position.y = 18;
+});
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.78));
 const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
@@ -1062,6 +1065,7 @@ let colorMode = "stop";       // "stop" | "room" | "handling"
 let playDir = "load";         // "load" | "unload"
 let focusBinIndex = -1;       // -1 = all bins, >=0 = specific truck or store index
 let showVenueRoof = true;     // toggle Moynihan arched glass skylight roof in "venue" mode
+let hideVenueBoxes = true;    // default unpacked coworking look (cardboard boxes tucked out of sight)
 let storyboardTruckIdx = -1;  // -1 = all trucks, >=0 = specific truck in video storyboard
 let highlightRoomId = null;   // optional source room highlight from clicking a room video still
 let venueCornerStills = {};   // zone_id -> offscreen 3D corner cam dataURL
@@ -1290,6 +1294,7 @@ function rebuildScene(resetCamera = false) {
       makeBoxFaceTexture,
       makeTextSprite,
       showRoof: showVenueRoof,
+      hideUnpackedBoxes: hideVenueBoxes,
       fmt,
     });
   } else {
@@ -1397,9 +1402,10 @@ function renderCameraChips() {
   let html = "";
   if (sceneMode === "venue") {
     html += `<button type="button" class="hud-chip" id="tog-venue-roof" aria-pressed="${showVenueRoof}">✨ Skylight Vault</button>`;
+    html += `<button type="button" class="hud-chip" id="tog-venue-boxes" aria-pressed="${!hideVenueBoxes}">${hideVenueBoxes ? "✨ Unpacked Coworking" : "📦 Stock Boxes Shown"}</button>`;
   }
   if (binTargets.length > 1) {
-    const allLabel = sceneMode === "venue" ? "Aerial Station" : `All (${binTargets.length})`;
+    const allLabel = sceneMode === "venue" ? "Aerial Campus" : `All (${binTargets.length})`;
     html += `<button type="button" class="hud-chip" data-cam="-1" aria-pressed="${focusBinIndex === -1}">${esc(allLabel)}</button>`;
     binTargets.forEach((b, idx) => {
       html += `<button type="button" class="hud-chip" data-cam="${idx}" aria-pressed="${focusBinIndex === idx}">${esc(b.label)}</button>`;
@@ -1410,6 +1416,13 @@ function renderCameraChips() {
   if (roofBtn) {
     roofBtn.addEventListener("click", () => {
       showVenueRoof = !showVenueRoof;
+      rebuildScene(false);
+    });
+  }
+  const boxBtn = $("#tog-venue-boxes", host);
+  if (boxBtn) {
+    boxBtn.addEventListener("click", () => {
+      hideVenueBoxes = !hideVenueBoxes;
       rebuildScene(false);
     });
   }
@@ -1434,8 +1447,8 @@ function focusCamera(idx) {
       camera.position.set(t.center.x + d * 0.92, t.center.y + d * 0.72, t.center.z + d * 0.92);
     }
   } else if (sceneMode === "venue") {
-    controls.target.set(-10, 38, 10);
-    camera.position.set(-490, 440, 560);
+    controls.target.set(80, 140, 0);
+    camera.position.set(-1980, 1360, 2080);
   } else {
     const first = binTargets[0];
     const last = binTargets[binTargets.length - 1];
@@ -1455,16 +1468,22 @@ function applyStepVisibility() {
 
   let activeEntry = null;
   meshEntries.forEach((entry) => {
-    const visible = entry.seqIndex <= currentStep;
+    const isSelected = selectedItemId && entry.item.id === selectedItemId;
+    const visible = (entry.seqIndex <= currentStep) && (!entry.hiddenByBoxToggle || isSelected);
     entry.mesh.visible = visible;
     if (entry.seqIndex === currentStep) activeEntry = entry;
 
-    const isSelected = selectedItemId && entry.item.id === selectedItemId;
     const isRoomMatch = highlightRoomId && entry.item.room_id === highlightRoomId;
     entry.edges.material.color.setHex(
       isSelected ? 0xffffff : isRoomMatch ? 0xfacc15 : violatingIds.has(entry.item.id) ? 0xff8080 : 0x0f172a
     );
-    entry.edges.material.opacity = isSelected || isRoomMatch ? 1.0 : entry.isVenue ? 0.24 : 0.55;
+    entry.edges.material.opacity = isSelected || isRoomMatch
+      ? 1.0
+      : violatingIds.has(entry.item.id)
+        ? 0.9
+        : entry.isVenue
+          ? 0.0
+          : 0.55;
   });
 
   if (activeEntry && currentStep < total) {

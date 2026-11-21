@@ -1,120 +1,159 @@
-// 3D Architectural NY Penn Station / Moynihan Train Hall Venue Builder for Pack It Up.
-// Renders an authentic spatial station layout (Main Concourse, vaulted skylight roof,
-// colonnades, LIRR/Amtrak departure board, Track 17-20 stairs, 31st St Loading Dock +
-// docked U-Haul, and 5 surrounding glazed storefronts with real doorway cutouts)
-// populated with procedural 3D furniture & QR-labelled moving boxes.
+// 1:1 True Architectural Scale 3D Model of Moynihan Train Hall & SOM LIRR Concourse.
+// Scale: 1 Three.js unit = 1 inch (exact same 1:1 scale as our 72" tables & 314" U-Haul 26' trucks).
+//
+// Grounded in published SOM (Skidmore, Owings & Merrill) & Schlaich Bergermann Partner specs:
+//   - Main Moynihan Boarding Atrium: 200 ft × 150 ft (2,400" × 1,800" = 30,000–31,000 sq ft)
+//   - Skylight Vaults: 4 double-curved catenary glass-and-steel vaults peaking at 92 ft (1,104")
+//   - Historic Steel Trusses: 3 restored 1912 riveted Pratt trusses, 150 ft (1,800") span, 50 ft (600") o.c.
+//   - Upper Mezzanine Balcony: +20 ft (240") perimeter balcony overlooking the hall (Metropolitan Lounge)
+//   - Track 5–16 Boarding Portals: glass-balustrade escalator islands + LED gate totems on concourse floor
+//   - East LIRR 33rd St Concourse: widened to 57 ft (684") × 18 ft (216") ceiling with luminous LED coffers
 
 import * as THREE from "three";
 
-const STOP_HEX = {
-  1: "#f97316",
-  2: "#eab308",
-  3: "#10b981",
-  4: "#3b82f6",
-  5: "#8b5cf6",
-  6: "#06b6d4",
-};
-
 /**
- * Spatial placement of every Penn Station zone inside the station footprint (1 unit = 1 inch).
- * `rotY`: rotation from local zone (+X depth, +Z width) into world coordinates so each
- * storefront's doorway (`local +X = +L/2` face) opens directly onto the Central Concourse!
- *   - In local zone coords, doorway is on `+X` (`localX = +L/2`).
- *   - North wing (`Z < 0`) wants doorway facing `+Z` (South into concourse) -> `rotY = -Math.PI / 2`!
- *     Wait: in Three.js right-handed Y-up: rotating `(1, 0, 0)` by `-PI/2` around Y gives `(0, 0, +1)` (+Z)!
- *   - South wing (`Z > 0`) wants doorway facing `-Z` (North into concourse) -> `rotY = +Math.PI / 2`!
- *     Rotating `(1, 0, 0)` by `+PI/2` around Y gives `(0, 0, -1)` (-Z)!
- *   - Concourse (`Stop 6`) aligns along hall spine (`rotY = 0`), receiving from `-X` loading dock.
+ * 1:1 Architectural Zone Placements (`1 unit = 1 inch`).
+ * Notice `floorY`: Stop 5 (Members Lounge) sits at `floorY = 240` (+20 ft) right on the
+ * South Mezzanine Balcony overlooking the 92-ft skylit Train Hall, just like the real
+ * Amtrak Metropolitan Lounge in Moynihan Train Hall!
  */
 export const VENUE_ZONE_LAYOUT = {
   penn_merch_kiosk: {
-    // Local dims [120, 84, 90]: rotated -90deg -> world X span = 84, world Z depth = 120.
-    // Front doorway at world Z = -148 -> center Z = -148 - 120/2 = -208.
-    cx: -195,
-    cz: -208,
+    // 36 ft × 26 ft open welcome pavilion inside West Entrance near 9th Ave / 31st St
+    cx: -860,
+    cz: -520,
+    floorY: 0,
     rotY: -Math.PI / 2,
-    floorColor: 0x332924,
+    vDims: [312, 432, 168],
+    doorSpan: 340,
+    floorColor: 0x2d2926,
+    rugColor: 0x3730a3,
     accentHex: "#f97316",
-    signTitle: "STOP 1 · POP-UP MERCH",
-    dockPath: [[-330, -40], [-235, -40], [-195, -148]],
+    signTitle: "STOP 1 · WEST ENTRANCE CHECK-IN & SWAG",
+    dockPath: [[-1360, -140], [-980, -140], [-860, -364]],
   },
   penn_cafe: {
-    // Local dims [168, 120, 96]: rotated -90deg -> world X span = 120, world Z depth = 168.
-    // Front doorway at world Z = -148 -> center Z = -148 - 168/2 = -232.
-    cx: -55,
-    cz: -232,
+    // 64 ft × 40 ft Food Hall & Espresso Bay along North 33rd St Colonnade (Moynihan Food Hall)
+    cx: -180,
+    cz: -1140,
+    floorY: 0,
     rotY: -Math.PI / 2,
-    floorColor: 0x362b22,
+    vDims: [480, 768, 216],
+    doorSpan: 560,
+    floorColor: 0x332920,
+    rugColor: 0x7c2d12,
     accentHex: "#eab308",
-    signTitle: "STOP 2 · TRACKSIDE CAFÉ",
-    dockPath: [[-330, -24], [-110, -24], [-55, -148]],
+    signTitle: "STOP 2 · MOYNIHAN FOOD HALL & ESPRESSO BAR",
+    dockPath: [[-1360, -60], [-360, -60], [-180, -900]],
   },
   penn_bookshop: {
-    // Local dims [180, 132, 96]: rotated -90deg -> world X span = 132, world Z depth = 180.
-    // Front doorway at world Z = -148 -> center Z = -148 - 180/2 = -238.
-    cx: 115,
-    cz: -238,
+    // 55 ft × 36 ft retail bay opening onto the 57-ft-wide SOM LIRR 33rd St Concourse (East Wing)
+    cx: 1720,
+    cz: -558,
+    floorY: 0,
     rotY: -Math.PI / 2,
-    floorColor: 0x1e2f2d,
+    vDims: [432, 660, 204],
+    doorSpan: 480,
+    floorColor: 0x1f2e2b,
+    rugColor: 0x1e3a3a,
     accentHex: "#10b981",
-    signTitle: "STOP 3 · HUDSON BOOKS",
-    dockPath: [[-330, -8], [65, -8], [115, -148]],
+    signTitle: "STOP 3 · LIRR CONCOURSE LIBRARY & FOCUS BAR",
+    dockPath: [[-1360, -15], [1460, -15], [1720, -342]],
   },
   penn_tech_hub: {
-    // Local dims [216, 156, 102]: rotated +90deg -> world X span = 156, world Z depth = 216.
-    // Front doorway at world Z = +148 -> center Z = +148 + 216/2 = +256.
-    cx: -115,
-    cz: 256,
+    // 68 ft × 42 ft ground-level Deep-Work Studio along South 31st St Arcade beneath Mezzanine
+    cx: -320,
+    cz: 1152,
+    floorY: 0,
     rotY: Math.PI / 2,
-    floorColor: 0x1e2838,
+    vDims: [504, 816, 216],
+    doorSpan: 600,
+    floorColor: 0x1f2937,
+    rugColor: 0x1e3a5f,
     accentHex: "#3b82f6",
-    signTitle: "STOP 4 · MOYNIHAN TECH HUB",
-    dockPath: [[-330, 18], [-155, 18], [-115, 148]],
+    signTitle: "STOP 4 · 31st ST ARCADE DEEP-WORK STUDIO",
+    dockPath: [[-1360, 55], [-520, 55], [-320, 900]],
   },
   penn_lounge: {
-    // Local dims [240, 180, 108]: rotated +90deg -> world X span = 180, world Z depth = 240.
-    // Front doorway at world Z = +148 -> center Z = +148 + 240/2 = +268.
-    cx: 105,
-    cz: 268,
+    // 72 ft × 42 ft Upper Mezzanine Balcony Suite (+20 ft = 240" elevation!) overlooking the Main Atrium
+    cx: 460,
+    cz: 1110,
+    floorY: 240,
     rotY: Math.PI / 2,
-    floorColor: 0x2d2436,
+    vDims: [420, 864, 180],
+    doorSpan: 760,
+    isMezzanine: true,
+    floorColor: 0x2b2333,
+    rugColor: 0x4c3549,
     accentHex: "#8b5cf6",
-    signTitle: "STOP 5 · TICKETED LOUNGE",
-    dockPath: [[-330, 34], [55, 34], [105, 148]],
+    signTitle: "STOP 5 · MEZZANINE METROPOLITAN / MALIN LOUNGE (+20 FT)",
+    dockPath: [[-1360, 120], [150, 120], [150, 860]],
   },
   penn_concourse: {
-    // Local dims [420, 260, 144]: central grand hall, X = -210..+210, Z = -130..+130.
+    // Central Hackathon & Coworking Village centered inside the 200×150 ft (2,400×1,800") Skylit Atrium
     cx: 0,
     cz: 0,
+    floorY: 0,
     rotY: 0,
-    floorColor: 0x2c323d,
+    vDims: [1160, 760, 1104],
+    doorSpan: 760,
+    floorColor: 0x2b323e,
+    rugColor: 0x1e293b,
     accentHex: "#06b6d4",
-    signTitle: "STOP 6 · MAIN LIRR CONCOURSE",
-    dockPath: [[-330, 0], [-180, 0]],
+    signTitle: "STOP 6 · MAIN ATRIUM HACKATHON VILLAGE (200×150 FT HALL)",
+    dockPath: [[-1360, 0], [-580, 0]],
   },
 };
 
+function classifyItem(it) {
+  const k = `${it.catalog_id || ""} ${it.label || ""}`.toLowerCase();
+  if (it.is_box) return "box";
+  if (k.includes("round") && k.includes("table")) return "round_table";
+  if (k.includes("coffee") && k.includes("table")) return "coffee_table";
+  if (k.includes("table") || k.includes("desk")) return "desk_table";
+  if ((it.stack_count && it.stack_count > 1) || k.includes("chair_stack") || k.includes("stack of")) return "chair_stack";
+  if (k.includes("bar_stool") || k.includes("stool")) return "stool";
+  if (k.includes("office_chair") || k.includes("chair")) return "chair";
+  if (k.includes("sofa") || k.includes("loveseat") || k.includes("sectional")) return "sofa";
+  if (k.includes("armchair") || k.includes("recliner") || k.includes("single seat")) return "armchair";
+  if (k.includes("ottoman") || k.includes("pouf")) return "ottoman";
+  if (k.includes("rug")) return "rug";
+  if (k.includes("monitor") || k.includes("tv")) return "monitor";
+  if (k.includes("whiteboard")) return "whiteboard";
+  if (k.includes("projector_screen") || (k.includes("screen") && !k.includes("pos"))) return "screen";
+  if (k.includes("projector")) return "projector";
+  if (k.includes("podium") || k.includes("lectern")) return "podium";
+  if (k.includes("piano")) return "piano";
+  if (k.includes("espresso") || k.includes("pastry") || k.includes("microwave")) return "counter_appliance";
+  if (k.includes("framed_art") || k.includes("mirror") || k.includes("art")) return "wall_art";
+  if (k.includes("shelf") || k.includes("shelving") || k.includes("bookcase")) return "bookshelf";
+  if (k.includes("merch_rack") || k.includes("rack")) return "merch_rack";
+  if (k.includes("pos_kiosk") || k.includes("kiosk")) return "pos_kiosk";
+  if (k.includes("sideboard") || k.includes("credenza") || k.includes("filing") || k.includes("cabinet") || k.includes("dresser")) return "credenza";
+  if (k.includes("power_strip")) return "power_strip";
+  return "generic";
+}
+
 function makeSignTexture(title, subtitle, accentHex = "#3b82f6", darkBg = "#0f172a") {
   const c = document.createElement("canvas");
-  c.width = 512;
-  c.height = 112;
+  c.width = 640;
+  c.height = 120;
   const ctx = c.getContext("2d");
 
   ctx.fillStyle = darkBg;
-  ctx.fillRect(0, 0, 512, 112);
-
+  ctx.fillRect(0, 0, 640, 120);
   ctx.fillStyle = accentHex;
-  ctx.fillRect(0, 0, 16, 112);
-  ctx.fillRect(0, 104, 512, 8);
+  ctx.fillRect(0, 0, 18, 120);
+  ctx.fillRect(0, 112, 640, 8);
 
   ctx.fillStyle = "#f8fafc";
-  ctx.font = "bold 30px system-ui, -apple-system, sans-serif";
+  ctx.font = "bold 28px system-ui, -apple-system, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(title, 32, 52);
+  ctx.fillText(title, 34, 54);
 
   ctx.fillStyle = "#94a3b8";
   ctx.font = "600 21px system-ui, -apple-system, sans-serif";
-  ctx.fillText(subtitle, 32, 86);
+  ctx.fillText(subtitle, 34, 90);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -123,42 +162,41 @@ function makeSignTexture(title, subtitle, accentHex = "#3b82f6", darkBg = "#0f17
 
 function makeDepartureBoardTexture() {
   const c = document.createElement("canvas");
-  c.width = 768;
-  c.height = 240;
+  c.width = 896;
+  c.height = 256;
   const ctx = c.getContext("2d");
 
   ctx.fillStyle = "#090d16";
-  ctx.fillRect(0, 0, 768, 240);
+  ctx.fillRect(0, 0, 896, 256);
   ctx.strokeStyle = "#334155";
   ctx.lineWidth = 6;
-  ctx.strokeRect(3, 3, 762, 234);
+  ctx.strokeRect(3, 3, 890, 250);
 
-  // Top header bar
   ctx.fillStyle = "#1d4ed8";
-  ctx.fillRect(6, 6, 756, 48);
+  ctx.fillRect(6, 6, 884, 52);
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 25px system-ui, -apple-system, sans-serif";
-  ctx.fillText("NY PENN STATION · MOYNIHAN & LIRR DEPARTURES", 24, 39);
+  ctx.font = "bold 26px system-ui, -apple-system, sans-serif";
+  ctx.fillText("NY PENN & MOYNIHAN TRAIN HALL · DEPARTURES & HACKATHON", 24, 41);
 
   const rows = [
-    ["12:55", "LIRR · PORT WASHINGTON", "TRK 18", "BOARDING", "#4ade80"],
-    ["13:02", "AMTRAK ACELA 2155 · WASH DC", "TRK 12", "ON TIME", "#fbbf24"],
-    ["13:08", "LIRR · RONKONKOMA EXPRESS", "TRK 20", "ON TIME", "#fbbf24"],
-    ["13:15", "NJT · TRENTON / NEWARK", "TRK 09", "ON TIME", "#fbbf24"],
+    ["ATRIUM", "MAIN CONCOURSE · GEMINI 4 HACKATHON ARENA", "STOP 6", "LIVE NOW", "#4ade80"],
+    ["MEZZ", "METROPOLITAN × MALIN LOUNGE (+20 FT BALCONY)", "STOP 5", "OPEN", "#c084fc"],
+    ["14:08", "AMTRAK ACELA 2155 · WASHINGTON DC", "TRK 11", "BOARDING", "#4ade80"],
+    ["14:15", "LIRR · PORT WASHINGTON / RONKONKOMA", "TRK 18", "ON TIME", "#fbbf24"],
   ];
   ctx.font = "bold 21px ui-monospace, SFMono-Regular, Menlo, monospace";
-  rows.forEach(([time, dest, trk, status, col], i) => {
-    const y = 90 + i * 40;
-    ctx.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.03)" : "transparent";
-    ctx.fillRect(10, y - 26, 748, 34);
-    ctx.fillStyle = "#e2e8f0";
-    ctx.fillText(time, 24, y);
+  rows.forEach(([col1, dest, trk, status, col], i) => {
+    const y = 96 + i * 42;
+    ctx.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.035)" : "transparent";
+    ctx.fillRect(10, y - 28, 876, 36);
+    ctx.fillStyle = "#93c5fd";
+    ctx.fillText(col1, 22, y);
     ctx.fillStyle = "#f8fafc";
-    ctx.fillText(dest, 112, y);
-    ctx.fillStyle = "#60a5fa";
-    ctx.fillText(trk, 520, y);
+    ctx.fillText(dest, 132, y);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillText(trk, 648, y);
     ctx.fillStyle = col;
-    ctx.fillText(status, 628, y);
+    ctx.fillText(status, 756, y);
   });
 
   const tex = new THREE.CanvasTexture(c);
@@ -168,322 +206,919 @@ function makeDepartureBoardTexture() {
 
 function makeClockTexture() {
   const c = document.createElement("canvas");
-  c.width = 128;
-  c.height = 128;
+  c.width = 160;
+  c.height = 160;
   const ctx = c.getContext("2d");
   ctx.fillStyle = "#0f172a";
-  ctx.beginPath();
-  ctx.arc(64, 64, 60, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#eab308";
-  ctx.lineWidth = 7;
-  ctx.stroke();
-
-  ctx.strokeStyle = "#f8fafc";
-  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(80, 80, 74, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#eab308"; ctx.lineWidth = 9; ctx.stroke();
+  ctx.strokeStyle = "#f8fafc"; ctx.lineWidth = 4;
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2;
     ctx.beginPath();
-    ctx.moveTo(64 + Math.cos(a) * 44, 64 + Math.sin(a) * 44);
-    ctx.lineTo(64 + Math.cos(a) * 52, 64 + Math.sin(a) * 52);
+    ctx.moveTo(80 + Math.cos(a) * 54, 80 + Math.sin(a) * 54);
+    ctx.lineTo(80 + Math.cos(a) * 65, 80 + Math.sin(a) * 65);
     ctx.stroke();
   }
-  // Hands at ~1:00 hackathon join time
-  ctx.lineWidth = 5;
-  ctx.beginPath(); ctx.moveTo(64, 64); ctx.lineTo(80, 36); ctx.stroke();
-  ctx.lineWidth = 3.5;
-  ctx.beginPath(); ctx.moveTo(64, 64); ctx.lineTo(64, 22); ctx.stroke();
-
+  ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(80, 80); ctx.lineTo(104, 52); ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(80, 80); ctx.lineTo(80, 24); ctx.stroke();
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
 /**
- * Compute natural architectural staging coordinates `[sx, sy, sz]` and `[sdx, sdy, sdz]`
- * inside a Penn Station zone `[L, W, H]` so rooms look like furnished venues rather than
- * corner-packed storage bins, while guaranteeing every item stays strictly inside `[0..L, 0..W]`.
+ * Minimalist SOM-style 1:1 human scale figure (`68"` = 5 ft 8 in tall) so the viewer's eye
+ * immediately reads the 92-foot skylight, 20-foot mezzanine, and 6-foot coworking tables!
  */
-function stageZoneItemsForVenue(zone) {
-  const [L, W, H] = zone.dims_in;
-  const [doorW] = zone.door_in || [48, 84];
-  const items = (zone.items || []).map((it) => ({ ...it }));
-  if (!items.length) return [];
-
-  const boxes = items.filter((i) => i.is_box);
-  const furn = items.filter((i) => !i.is_box);
-
-  const staged = [];
-
-  // 1. Stage moving boxes neatly along the back wall (local x near -L/2 -> solver x near 0..26)
-  let bxCursorY = 8;
-  let stackZ = 0;
-  let rowX = 6;
-  boxes.forEach((b) => {
-    const [dx, dy, dz] = b.size_in;
-    if (stackZ + dz > Math.min(H - 6, 54) || stackZ >= 36) {
-      stackZ = 0;
-      bxCursorY += dy + 4;
-    }
-    if (bxCursorY + dy > W - 8) {
-      bxCursorY = 8;
-      rowX += dx + 6;
-    }
-    const px = Math.min(L - dx - 4, rowX);
-    const py = Math.min(W - dy - 4, bxCursorY);
-    staged.push({
-      item: b,
-      pos: [px, py, stackZ],
-      size: [dx, dy, dz],
-      unfoldedTable: false,
-    });
-    stackZ += dz;
+function buildHumanScaleFigure(x, y, z, colorHex = 0xcbd5e1) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  const mat = new THREE.MeshStandardMaterial({
+    color: colorHex,
+    roughness: 0.65,
+    transparent: true,
+    opacity: 0.82,
   });
-
-  // 2. Stage furniture across the main room floor with walking aisles & doorway clearance
-  const startX = boxes.length ? Math.min(L * 0.45, rowX + 28) : 14;
-  const maxFrontX = L - 16; // leave clearance inside the front doorway (`x = L`)
-  const marginY = 10;
-  const aisleGapX = zone.zone_type === "concourse" ? 18 : 12;
-  const aisleGapY = zone.zone_type === "concourse" ? 14 : 10;
-
-  let curX = startX;
-  let curY = marginY;
-  let rowMaxDx = 0;
-
-  // Sort furniture so anchor tables/sofas/shelving place cleanly in architectural groups
-  const furnOrdered = furn.slice().sort((a, b) =>
-    String(a.catalog_id).localeCompare(String(b.catalog_id)) || (b.size_in[0] * b.size_in[1] - a.size_in[0] * a.size_in[1])
-  );
-
-  furnOrdered.forEach((f) => {
-    let [dx, dy, dz] = f.size_in;
-    let unfoldedTable = false;
-
-    // Unfold flat-packed folding/banquet/standing tables on the venue floor so they look set up!
-    const lbl = `${f.catalog_id || ""} ${f.label || ""}`.toLowerCase();
-    if ((lbl.includes("table") || lbl.includes("desk")) && dz <= 8 && H >= 36) {
-      dz = 30;
-      unfoldedTable = true;
-    }
-
-    // Keep clear of front doorway center `[L - 28 .. L, W/2 - doorW/2 .. W/2 + doorW/2]`
-    if (curY + dy > W - marginY) {
-      curY = marginY;
-      curX += Math.max(20, rowMaxDx) + aisleGapX;
-      rowMaxDx = 0;
-    }
-
-    if (curX + dx <= maxFrontX && curY + dy <= W - marginY) {
-      // Avoid blocking doorway throat right at the front
-      const inDoorThroat = curX + dx > L - 30 && curY + dy > W / 2 - doorW / 2 - 8 && curY < W / 2 + doorW / 2 + 8;
-      if (!inDoorThroat) {
-        staged.push({
-          item: f,
-          pos: [curX, curY, 0],
-          size: [dx, dy, dz],
-          unfoldedTable,
-        });
-        rowMaxDx = Math.max(rowMaxDx, dx);
-        curY += dy + aisleGapY;
-        return;
-      }
-    }
-
-    // Fallback: use exact solver 3D coordinates inside the store so nothing ever overflows walls
-    staged.push({
-      item: f,
-      pos: f.pos_in.slice(),
-      size: f.size_in.slice(),
-      unfoldedTable: false,
-    });
-  });
-
-  return staged;
+  // Legs + Torso (`0..57"`)
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 3.4, 56, 12), mat);
+  body.position.y = 28;
+  g.add(body);
+  // Shoulders
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(5.6, 12, 10), mat);
+  shoulders.scale.set(1.2, 0.7, 0.75);
+  shoulders.position.y = 53;
+  g.add(shoulders);
+  // Head (`58..68"` = 5'8" total height)
+  const head = new THREE.Mesh(new THREE.SphereGeometry(4.4, 12, 12), mat);
+  head.position.y = 63.5;
+  g.add(head);
+  return g;
 }
 
 /**
- * Build a recognizable 3D procedural furniture/box object inside bounding box `(gx, gy, gz)`
- * centered at `(0, 0, 0)` where `gy` is vertical height.
+ * Coworking Interior Designer at 1:1 Human Scale (`1 unit = 1 inch`)!
+ * Furniture keeps its true 1:1 physical dimensions (`72×30"` banquet tables, `84×36"` sofas,
+ * `60"` round tables, `30"` desk height), arranged with realistic generous architectural spacing!
  */
-function buildProceduralPiece(it, gx, gy, gz, baseHex, makeBoxFaceTexture, unfoldedTable = false) {
+function designCoworkingZone(zone, spec) {
+  const [L, W] = spec.vDims;
+  const items = (zone.items || []).slice();
+  const placements = [];
+  const fixtures = [];
+
+  const byKind = {};
+  items.forEach((it) => {
+    const k = classifyItem(it);
+    (byKind[k] = byKind[k] || []).push(it);
+  });
+  const take = (k) => byKind[k] || [];
+
+  const place = (it, lx, localFloorY, lz, gx, gy, gz, rotY = 0, cornerOverride = null, extra = {}) => {
+    const cxNorm = (lx + L / 2) / L;
+    const czNorm = (lz + W / 2) / W;
+    let corner = cornerOverride;
+    if (!corner) {
+      const d = cxNorm < 0.34 ? "Back" : cxNorm > 0.68 ? "Concourse Front" : "Center";
+      const s = czNorm < 0.34 ? "Left" : czNorm > 0.66 ? "Right" : "Mid";
+      if (d === "Center" && s === "Mid") corner = "Center Coworking Floor";
+      else if (d === "Center") corner = `${s} Collaboration Wing`;
+      else if (s === "Mid") corner = d === "Back" ? "Back Feature Wall" : "Front Promenade";
+      else corner = `${d}-${s} Nook`;
+    }
+    placements.push({
+      item: it,
+      localPos: [lx, localFloorY + gy / 2, lz],
+      dims: [gx, gy, gz],
+      rotY,
+      kind: classifyItem(it),
+      cornerLabel: corner,
+      ...extra,
+    });
+  };
+
+  // 1. Moving boxes tucked into a Back-of-House Supply Room / Alcove along `-L/2 + 16`
+  const boxes = take("box");
+  if (boxes.length) {
+    const zStart = -W * 0.38;
+    let bz = zStart;
+    let tier = 0;
+    boxes.forEach((b) => {
+      const [dx, dy, dz] = b.size_in;
+      const yFloor = tier * (dz + 1.0);
+      place(b, -L / 2 + dx / 2 + 10, yFloor, bz, dx, dz, dy, 0, "Backstage Supply Alcove", { isTuckedBox: true });
+      tier++;
+      if (tier >= 3) {
+        tier = 0;
+        bz += dy + 6;
+        if (bz > W * 0.38) bz = zStart;
+      }
+    });
+  }
+
+  /* ==================== 1:1 ZONE COWORKING LAYOUTS ==================== */
+
+  if (zone.zone_id === "penn_concourse") {
+    // --- MAIN ATRIUM HACKATHON VILLAGE (`1,160" × 760"` event carpet centered inside the `2,400" × 1,800"` Train Hall!) ---
+    // Event village carpet pad + brass stanchion perimeter
+    fixtures.push({ type: "area_rug", lx: -10, lz: 0, w: 1120, d: 700, color: 0x1e2636 });
+    fixtures.push({ type: "stage_deck", lx: 430, lz: 0, w: 168, d: 380, h: 16 });
+    fixtures.push({ type: "human", lx: 385, ly: 16, lz: -42 }); // Speaker at podium!
+    fixtures.push({ type: "human", lx: -180, ly: 0, lz: -110 });
+    fixtures.push({ type: "human", lx: -40, ly: 0, lz: 115 });
+    fixtures.push({ type: "human", lx: 165, ly: 0, lz: -25 });
+
+    const screens = take("screen");
+    screens.forEach((sc, i) => {
+      const sz = screens.length === 1 ? 0 : (i === 0 ? -105 : 105);
+      place(sc, 492, 16, sz, 12, 96, 128, 0, "East Keynote Stage");
+    });
+
+    const podiums = take("podium");
+    podiums.forEach((pd, i) => {
+      const pz = podiums.length === 1 ? 0 : (i === 0 ? -48 : 48);
+      place(pd, 376, 16, pz, 26, 47, 26, Math.PI, "East Keynote Stage");
+    });
+
+    const projectors = take("projector");
+    projectors.forEach((pr, i) => {
+      const pz = projectors.length === 1 ? 0 : (i === 0 ? -105 : 105);
+      fixtures.push({ type: "pedestal", lx: 318, lz: pz, h: 38 });
+      place(pr, 318, 38, pz, 18, 8, 18, 0, "Stage AV Pedestal");
+    });
+
+    take("piano").forEach((pi, i) => {
+      place(pi, 435, 16, -152 + i * 64, 25, 48, 58, -0.35, "East Keynote Stage");
+    });
+
+    // 7 Double-Wide 6-ft Hacker Coworking Islands (`144" = 12 ft` on center — true spacious hackathon aisles!)
+    const tables = take("desk_table");
+    const deskSpots = [];
+    const pairs = [];
+    for (let i = 0; i < tables.length; i += 2) pairs.push(tables.slice(i, i + 2));
+
+    pairs.forEach((pair, pIdx) => {
+      const col = Math.floor(pIdx / 2);
+      const row = pIdx % 2;
+      const podX = -410 + col * 168; // 14-foot spacing between island centers!
+      const podZ = row === 0 ? -175 : 175;
+      pair.forEach((tb, sideIdx) => {
+        const tz = pair.length === 2 ? podZ + (sideIdx === 0 ? -15.5 : 15.5) : podZ;
+        place(tb, podX, 0.8, tz, 72, 30, 30, 0, row === 0 ? "North Hacker Pods" : "South Hacker Pods", {
+          hasLaptops: true,
+        });
+      });
+      deskSpots.push({ x: podX, z: podZ });
+    });
+
+    // 60-inch Round Collaboration Tables down the spacious Center Promenade (`lz = -58 / +58`)
+    const rounds = take("round_table");
+    const roundSpots = [];
+    rounds.forEach((rt, rIdx) => {
+      const col = Math.floor(rIdx / 2);
+      const row = rIdx % 2;
+      const rx = -110 + col * 168;
+      const rz = row === 0 ? -56 : 56;
+      place(rt, rx, 0.8, rz, 60, 30, 60, 0, "Center Collaboration Lounge", { hasCenterpiece: true });
+      roundSpots.push({ x: rx, z: rz });
+    });
+
+    // Unstack `stacking_chair_stack` into 6-chair seated rings around each pod & round table!
+    take("chair_stack").forEach((st, sIdx) => {
+      if (sIdx < deskSpots.length) {
+        const pod = deskSpots[sIdx];
+        place(st, pod.x, 0.8, pod.z, 70, 33, 86, 0, "Hacker Island Seating", { chairLayout: "island_6" });
+      } else if (roundSpots.length) {
+        const rt = roundSpots[(sIdx - deskSpots.length) % roundSpots.length];
+        place(st, rt.x, 0.8, rt.z, 82, 33, 82, 0, "Round Table Seating", { chairLayout: "round_6" });
+      }
+    });
+
+    [[-520, -310], [0, -310], [500, -310], [-520, 310], [0, 310], [500, 310]].forEach(([px, pz]) => {
+      fixtures.push({ type: "planter_tree", lx: px, lz: pz });
+    });
+  } else if (zone.zone_id === "penn_lounge") {
+    // --- STOP 5: MEZZANINE METROPOLITAN × MALIN LOUNGE (`420" × 864"` at +20 ft elevation overlooking Atrium!) ---
+    fixtures.push({ type: "area_rug", lx: 25, lz: -210, w: 260, d: 310, color: spec.rugColor });
+    fixtures.push({ type: "area_rug", lx: 25, lz: 210, w: 260, d: 310, color: 0x3b2d4a });
+    fixtures.push({ type: "lounge_table", lx: 25, lz: -210, r: 28 });
+    fixtures.push({ type: "lounge_table", lx: 25, lz: 210, r: 28 });
+    fixtures.push({ type: "pendant_cluster", lx: 25, lz: -210, h: 124 });
+    fixtures.push({ type: "pendant_cluster", lx: 25, lz: 210, h: 124 });
+    fixtures.push({ type: "planter_tree", lx: 145, lz: -370 });
+    fixtures.push({ type: "planter_tree", lx: 145, lz: 0 });
+    fixtures.push({ type: "planter_tree", lx: 145, lz: 370 });
+    fixtures.push({ type: "human", lx: 155, ly: 0, lz: -60 }); // Overlooking the balcony glass!
+
+    take("rug").forEach((rg, idx) => {
+      place(rg, 25, 0.4, idx === 0 ? -210 : 210, 140, 0.9, 180, 0, "Mezzanine Lounge Rug");
+    });
+
+    take("credenza").forEach((cr, idx) => {
+      const cz = -160 + idx * 320;
+      place(cr, -L / 2 + 26, 0, cz, 20, 33, 84, Math.PI / 2, "Mezzanine Credenza Wall");
+    });
+
+    const sofaSlots = [
+      { lx: -55, lz: -210, rot: Math.PI / 2, c: "West Mezzanine Salon" },
+      { lx: -55, lz: 210, rot: Math.PI / 2, c: "East Mezzanine Salon" },
+      { lx: 25, lz: -315, rot: 0, c: "West Mezzanine Salon" },
+      { lx: 25, lz: 315, rot: Math.PI, c: "East Mezzanine Salon" },
+      { lx: 105, lz: 0, rot: Math.PI / 2, c: "Atrium Overlook Divan" },
+    ];
+    take("sofa").forEach((sf, idx) => {
+      const sl = sofaSlots[idx % sofaSlots.length];
+      const [l, w, h] = sf.orig_dims_in || sf.size_in;
+      place(sf, sl.lx, 0.9, sl.lz, l, Math.max(33, h), w, sl.rot, sl.c);
+    });
+
+    const armSlots = [
+      { lx: 95, lz: -265, rot: -Math.PI * 0.75, c: "West Mezzanine Salon" },
+      { lx: 95, lz: -155, rot: -Math.PI * 0.25, c: "West Mezzanine Salon" },
+      { lx: 25, lz: -105, rot: Math.PI, c: "Center Mezzanine Overlook" },
+      { lx: 95, lz: 155, rot: -Math.PI * 0.75, c: "East Mezzanine Salon" },
+      { lx: 95, lz: 265, rot: -Math.PI * 0.25, c: "East Mezzanine Salon" },
+      { lx: 25, lz: 105, rot: 0, c: "Center Mezzanine Overlook" },
+    ];
+    take("armchair").forEach((ac, idx) => {
+      const sl = armSlots[idx % armSlots.length];
+      place(ac, sl.lx, 0.9, sl.lz, 36, 32, 36, sl.rot, sl.c);
+    });
+  } else if (zone.zone_id === "penn_cafe") {
+    // --- STOP 2: MOYNIHAN FOOD HALL & ESPRESSO BAR (`480" × 768"` = 40 ft × 64 ft!) ---
+    const barX = -85;
+    fixtures.push({ type: "espresso_bar", lx: barX, lz: 0, w: 36, d: 340, h: 40 });
+    fixtures.push({ type: "pendant_cluster", lx: barX, lz: -90, h: 120 });
+    fixtures.push({ type: "pendant_cluster", lx: barX, lz: 90, h: 120 });
+    fixtures.push({ type: "human", lx: barX - 24, ly: 0, lz: -20 }); // Barista behind counter!
+    fixtures.push({ type: "human", lx: barX + 42, ly: 0, lz: 35 });
+
+    take("counter_appliance").forEach((ap, idx) => {
+      const az = -96 + idx * 96;
+      const [dx, dy, dz] = ap.size_in;
+      place(ap, barX, 40, az, Math.min(28, dy), Math.max(18, dz), Math.min(32, dx), 0, "Marble Espresso Bar");
+    });
+
+    take("stool").forEach((st, idx) => {
+      const sz = -125 + idx * 50;
+      place(st, barX + 34, 0, sz, 17, 30, 17, -Math.PI / 2, "Espresso Bar Stools");
+    });
+
+    take("rug").forEach((rg, idx) => {
+      const rz = idx === 0 ? -150 : 150;
+      place(rg, 95, 0, rz, 130, 0.8, 170, 0, idx === 0 ? "West Bistro Patio" : "East Bistro Patio");
+    });
+
+    take("coffee_table").forEach((ct, idx) => {
+      const cz = idx === 0 ? -150 : 150;
+      place(ct, 95, 0.8, cz, 28, 18, 48, 0, idx === 0 ? "West Bistro Table" : "East Bistro Table", { hasCenterpiece: true });
+    });
+
+    const ottoSlots = [
+      { lx: 56, lz: -150, c: "West Bistro Table" },
+      { lx: 134, lz: -150, c: "West Bistro Table" },
+      { lx: 56, lz: 150, c: "East Bistro Table" },
+      { lx: 134, lz: 150, c: "East Bistro Table" },
+    ];
+    take("ottoman").forEach((ot, idx) => {
+      const sl = ottoSlots[idx % ottoSlots.length];
+      place(ot, sl.lx, 0.8, sl.lz, 22, 18, 22, 0, sl.c);
+    });
+  } else if (zone.zone_id === "penn_bookshop") {
+    // --- STOP 3: LIRR CONCOURSE LIBRARY & DEVELOPER FOCUS BAR (`432" × 660"` = 36 ft × 55 ft!) ---
+    fixtures.push({ type: "area_rug", lx: 20, lz: 0, w: 240, d: 380, color: spec.rugColor });
+    const focusZ = W / 2 - 32;
+    fixtures.push({ type: "focus_bar", lx: 10, lz: focusZ, w: 290, d: 30, h: 30 });
+    fixtures.push({ type: "human", lx: -20, ly: 0, lz: focusZ - 28 });
+
+    take("bookshelf").forEach((sh, idx) => {
+      const sx = -100 + idx * 100;
+      place(sh, sx, 0, -W / 2 + 14, 48, 78, 15, 0, "West Oak Library Wall", { withBooks: true });
+    });
+
+    const desks = take("desk_table");
+    desks.forEach((dk, idx) => {
+      place(dk, 20 + idx * 80, 0.8, -20, 32, 30, 64, 0, "Center Reading Table", { hasLaptops: true });
+    });
+
+    take("monitor").forEach((mn, idx) => {
+      if (idx === 0 && desks.length) {
+        place(mn, 20, 30.8, -20, 8, 18, 26, Math.PI / 2, "Center Reading Table");
+      } else {
+        const barIdx = desks.length ? idx - 1 : idx;
+        const mx = -105 + barIdx * 44;
+        place(mn, mx, 30, focusZ - 2, 26, 18, 7, Math.PI, "Developer 4K Focus Bar");
+      }
+    });
+
+    take("wall_art").forEach((ar, idx) => {
+      if (idx < 2) {
+        place(ar, -55 + idx * 120, 66, W / 2 - 5, 38, 28, 3, Math.PI, "East Gallery Wall");
+      } else {
+        place(ar, -L / 2 + 6, 66, -95 + (idx - 2) * 190, 3, 28, 38, 0, "Back Gallery Wall");
+      }
+    });
+
+    take("power_strip").forEach((ps, idx) => {
+      place(ps, -80 + idx * 54, 0, focusZ + 2, 16, 10, 14, 0, "Under-Bar Power Channel");
+    });
+  } else if (zone.zone_id === "penn_tech_hub") {
+    // --- STOP 4: 31st ST ARCADE DEEP-WORK STUDIO (`504" × 816"` = 42 ft × 68 ft!) ---
+    fixtures.push({ type: "area_rug", lx: 15, lz: -145, w: 260, d: 240, color: spec.rugColor });
+    fixtures.push({ type: "area_rug", lx: 15, lz: 145, w: 260, d: 240, color: spec.rugColor });
+    fixtures.push({ type: "planter_tree", lx: 175, lz: -320 });
+    fixtures.push({ type: "planter_tree", lx: 175, lz: 320 });
+    fixtures.push({ type: "human", lx: -35, ly: 0, lz: -145 });
+
+    const desks = take("desk_table");
+    const deskCoords = [];
+    desks.forEach((dk, idx) => {
+      const pod = Math.floor(idx / 2);
+      const side = idx % 2;
+      const dx = 15 + (side === 0 ? -17 : 17);
+      const dz = pod === 0 ? -145 : 145;
+      place(dk, dx, 0.8, dz, 32, 30, 64, 0, pod === 0 ? "West Deep-Work Pod" : "East Deep-Work Pod", { hasLaptops: true });
+      deskCoords.push({ x: dx, z: dz, side });
+    });
+
+    const chairs = take("chair");
+    chairs.forEach((ch, idx) => {
+      if (deskCoords.length) {
+        const dc = deskCoords[idx % deskCoords.length];
+        const zShift = idx >= deskCoords.length ? 16 : -16;
+        const chairX = dc.x + (dc.side === 0 ? -28 : 28);
+        const rot = dc.side === 0 ? Math.PI / 2 : -Math.PI / 2;
+        place(ch, chairX, 0.8, dc.z + zShift, 25, 39, 25, rot, dc.z < 0 ? "West Deep-Work Pod" : "East Deep-Work Pod");
+      }
+    });
+
+    take("monitor").forEach((mn, idx) => {
+      const dc = deskCoords[idx % Math.max(1, deskCoords.length)] || { x: 15, z: 0, side: 0 };
+      place(mn, dc.x, 30.8, dc.z, 7, 18, 26, dc.side === 0 ? -Math.PI / 2 : Math.PI / 2, "Standing Desk Monitor");
+    });
+
+    take("whiteboard").forEach((wb, idx) => {
+      const wz = idx % 2 === 0 ? -W / 2 + 34 : W / 2 - 34;
+      const wx = -60 + Math.floor(idx / 2) * 140;
+      place(wb, wx, 0, wz, 72, 75, 22, idx % 2 === 0 ? 0.12 : -0.12, "Glass Whiteboard Wall");
+    });
+
+    take("credenza").forEach((fc, idx) => {
+      place(fc, -L / 2 + 44, 0, -120 + idx * 240, 25, 29, 16, Math.PI / 2, "Back Studio Cabinets");
+    });
+    take("power_strip").forEach((ps, idx) => {
+      place(ps, 15, 0.8, idx === 0 ? -145 : 145, 16, 10, 14, 0, "Under-Desk Power Channel");
+    });
+  } else if (zone.zone_id === "penn_merch_kiosk") {
+    // --- STOP 1: WEST ENTRANCE WELCOME & SWAG PAVILION (`312" × 432"` = 26 ft × 36 ft!) ---
+    fixtures.push({ type: "area_rug", lx: 15, lz: 0, w: 220, d: 310, color: spec.rugColor });
+    fixtures.push({ type: "human", lx: 28, ly: 0, lz: 0 }); // Welcome host behind check-in desk!
+
+    take("desk_table").forEach((dk, idx) => {
+      place(dk, 58 - idx * 54, 0.8, 0, 32, 30, 68, Math.PI / 2, "Welcome Check-In Desk", { hasLaptops: true });
+    });
+
+    take("pos_kiosk").forEach((pk, idx) => {
+      const pz = idx === 0 ? -96 : 96;
+      place(pk, 72, 0.8, pz, 20, 56, 20, Math.PI / 2, "Badge Check-In Kiosks");
+    });
+
+    take("merch_rack").forEach((mr, idx) => {
+      const mz = -110 + idx * 110;
+      place(mr, -52, 0.8, mz, 24, 66, 52, Math.PI / 2, "Swag & Hoodie Boutique");
+    });
+  }
+
+  const placedIds = new Set(placements.map((p) => p.item.id));
+  items.filter((it) => !placedIds.has(it.id)).forEach((it, rIdx) => {
+    const [dx, dy, dz] = it.size_in;
+    const col = rIdx % 4;
+    const row = Math.floor(rIdx / 4);
+    place(it, -60 + row * 72, 0, -W * 0.25 + col * (W * 0.17), dx, dz, dy, 0, "Coworking Floor");
+  });
+
+  return { placements, fixtures };
+}
+
+function buildCoworkingPieceMesh(p, baseHex, makeBoxFaceTexture) {
+  const { item: it, dims: [gx, gy, gz], kind, hasLaptops, hasCenterpiece, withBooks, chairLayout } = p;
   const root = new THREE.Group();
-  const key = `${it.catalog_id || ""} ${it.label || ""}`.toLowerCase();
 
-  const mainMat = new THREE.MeshStandardMaterial({ color: baseHex, roughness: 0.52, metalness: 0.1 });
-  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.45, metalness: 0.55 });
-  const woodDark = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.65, metalness: 0.05 });
-  const screenGlow = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, emissive: 0x1e293b, roughness: 0.25 });
+  const mainMat = new THREE.MeshStandardMaterial({ color: baseHex, roughness: 0.48, metalness: 0.08 });
+  const warmOak = new THREE.MeshStandardMaterial({ color: 0xb88655, roughness: 0.58, metalness: 0.05 });
+  const walnutMat = new THREE.MeshStandardMaterial({ color: 0x5c3d28, roughness: 0.55, metalness: 0.06 });
+  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x27303f, roughness: 0.42, metalness: 0.6 });
+  const chromeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.28, metalness: 0.78 });
+  const screenGlow = new THREE.MeshStandardMaterial({ color: 0xe0f2fe, emissive: 0x1d4ed8, emissiveIntensity: 0.35, roughness: 0.2 });
 
-  if (it.is_box) {
+  const addLaptop = (lx, ly, lz, rot = 0) => {
+    const g = new THREE.Group();
+    g.position.set(lx, ly, lz);
+    g.rotation.y = rot;
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(9.5, 0.5, 13.5), chromeMat));
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(0.5, 9, 13.5), screenGlow);
+    lid.position.set(-4.4, 4.3, 0);
+    lid.rotation.z = 0.22;
+    g.add(lid);
+    root.add(g);
+  };
+
+  const buildSingleChair = (cx, cz, rotY, seatW = 18, seatH = 18, totalH = 33) => {
+    const cg = new THREE.Group();
+    cg.position.set(cx, 0, cz);
+    cg.rotation.y = rotY;
+    const sY = -totalH / 2 + seatH;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(seatW, 2.0, seatW), mainMat);
+    seat.position.set(0, sY, 0);
+    cg.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(seatW * 0.92, totalH - seatH, 1.8), mainMat);
+    back.position.set(0, sY + (totalH - seatH) / 2, -seatW * 0.44);
+    cg.add(back);
+    const legGeo = new THREE.BoxGeometry(1.3, seatH, 1.3);
+    const o = seatW * 0.4;
+    [[-o, -o], [o, -o], [-o, o], [o, o]].forEach(([lx, lz]) => {
+      const leg = new THREE.Mesh(legGeo, darkMetal);
+      leg.position.set(lx, -totalH / 2 + seatH / 2, lz);
+      cg.add(leg);
+    });
+    return cg;
+  };
+
+  if (kind === "box") {
     const geo = new THREE.BoxGeometry(gx, gy, gz);
     const qrTex = makeBoxFaceTexture(it, baseHex);
-    const sideMat = new THREE.MeshStandardMaterial({ color: baseHex, roughness: 0.68, metalness: 0.04 });
-    const qrMat = new THREE.MeshStandardMaterial({ map: qrTex, roughness: 0.55, metalness: 0.04 });
-    const m = new THREE.Mesh(geo, [qrMat, qrMat, sideMat, sideMat, sideMat, sideMat]);
-    root.add(m);
+    const sideMat = new THREE.MeshStandardMaterial({ color: 0xc29b6c, roughness: 0.75, metalness: 0.02 });
+    const qrMat = new THREE.MeshStandardMaterial({ map: qrTex, roughness: 0.6, metalness: 0.04 });
+    root.add(new THREE.Mesh(geo, [qrMat, qrMat, sideMat, sideMat, sideMat, sideMat]));
     return root;
   }
 
-  // 1. Tables & Desks (tabletop + 4 legs)
-  if ((key.includes("table") || key.includes("desk")) && (gy >= 15 || unfoldedTable)) {
-    const topThick = Math.min(2.4, gy * 0.14);
-    if (key.includes("round")) {
-      const r = Math.min(gx, gz) * 0.49;
-      const top = new THREE.Mesh(new THREE.CylinderGeometry(r, r, topThick, 24), mainMat);
-      top.position.y = gy / 2 - topThick / 2;
-      root.add(top);
-    } else {
-      const top = new THREE.Mesh(new THREE.BoxGeometry(gx, topThick, gz), mainMat);
-      top.position.y = gy / 2 - topThick / 2;
-      root.add(top);
+  if (kind === "chair_stack" && chairLayout) {
+    if (chairLayout === "island_6") {
+      [-22, 0, 22].forEach((cx) => {
+        root.add(buildSingleChair(cx, -39, 0));
+        root.add(buildSingleChair(cx, 39, Math.PI));
+      });
+      return root;
     }
-    const legH = gy - topThick;
-    const legW = Math.max(1.2, Math.min(2.2, Math.min(gx, gz) * 0.06));
-    const legGeo = new THREE.BoxGeometry(legW, legH, legW);
-    const ox = gx * 0.43, oz = gz * 0.41;
-    [[-ox, -oz], [ox, -oz], [-ox, oz], [ox, oz]].forEach(([lx, lz]) => {
-      const leg = new THREE.Mesh(legGeo, darkMetal);
-      leg.position.set(lx, -topThick / 2, lz);
-      root.add(leg);
-    });
+    if (chairLayout === "round_6") {
+      for (let k = 0; k < 6; k++) {
+        const ang = (k / 6) * Math.PI * 2;
+        const r = 39;
+        root.add(buildSingleChair(Math.cos(ang) * r, Math.sin(ang) * r, -ang - Math.PI / 2));
+      }
+      return root;
+    }
+  }
+
+  if (kind === "rug") {
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(gx, Math.max(0.8, gy), gz), new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.92 })));
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(gx * 0.88, Math.max(0.95, gy + 0.15), gz * 0.88), new THREE.MeshStandardMaterial({ color: baseHex, roughness: 0.9 })));
     return root;
   }
 
-  // 2. Sofas, Loveseats, Sectionals & Armchairs (seat base + backrest + armrests)
-  if (key.includes("sofa") || key.includes("loveseat") || key.includes("sectional") || key.includes("armchair") || key.includes("recliner") || key.includes("single seat") || key.includes("three-seat")) {
+  if (kind === "desk_table" || kind === "round_table" || kind === "coffee_table") {
+    const topThick = 2.0;
+    const topMat = kind === "coffee_table" ? walnutMat : warmOak;
+    if (kind === "round_table") {
+      const r = Math.min(gx, gz) * 0.49;
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(r, r, topThick, 28), topMat);
+      top.position.y = gy / 2 - topThick / 2;
+      root.add(top);
+      const ped = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.4, gy - topThick, 12), darkMetal);
+      ped.position.y = -topThick / 2;
+      root.add(ped);
+      const baseDisc = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.42, r * 0.45, 1.5, 20), darkMetal);
+      baseDisc.position.y = -gy / 2 + 0.8;
+      root.add(baseDisc);
+    } else {
+      const top = new THREE.Mesh(new THREE.BoxGeometry(gx, topThick, gz), topMat);
+      top.position.y = gy / 2 - topThick / 2;
+      root.add(top);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(gx + 0.4, 0.9, gz + 0.4), mainMat);
+      trim.position.y = gy / 2 - topThick + 0.3;
+      root.add(trim);
+      const legH = gy - topThick;
+      const legGeo = new THREE.BoxGeometry(1.9, legH, 1.9);
+      const ox = gx * 0.44, oz = gz * 0.42;
+      [[-ox, -oz], [ox, -oz], [-ox, oz], [ox, oz]].forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(legGeo, darkMetal);
+        leg.position.set(lx, -topThick / 2, lz);
+        root.add(leg);
+      });
+    }
+    if (hasLaptops) {
+      if (gx >= 55) {
+        addLaptop(-18, gy / 2 + 0.3, 0, Math.PI / 2);
+        addLaptop(18, gy / 2 + 0.3, 0, -Math.PI / 2);
+      } else {
+        addLaptop(0, gy / 2 + 0.3, -12, 0);
+        addLaptop(0, gy / 2 + 0.3, 12, Math.PI);
+      }
+    }
+    if (hasCenterpiece) {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 2.6, 4.8, 12), walnutMat);
+      pot.position.y = gy / 2 + 2.4;
+      root.add(pot);
+      const foliage = new THREE.Mesh(new THREE.SphereGeometry(5.5, 12, 10), new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 }));
+      foliage.position.y = gy / 2 + 6.8;
+      root.add(foliage);
+    }
+    return root;
+  }
+
+  if (kind === "chair") {
+    root.add(buildSingleChair(0, 0, 0, gx * 0.85, gy * 0.46, gy));
+    return root;
+  }
+
+  if (kind === "stool") {
+    const r = Math.min(gx, gz) * 0.44;
+    const cushion = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 3.2, 18), mainMat);
+    cushion.position.y = gy / 2 - 1.6;
+    root.add(cushion);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, gy - 3.2, 12), darkMetal);
+    stem.position.y = -1.6;
+    root.add(stem);
+    return root;
+  }
+
+  if (kind === "sofa" || kind === "armchair") {
     const seatH = gy * 0.42;
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(gx, seatH, gz * 0.88), mainMat);
-    seat.position.set(0, -gy / 2 + seatH / 2, gz * 0.05);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.92, seatH, gz * 0.86), mainMat);
+    seat.position.set(0, -gy / 2 + seatH / 2 + 2, gz * 0.05);
     root.add(seat);
-
-    const backThick = Math.max(4, gz * 0.24);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(gx, gy * 0.92, backThick), mainMat);
-    back.position.set(0, -gy * 0.04, -gz / 2 + backThick / 2);
+    const backThick = Math.max(5, gz * 0.24);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.96, gy * 0.88, backThick), mainMat);
+    back.position.set(0, 0, -gz / 2 + backThick / 2);
     root.add(back);
-
-    const armW = Math.max(3.5, gx * 0.12);
-    const armH = gy * 0.68;
-    const armGeo = new THREE.BoxGeometry(armW, armH, gz * 0.92);
+    const armW = Math.max(4.5, gx * 0.12);
+    const armH = gy * 0.66;
+    const armGeo = new THREE.BoxGeometry(armW, armH, gz * 0.9);
     [-gx / 2 + armW / 2, gx / 2 - armW / 2].forEach((ax) => {
       const arm = new THREE.Mesh(armGeo, mainMat);
-      arm.position.set(ax, -gy / 2 + armH / 2, 0);
+      arm.position.set(ax, -gy / 2 + armH / 2 + 2, 0);
       root.add(arm);
     });
     return root;
   }
 
-  // 3. Chair Stacks & Individual Chairs / Stools
-  if (key.includes("chair") || key.includes("stool")) {
-    if ((it.stack_count && it.stack_count > 1) || key.includes("stack")) {
-      const count = Math.min(8, Math.max(3, it.stack_count || 6));
-      const legGeo = new THREE.BoxGeometry(1.4, gy * 0.65, 1.4);
-      const ox = gx * 0.4, oz = gz * 0.4;
-      [[-ox, -oz], [ox, -oz], [-ox, oz], [ox, oz]].forEach(([lx, lz]) => {
-        const l = new THREE.Mesh(legGeo, darkMetal);
-        l.position.set(lx, -gy * 0.17, lz);
-        root.add(l);
-      });
-      for (let k = 0; k < count; k++) {
-        const yOff = -gy * 0.12 + (k / count) * (gy * 0.52);
-        const seat = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.88, 1.8, gz * 0.85), mainMat);
-        seat.position.set(0, yOff, 0);
-        root.add(seat);
-      }
-      const topBack = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.86, gy * 0.28, 2.0), mainMat);
-      topBack.position.set(0, gy * 0.36, -gz * 0.4);
-      root.add(topBack);
-      return root;
-    }
-
-    const seatY = -gy * 0.05;
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.88, 2.2, gz * 0.86), mainMat);
-    seat.position.set(0, seatY, 0);
-    root.add(seat);
-    const legH = gy / 2 + seatY;
-    const legGeo = new THREE.BoxGeometry(1.4, legH, 1.4);
-    const ox = gx * 0.38, oz = gz * 0.38;
-    [[-ox, -oz], [ox, -oz], [-ox, oz], [ox, oz]].forEach(([lx, lz]) => {
-      const leg = new THREE.Mesh(legGeo, darkMetal);
-      leg.position.set(lx, -gy / 2 + legH / 2, lz);
-      root.add(leg);
-    });
-    if (!key.includes("stool")) {
-      const back = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.84, gy * 0.48, 2.0), mainMat);
-      back.position.set(0, gy * 0.24, -gz * 0.39);
-      root.add(back);
-    }
+  if (kind === "ottoman") {
+    const r = Math.min(gx, gz) * 0.48;
+    root.add(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.92, r, gy, 20), mainMat));
     return root;
   }
 
-  // 4. Bookshelves & Shelving Units (side uprights + horizontal shelves)
-  if (key.includes("shelf") || key.includes("shelving") || key.includes("bookcase")) {
-    const sideW = Math.max(1.5, gx * 0.05);
-    const sideGeo = new THREE.BoxGeometry(sideW, gy, gz);
-    [-gx / 2 + sideW / 2, gx / 2 - sideW / 2].forEach((sx) => {
-      const s = new THREE.Mesh(sideGeo, mainMat);
-      s.position.set(sx, 0, 0);
-      root.add(s);
-    });
-    const tiers = Math.max(3, Math.min(6, Math.round(gy / 16)));
-    const shelfGeo = new THREE.BoxGeometry(gx - sideW, 1.5, gz * 0.94);
-    for (let t = 0; t <= tiers; t++) {
-      const sy = -gy / 2 + 1 + (t / tiers) * (gy - 2);
-      const sh = new THREE.Mesh(shelfGeo, mainMat);
-      sh.position.set(0, sy, 0);
-      root.add(sh);
-    }
+  if (kind === "monitor") {
+    const bezelW = Math.max(gx, gz);
+    const bezelD = Math.min(gx, gz);
+    const panelH = gy * 0.74;
+    const bezel = new THREE.Mesh(new THREE.BoxGeometry(bezelW, panelH, Math.min(2.2, bezelD)), darkMetal);
+    bezel.position.y = gy * 0.13;
+    root.add(bezel);
+    const disp = new THREE.Mesh(new THREE.BoxGeometry(bezelW * 0.92, panelH * 0.88, Math.min(2.5, bezelD + 0.3)), screenGlow);
+    disp.position.y = gy * 0.13;
+    root.add(disp);
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(2.4, gy * 0.35, 1.8), chromeMat);
+    neck.position.y = -gy * 0.32;
+    root.add(neck);
     return root;
   }
 
-  // 5. Whiteboards, Monitors, TVs & Projector Screens
-  if (key.includes("whiteboard") || key.includes("monitor") || key.includes("tv") || key.includes("screen")) {
-    const boardH = gy * 0.62;
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(gx, boardH, Math.min(4, gz * 0.35)), darkMetal);
-    frame.position.set(0, gy * 0.16, 0);
+  if (kind === "whiteboard" || kind === "screen") {
+    const boardH = gy * 0.64;
+    const boardW = Math.max(gx, gz);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(boardW, boardH, 2.6), darkMetal);
+    frame.position.y = gy * 0.16;
     root.add(frame);
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.93, boardH * 0.88, Math.min(4.6, gz * 0.38)), screenGlow);
-    panel.position.set(0, gy * 0.16, 0);
-    root.add(panel);
-    // Stand legs
-    const postGeo = new THREE.BoxGeometry(2.0, gy * 0.85, 2.0);
-    [-gx * 0.36, gx * 0.36].forEach((px) => {
-      const post = new THREE.Mesh(postGeo, darkMetal);
-      post.position.set(px, -gy * 0.07, 0);
+    const glass = new THREE.Mesh(
+      new THREE.BoxGeometry(boardW * 0.94, boardH * 0.9, 3.0),
+      kind === "screen" ? screenGlow : new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 })
+    );
+    glass.position.y = gy * 0.16;
+    root.add(glass);
+    [-boardW * 0.42, boardW * 0.42].forEach((px) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(2.2, gy * 0.92, 2.2), darkMetal);
+      post.position.set(px, -gy * 0.04, 0);
       root.add(post);
     });
-    const footGeo = new THREE.BoxGeometry(3.0, 2.0, gz * 0.92);
-    [-gx * 0.36, gx * 0.36].forEach((px) => {
-      const ft = new THREE.Mesh(footGeo, darkMetal);
-      ft.position.set(px, -gy / 2 + 1, 0);
-      root.add(ft);
-    });
     return root;
   }
 
-  // 6. Upright Piano
-  if (key.includes("piano")) {
-    const body = new THREE.Mesh(new THREE.BoxGeometry(gx, gy, gz * 0.68), woodDark);
-    body.position.set(0, 0, -gz * 0.14);
+  if (kind === "bookshelf") {
+    const sideW = 1.8;
+    [-gx / 2 + sideW / 2, gx / 2 - sideW / 2].forEach((sx) => {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(sideW, gy, gz), warmOak);
+      s.position.x = sx;
+      root.add(s);
+    });
+    const back = new THREE.Mesh(new THREE.BoxGeometry(gx, gy, 1.0), walnutMat);
+    back.position.z = -gz / 2 + 0.5;
+    root.add(back);
+    const tiers = 5;
+    const bookColors = [0x3b82f6, 0xf97316, 0x10b981, 0xeab308, 0xec4899, 0xf8fafc];
+    for (let t = 0; t <= tiers; t++) {
+      const sy = -gy / 2 + 1.5 + (t / tiers) * (gy - 3);
+      const sh = new THREE.Mesh(new THREE.BoxGeometry(gx - sideW, 1.4, gz * 0.94), warmOak);
+      sh.position.y = sy;
+      root.add(sh);
+      if (withBooks && t < tiers) {
+        for (let b = 0; b < 5; b++) {
+          const bw = (gx - 10) / 6;
+          const bh = (gy / tiers) * 0.68;
+          const bk = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.82, bh, gz * 0.68), new THREE.MeshStandardMaterial({ color: bookColors[(b + t * 2) % bookColors.length] }));
+          bk.position.set(-gx * 0.34 + b * (bw + 1.2), sy + 0.7 + bh / 2, 0.5);
+          root.add(bk);
+        }
+      }
+    }
+    return root;
+  }
+
+  if (kind === "wall_art") {
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(gx, gy, gz), walnutMat));
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(gx * 0.84 + 0.4, gy * 0.82, gz * 0.84 + 0.4), mainMat));
+    return root;
+  }
+
+  if (kind === "merch_rack") {
+    const barW = Math.max(gx, gz);
+    const topBar = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, barW, 10), chromeMat);
+    topBar.rotation.z = Math.PI / 2;
+    topBar.position.y = gy / 2 - 2;
+    root.add(topBar);
+    [-barW * 0.45, barW * 0.45].forEach((rx) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, gy, 10), darkMetal);
+      post.position.x = rx;
+      root.add(post);
+    });
+    const hoodieCols = [0x1f6feb, 0xf97316, 0x10b981, 0x8b5cf6, 0xf8fafc];
+    for (let h = 0; h < 5; h++) {
+      const garment = new THREE.Mesh(new THREE.BoxGeometry(barW * 0.14, gy * 0.52, 15), new THREE.MeshStandardMaterial({ color: hoodieCols[h % hoodieCols.length] }));
+      garment.position.set(-barW * 0.32 + h * (barW * 0.16), gy * 0.08, 0);
+      root.add(garment);
+    }
+    return root;
+  }
+
+  if (kind === "pos_kiosk" || kind === "podium") {
+    const colW = kind === "podium" ? gx * 0.72 : gx * 0.45;
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(colW, gy * 0.82, gz * 0.65), kind === "podium" ? walnutMat : darkMetal);
+    stand.position.y = -gy * 0.09;
+    root.add(stand);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.95, gy * 0.24, gz * 0.92), kind === "podium" ? warmOak : screenGlow);
+    head.position.y = gy * 0.35;
+    head.rotation.x = 0.32;
+    root.add(head);
+    return root;
+  }
+
+  if (kind === "counter_appliance") {
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(gx, gy, gz), chromeMat));
+    const accent = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.9, gy * 0.35, gz + 0.6), mainMat);
+    accent.position.y = gy * 0.22;
+    root.add(accent);
+    return root;
+  }
+
+  if (kind === "piano") {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.7, gy, gz), walnutMat);
+    body.position.x = -gx * 0.12;
     root.add(body);
-    const keybed = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.96, 5, gz * 0.42), mainMat);
-    keybed.position.set(0, -gy * 0.06, gz * 0.22);
-    root.add(keybed);
-    const keys = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.88, 1.6, gz * 0.26), screenGlow);
-    keys.position.set(0, -gy * 0.06 + 2.8, gz * 0.26);
+    const keys = new THREE.Mesh(new THREE.BoxGeometry(gx * 0.45, 3.5, gz * 0.92), screenGlow);
+    keys.position.set(gx * 0.22, -gy * 0.05, 0);
     root.add(keys);
     return root;
   }
 
-  // Default solid furniture block (sideboards, cabinets, podiums, appliances)
-  const fallback = new THREE.Mesh(new THREE.BoxGeometry(gx, gy, gz), mainMat);
-  root.add(fallback);
+  const cabinet = new THREE.Mesh(new THREE.BoxGeometry(gx, gy - 3, gz), warmOak);
+  cabinet.position.y = 1.5;
+  root.add(cabinet);
+  const stoneTop = new THREE.Mesh(new THREE.BoxGeometry(gx + 0.8, 2.0, gz + 0.8), mainMat);
+  stoneTop.position.y = gy / 2 - 1.0;
+  root.add(stoneTop);
   return root;
 }
 
+function renderZoneBuiltInFixtures(roomGroup, fixtures) {
+  const walnut = new THREE.MeshStandardMaterial({ color: 0x4a3222, roughness: 0.62 });
+  const marble = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.28, metalness: 0.1 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.32, metalness: 0.72 });
+  const globeGlow = new THREE.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0xfbbf24, emissiveIntensity: 0.8 });
+  const foliageMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.78 });
+
+  fixtures.forEach((fx) => {
+    if (fx.type === "stage_deck") {
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(fx.w, fx.h, fx.d), walnut);
+      deck.position.set(fx.lx, fx.h / 2, fx.lz);
+      roomGroup.add(deck);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(fx.w + 2, 2.0, fx.d + 2), brass);
+      trim.position.set(fx.lx, fx.h - 0.8, fx.lz);
+      roomGroup.add(trim);
+    } else if (fx.type === "espresso_bar") {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(fx.w, fx.h - 3, fx.d), walnut);
+      base.position.set(fx.lx, (fx.h - 3) / 2, fx.lz);
+      roomGroup.add(base);
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(fx.w + 6, 3, fx.d + 6), marble);
+      counter.position.set(fx.lx + 2, fx.h - 1.5, fx.lz);
+      roomGroup.add(counter);
+    } else if (fx.type === "focus_bar") {
+      const top = new THREE.Mesh(new THREE.BoxGeometry(fx.w, 2.5, fx.d), walnut);
+      top.position.set(fx.lx, fx.h - 1.25, fx.lz);
+      roomGroup.add(top);
+      [-fx.w * 0.45, 0, fx.w * 0.45].forEach((ox) => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(3, fx.h - 2.5, fx.d * 0.85), brass);
+        leg.position.set(fx.lx + ox, (fx.h - 2.5) / 2, fx.lz);
+        roomGroup.add(leg);
+      });
+    } else if (fx.type === "area_rug") {
+      const rug = new THREE.Mesh(new THREE.BoxGeometry(fx.w, 0.8, fx.d), new THREE.MeshStandardMaterial({ color: fx.color || 0x312e81, roughness: 0.92 }));
+      rug.position.set(fx.lx, 0.4, fx.lz);
+      roomGroup.add(rug);
+    } else if (fx.type === "lounge_table") {
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(fx.r, fx.r, 2.0, 24), marble);
+      top.position.set(fx.lx, 17, fx.lz);
+      roomGroup.add(top);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(fx.r * 0.45, fx.r * 0.55, 16, 16), walnut);
+      base.position.set(fx.lx, 8.5, fx.lz);
+      roomGroup.add(base);
+    } else if (fx.type === "pendant_cluster") {
+      [-28, 28].forEach((oz, i) => {
+        const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 36, 6), brass);
+        cord.position.set(fx.lx, fx.h + 16, fx.lz + oz);
+        roomGroup.add(cord);
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(7.5, 14, 12), globeGlow);
+        bulb.position.set(fx.lx, fx.h - 2 - i * 4, fx.lz + oz);
+        roomGroup.add(bulb);
+      });
+    } else if (fx.type === "planter_tree") {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(14, 11, 26, 14), walnut);
+      pot.position.set(fx.lx, 13, fx.lz);
+      roomGroup.add(pot);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.4, 58, 8), walnut);
+      trunk.position.set(fx.lx, 48, fx.lz);
+      roomGroup.add(trunk);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(28, 16, 12), foliageMat);
+      crown.position.set(fx.lx, 88, fx.lz);
+      roomGroup.add(crown);
+    } else if (fx.type === "pedestal") {
+      const ped = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 6, fx.h, 12), walnut);
+      ped.position.set(fx.lx, fx.h / 2, fx.lz);
+      roomGroup.add(ped);
+    } else if (fx.type === "human") {
+      roomGroup.add(buildHumanScaleFigure(fx.lx, fx.ly || 0, fx.lz));
+    }
+  });
+}
+
 /**
- * Build the complete 3D NY Penn Station / Moynihan Venue scene into `worldGroup`.
- * Populates `meshEntries` and `binTargets` in the exact shape `index.html` expects!
+ * Build a 1912 Historic Riveted Steel Pratt Truss spanning `1,800"` (`150 ft`) across Z!
+ */
+function buildHistoricSteelTruss(trussX, spanZ = 1800, baseY = 648, depthY = 126, mat) {
+  const g = new THREE.Group();
+  g.position.x = trussX;
+
+  // Bottom & Top heavy riveted box chords (`150 ft = 1,800"` long)
+  const botChord = new THREE.Mesh(new THREE.BoxGeometry(16, 14, spanZ), mat);
+  botChord.position.set(0, baseY, 0);
+  g.add(botChord);
+
+  const topChord = new THREE.Mesh(new THREE.BoxGeometry(16, 14, spanZ), mat);
+  topChord.position.set(0, baseY + depthY, 0);
+  g.add(topChord);
+
+  // Vertical & diagonal Pratt truss web members every 100" (`8.3 ft`)
+  const panels = 18;
+  const dz = spanZ / panels;
+  for (let i = 0; i <= panels; i++) {
+    const z = -spanZ / 2 + i * dz;
+    const vert = new THREE.Mesh(new THREE.BoxGeometry(11, depthY, 10), mat);
+    vert.position.set(0, baseY + depthY / 2, z);
+    g.add(vert);
+
+    if (i < panels) {
+      const diagLen = Math.hypot(dz, depthY);
+      const diag = new THREE.Mesh(new THREE.BoxGeometry(8, diagLen, 7), mat);
+      const zMid = z + dz / 2;
+      diag.position.set(0, baseY + depthY / 2, zMid);
+      const sign = zMid < 0 ? 1 : -1;
+      diag.rotation.x = sign * Math.atan2(dz, depthY);
+      g.add(diag);
+    }
+  }
+  return g;
+}
+
+/**
+ * Build one of Moynihan's 4 Double-Curved Catenary Skylight Gridshell Vaults (`600" × 1,800"`, apex `1,104"` = `92 ft`!).
+ */
+function buildCatenarySkylightVaultBay(xMin, xMax, zSpan = 1800, springY = 664, apexY = 1104, ribMat, glassMat) {
+  const g = new THREE.Group();
+  const nx = 10, nz = 20;
+  const maxRise = apexY - springY; // 440" rise -> peaks at 1,104" = 92 ft!
+
+  const ptAt = (ix, iz) => {
+    const u = -1 + (2 * ix) / nx; // -1 .. +1 across 50-ft bay X
+    const v = -1 + (2 * iz) / nz; // -1 .. +1 across 150-ft span Z
+    const x = 0.5 * (xMin + xMax) + 0.5 * (xMax - xMin) * u;
+    const z = 0.5 * zSpan * v;
+    // Double-curved catenary pillow (rises across the 150-ft span AND billows between the 50-ft steel trusses!)
+    const archZ = Math.max(0, 1 - v * v);
+    const pillowX = 0.34 + 0.66 * Math.cos(u * Math.PI * 0.5);
+    const y = springY + maxRise * archZ * pillowX;
+    return new THREE.Vector3(x, y, z);
+  };
+
+  const verts = [];
+  const lineVerts = [];
+  for (let ix = 0; ix < nx; ix++) {
+    for (let iz = 0; iz < nz; iz++) {
+      const p00 = ptAt(ix, iz);
+      const p10 = ptAt(ix + 1, iz);
+      const p11 = ptAt(ix + 1, iz + 1);
+      const p01 = ptAt(ix, iz + 1);
+
+      verts.push(
+        p00.x, p00.y, p00.z, p10.x, p10.y, p10.z, p11.x, p11.y, p11.z,
+        p00.x, p00.y, p00.z, p11.x, p11.y, p11.z, p01.x, p01.y, p01.z
+      );
+      // Diagrid + orthogonal spider steel glazing bars
+      lineVerts.push(
+        p00.x, p00.y, p00.z, p10.x, p10.y, p10.z,
+        p00.x, p00.y, p00.z, p01.x, p01.y, p01.z,
+        p00.x, p00.y, p00.z, p11.x, p11.y, p11.z
+      );
+    }
+  }
+
+  const glassGeo = new THREE.BufferGeometry();
+  glassGeo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  glassGeo.computeVertexNormals();
+  g.add(new THREE.Mesh(glassGeo, glassMat));
+
+  const ribGeo = new THREE.BufferGeometry();
+  ribGeo.setAttribute("position", new THREE.Float32BufferAttribute(lineVerts, 3));
+  g.add(new THREE.LineSegments(ribGeo, ribMat));
+
+  return g;
+}
+
+/**
+ * Build a Track Boarding Escalator Island (`Tracks 5–16`) on the Moynihan Concourse floor.
+ */
+function buildTrackEscalatorIsland(cx, cz, gateLabel, makeTextSprite) {
+  const g = new THREE.Group();
+  g.position.set(cx, 0, cz);
+
+  const wellW = 220, wellD = 84;
+  // Dark stairwell void on floor
+  const voidPad = new THREE.Mesh(
+    new THREE.PlaneGeometry(wellW, wellD),
+    new THREE.MeshStandardMaterial({ color: 0x0b0f17, roughness: 0.9 })
+  );
+  voidPad.rotation.x = -Math.PI / 2;
+  voidPad.position.y = 0.3;
+  g.add(voidPad);
+
+  // Glass balustrades (`42"` tall) around escalator opening
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0xbae6fd, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false });
+  [-wellD / 2, wellD / 2].forEach((rz) => {
+    const side = new THREE.Mesh(new THREE.BoxGeometry(wellW, 42, 2), glass);
+    side.position.set(0, 21, rz);
+    g.add(side);
+  });
+  const back = new THREE.Mesh(new THREE.BoxGeometry(2, 42, wellD), glass);
+  back.position.set(wellW / 2, 21, 0);
+  g.add(back);
+
+  // Sloping escalator stainless deck descending eastward
+  const ramp = new THREE.Mesh(
+    new THREE.BoxGeometry(170, 6, 56),
+    new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6, roughness: 0.4 })
+  );
+  ramp.position.set(10, -14, 0);
+  ramp.rotation.z = -0.18;
+  g.add(ramp);
+
+  // Iconic Moynihan vertical LED Boarding Gate Totem (`16 ft = 192"` tall)
+  const totem = new THREE.Mesh(
+    new THREE.BoxGeometry(14, 192, 28),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35, metalness: 0.4 })
+  );
+  totem.position.set(-wellW / 2 - 14, 96, 0);
+  g.add(totem);
+
+  const tag = makeTextSprite(gateLabel, "rgba(29, 78, 216, 0.92)", "#ffffff", 1.35);
+  tag.position.set(-wellW / 2 - 14, 212, 0);
+  g.add(tag);
+
+  return g;
+}
+
+/**
+ * Build the complete 1:1 Scale Moynihan Train Hall + SOM LIRR Concourse into `worldGroup`.
  */
 export function buildPennVenueScene({
   plan,
@@ -496,267 +1131,308 @@ export function buildPennVenueScene({
   makeBoxFaceTexture,
   makeTextSprite,
   showRoof = true,
+  hideUnpackedBoxes = false,
   fmt,
 }) {
   const archGroup = new THREE.Group();
   worldGroup.add(archGroup);
 
-  // 1. Grand Station Plinth & Travertine Floor Slab
-  const baseSlab = new THREE.Mesh(
-    new THREE.BoxGeometry(920, 6, 720),
-    new THREE.MeshStandardMaterial({ color: 0x1b2029, roughness: 0.92, metalness: 0.05 })
+  // ==================== 1. FULL CITY-BLOCK BASE & TRAVERTINE ATRIUM FLOOR (`200 × 150 FT = 2,400 × 1,800"`) ====================
+  const cityBlockSlab = new THREE.Mesh(
+    new THREE.BoxGeometry(4700, 12, 3100),
+    new THREE.MeshStandardMaterial({ color: 0x151922, roughness: 0.95 })
   );
-  baseSlab.position.set(-20, -3.2, 20);
-  archGroup.add(baseSlab);
+  cityBlockSlab.position.set(220, -6.2, 0);
+  archGroup.add(cityBlockSlab);
 
-  // Main Concourse polished stone floor + subtle architectural grid
-  const concourseFloor = new THREE.Mesh(
-    new THREE.PlaneGeometry(540, 292),
-    new THREE.MeshStandardMaterial({ color: 0x2b3340, roughness: 0.72, metalness: 0.08 })
+  // 31,000 sq ft Main Moynihan Boarding Concourse Travertine Floor (`2,400" × 1,800"`)
+  const atriumFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(2400, 1800),
+    new THREE.MeshStandardMaterial({ color: 0x353d4b, roughness: 0.65, metalness: 0.08 })
   );
-  concourseFloor.rotation.x = -Math.PI / 2;
-  concourseFloor.position.set(-20, 0.05, 0);
-  archGroup.add(concourseFloor);
+  atriumFloor.rotation.x = -Math.PI / 2;
+  atriumFloor.position.set(0, 0.1, 0);
+  archGroup.add(atriumFloor);
 
-  const grid = new THREE.GridHelper(540, 18, 0x475569, 0x334155);
-  grid.scale.z = 292 / 540;
-  grid.position.set(-20, 0.12, 0);
+  // 10-foot (`120"`) architectural stone expansion grid across the 200×150 ft hall
+  const grid = new THREE.GridHelper(2400, 20, 0x64748b, 0x475569);
+  grid.scale.z = 1800 / 2400;
+  grid.position.set(0, 0.25, 0);
   grid.material.transparent = true;
   grid.material.opacity = 0.28;
   archGroup.add(grid);
 
-  // Brass concourse center medallion
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(22, 26, 36),
-    new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.35, metalness: 0.7, side: THREE.DoubleSide })
+  // Scale reference callout on floor border
+  const scaleTag = makeTextSprite(
+    "MOYNIHAN ATRIUM · 200 FT × 150 FT (31,000 SQ FT) · 92 FT SKYLIGHT · 1:1 SCALE",
+    "rgba(15, 23, 42, 0.88)",
+    "#93c5fd",
+    2.2
   );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.set(0, 0.22, 0);
-  archGroup.add(ring);
+  scaleTag.position.set(0, 24, -865);
+  archGroup.add(scaleTag);
 
-  // 2. North & South Structural Colonnades (stone/steel columns + mezzanine box beams)
-  const colMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5, metalness: 0.35 });
-  const plinthMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.65, metalness: 0.2 });
-  const colXs = [-250, -145, -40, 65, 170, 250];
-  [-142, 142].forEach((cz) => {
-    colXs.forEach((cx) => {
-      const plinth = new THREE.Mesh(new THREE.BoxGeometry(16, 18, 16), plinthMat);
-      plinth.position.set(cx, 9, cz);
-      archGroup.add(plinth);
-
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 6.2, 134, 16), colMat);
-      shaft.position.set(cx, 18 + 67, cz);
-      archGroup.add(shaft);
-
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(15, 8, 15), plinthMat);
-      cap.position.set(cx, 154, cz);
-      archGroup.add(cap);
-    });
-
-    // Longitudinal mezzanine steel box beam
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(540, 10, 10), plinthMat);
-    beam.position.set(0, 160, cz);
-    archGroup.add(beam);
+  // Commuter human-scale figures (`5'8" = 68"`) walking the grand concourse for instant scale perception
+  [[-680, -320], [-540, 280], [640, -240], [720, 310], [1350, 60], [1580, -90]].forEach(([hx, hz]) => {
+    archGroup.add(buildHumanScaleFigure(hx, 0, hz, 0x94a3b8));
   });
 
-  // 3. Moynihan Arched Steel-and-Glass Barrel Vault Skylight (optional cutaway via `showRoof`)
+  // ==================== 2. HISTORIC BEAUX-ARTS GRANITE PIERS & +20 FT (`240"`) MEZZANINE BALCONY ====================
+  const limestoneMat = new THREE.MeshStandardMaterial({ color: 0x647082, roughness: 0.68, metalness: 0.12 });
+  const steelMat = new THREE.MeshStandardMaterial({ color: 0x3b4454, roughness: 0.45, metalness: 0.65 });
+  const mezzDeckMat = new THREE.MeshStandardMaterial({ color: 0x28303d, roughness: 0.75 });
+  const railGlassMat = new THREE.MeshPhysicalMaterial({
+    color: 0xbae6fd,
+    transparent: true,
+    opacity: 0.26,
+    roughness: 0.15,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+
+  // Monumental perimeter columns at the 50-ft (`600"`) structural bays (`X = -1200, -600, 0, +600, +1200`, `Z = ±900`)
+  const bayXs = [-1200, -600, 0, 600, 1200];
+  [-900, 900].forEach((pz) => {
+    bayXs.forEach((px) => {
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(54, 660, 54), limestoneMat);
+      pier.position.set(px, 330, pz);
+      archGroup.add(pier);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(68, 36, 68), steelMat);
+      base.position.set(px, 18, pz);
+      archGroup.add(base);
+    });
+    // Perimeter ring girder at `Y = 654"` (`54.5 ft`)
+    const ringBeam = new THREE.Mesh(new THREE.BoxGeometry(2460, 28, 36), steelMat);
+    ringBeam.position.set(0, 654, pz);
+    archGroup.add(ringBeam);
+  });
+
+  // Second-Story Mezzanine Balcony (`Y = 240"` = +20 ft high) along North, South, and West perimeter!
+  // South Mezzanine Promenade (`Z = +840 .. +1380`, hosting the Metropolitan / Malin Lounge!)
+  const southMezz = new THREE.Mesh(new THREE.BoxGeometry(2400, 14, 540), mezzDeckMat);
+  southMezz.position.set(0, 233, 1110);
+  archGroup.add(southMezz);
+  const southRail = new THREE.Mesh(new THREE.BoxGeometry(2360, 44, 2.5), railGlassMat);
+  southRail.position.set(0, 262, 842);
+  archGroup.add(southRail);
+
+  // North Mezzanine Balcony (`Z = -840 .. -1020` gallery walkway above Food Hall)
+  const northMezz = new THREE.Mesh(new THREE.BoxGeometry(2400, 14, 180), mezzDeckMat);
+  northMezz.position.set(0, 233, -930);
+  archGroup.add(northMezz);
+  const northRail = new THREE.Mesh(new THREE.BoxGeometry(2360, 44, 2.5), railGlassMat);
+  northRail.position.set(0, 262, -842);
+  archGroup.add(northRail);
+
+  // Dedicated Mezzanine Lounge Escalator & Feature Staircase rising from `Y = 0` to `Y = 240"` on South Concourse (`X = -40, Z = +780`)
+  const mezzEsc = new THREE.Group();
+  const escLen = Math.hypot(380, 240);
+  const escRamp = new THREE.Mesh(
+    new THREE.BoxGeometry(escLen, 14, 68),
+    new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.55, roughness: 0.4 })
+  );
+  escRamp.position.set(-140, 120, 800);
+  escRamp.rotation.z = Math.atan2(240, 380);
+  mezzEsc.add(escRamp);
+  const mezzEscTag = makeTextSprite("↑ MEZZANINE LOUNGE (+20 FT)", "rgba(139, 92, 246, 0.9)", "#ffffff", 1.3);
+  mezzEscTag.position.set(-310, 96, 800);
+  mezzEsc.add(mezzEscTag);
+  archGroup.add(mezzEsc);
+
+  // ==================== 3. FOUR TRACK BOARDING ESCALATOR ISLANDS (`Tracks 5–16`) ====================
+  [
+    [-760, -520, "TRACKS 5 · 6"],
+    [-760, 520, "TRACKS 7 · 8"],
+    [760, -520, "TRACKS 11 · 12"],
+    [760, 520, "TRACKS 15 · 16"],
+  ].forEach(([ix, iz, lbl]) => {
+    archGroup.add(buildTrackEscalatorIsland(ix, iz, lbl, makeTextSprite));
+  });
+
+  // ==================== 4. THREE 150-FT HISTORIC STEEL TRUSSES + FOUR 92-FT CATENARY VAULTS ====================
   if (showRoof) {
-    const vaultGroup = new THREE.Group();
-    const trussMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.38, metalness: 0.65 });
-    const archSpanHalf = 142;
-    const archBaseY = 164;
-    const archRise = 74;
+    const roofGroup = new THREE.Group();
 
-    colXs.forEach((cx) => {
-      const pts = [];
-      const segs = 24;
-      for (let s = 0; s <= segs; s++) {
-        const t = -1 + (2 * s) / segs; // -1 .. +1 across Z
-        const z = t * archSpanHalf;
-        const y = archBaseY + archRise * (1 - t * t);
-        pts.push(new THREE.Vector3(cx, y, z));
-      }
-      const curve = new THREE.CatmullRomCurve3(pts);
-      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 2.2, 8, false), trussMat);
-      vaultGroup.add(tube);
+    // 3 Historic 1912 Steel Trusses at X = -600", 0", +600" (`50 ft` on center, `150 ft` span!)
+    [-600, 0, 600].forEach((tx) => {
+      roofGroup.add(buildHistoricSteelTruss(tx, 1800, 648, 126, steelMat));
+    });
+    // End arch gable trusses at X = -1200" and +1200"
+    [-1200, 1200].forEach((tx) => {
+      roofGroup.add(buildHistoricSteelTruss(tx, 1800, 648, 84, steelMat));
     });
 
-    // Longitudinal skylight purlins + subtle translucent glass canopy
-    [-0.75, -0.4, 0, 0.4, 0.75].forEach((t) => {
-      const z = t * archSpanHalf;
-      const y = archBaseY + archRise * (1 - t * t);
-      const purlin = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 510, 8), trussMat);
-      purlin.rotation.z = Math.PI / 2;
-      purlin.position.set(0, y, z);
-      vaultGroup.add(purlin);
+    const ribMat = new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.42 });
+    const skyGlassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xdbeafe,
+      transparent: true,
+      opacity: 0.085,
+      roughness: 0.12,
+      side: THREE.DoubleSide,
+      depthWrite: false,
     });
 
-    // Translucent skylight glass panels (depthWrite: false so picking/visibility from top stays crystal clear)
-    const skyShapePts = [];
-    for (let s = 0; s <= 24; s++) {
-      const t = -1 + (2 * s) / 24;
-      skyShapePts.push(new THREE.Vector3(0, archBaseY + archRise * (1 - t * t), t * archSpanHalf));
-    }
-    const skyCurve = new THREE.CatmullRomCurve3(skyShapePts);
-    const skyFrames = skyCurve.getPoints(24);
-    const skyGeo = new THREE.BufferGeometry();
-    const verts = [];
-    for (let i = 0; i < skyFrames.length - 1; i++) {
-      const p1 = skyFrames[i], p2 = skyFrames[i + 1];
-      verts.push(
-        -250, p1.y, p1.z, 250, p1.y, p1.z, 250, p2.y, p2.z,
-        -250, p1.y, p1.z, 250, p2.y, p2.z, -250, p2.y, p2.z
-      );
-    }
-    skyGeo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-    skyGeo.computeVertexNormals();
-    const skyMesh = new THREE.Mesh(
-      skyGeo,
-      new THREE.MeshPhysicalMaterial({
-        color: 0xbae6fd,
-        transparent: true,
-        opacity: 0.09,
-        roughness: 0.15,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      })
-    );
-    vaultGroup.add(skyMesh);
+    // 4 Grand Catenary Skylight Vaults peaking at `Y = 1,104"` (`92 feet`!)
+    [
+      [-1200, -600],
+      [-600, 0],
+      [0, 600],
+      [600, 1200],
+    ].forEach(([x0, x1]) => {
+      roofGroup.add(buildCatenarySkylightVaultBay(x0, x1, 1800, 668, 1104, ribMat, skyGlassMat));
+    });
 
-    // Suspended Moynihan Station Clock at center arch
+    // Iconic Suspended Moynihan Central Clock hanging from Center Truss (`X = 0, Z = 0`, `Y = 480"`)
     const clockTex = makeClockTexture();
-    const clockMat = new THREE.MeshBasicMaterial({ map: clockTex });
-    const clockBody = new THREE.Mesh(
-      new THREE.CylinderGeometry(18, 18, 5, 28),
-      [new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.7, roughness: 0.3 }), clockMat, clockMat]
+    const clockFace = new THREE.MeshBasicMaterial({ map: clockTex });
+    const clockDrum = new THREE.Mesh(
+      new THREE.CylinderGeometry(48, 48, 16, 32),
+      [new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.75, roughness: 0.28 }), clockFace, clockFace]
     );
-    clockBody.rotation.z = Math.PI / 2;
-    clockBody.position.set(0, 198, 0);
-    vaultGroup.add(clockBody);
+    clockDrum.rotation.z = Math.PI / 2;
+    clockDrum.position.set(0, 485, 0);
+    roofGroup.add(clockDrum);
 
-    const hanger = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 36, 8), trussMat);
-    hanger.position.set(0, 220, 0);
-    vaultGroup.add(hanger);
+    const hanger = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 165, 10), steelMat);
+    hanger.position.set(0, 570, 0);
+    roofGroup.add(hanger);
 
-    archGroup.add(vaultGroup);
+    const apexTag = makeTextSprite("SKYLIGHT APEX · 92 FT (1,104 IN)", "rgba(15, 23, 42, 0.85)", "#fde68a", 1.8);
+    apexTag.position.set(0, 1138, 0);
+    roofGroup.add(apexTag);
+
+    archGroup.add(roofGroup);
   }
 
-  // 4. East End (`X = +265..+365`): LIRR/Amtrak Departure Board + Track 17–20 Platform Stairs
+  // ==================== 5. EAST WING: SOM RENOVATED LIRR CONCOURSE (`57 FT = 684"` WIDE × `18 FT = 216"` HIGH!) ====================
+  const lirrGroup = new THREE.Group();
+  // Spans `X = +1,200" .. +2,520"` (`110 ft` connector segment), `Z = -342" .. +342"` (`57 ft = 684"` exact width!)
+  const lirrFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(1320, 684),
+    new THREE.MeshStandardMaterial({ color: 0x303846, roughness: 0.66 })
+  );
+  lirrFloor.rotation.x = -Math.PI / 2;
+  lirrFloor.position.set(1860, 0.14, 0);
+  lirrGroup.add(lirrFloor);
+
+  // SOM's signature 18-ft-high (`Y = 216"`) Luminous Color-Accented LED Coffered Ceiling!
+  if (showRoof) {
+    const ledMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false });
+    for (let bx = 1320; bx <= 2400; bx += 180) {
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(148, 580), ledMat);
+      panel.rotation.x = Math.PI / 2;
+      panel.position.set(bx, 216, 0);
+      lirrGroup.add(panel);
+    }
+  }
+
+  // Wide Digital Departure Board at East Gateway (`X = +1,210, Y = 330"`, facing West into Moynihan Atrium!)
   const boardTex = makeDepartureBoardTexture();
   const boardMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(6, 62, 206),
+    new THREE.BoxGeometry(12, 138, 520),
     [
       new THREE.MeshStandardMaterial({ color: 0x0f172a }),
-      new THREE.MeshBasicMaterial({ map: boardTex }), // -X face looking West into the concourse!
+      new THREE.MeshBasicMaterial({ map: boardTex }),
       new THREE.MeshStandardMaterial({ color: 0x0f172a }),
       new THREE.MeshStandardMaterial({ color: 0x0f172a }),
       new THREE.MeshStandardMaterial({ color: 0x0f172a }),
       new THREE.MeshStandardMaterial({ color: 0x0f172a }),
     ]
   );
-  boardMesh.position.set(264, 126, 0);
-  archGroup.add(boardMesh);
+  boardMesh.position.set(1196, 336, 0);
+  lirrGroup.add(boardMesh);
 
-  // Two Track Stairwell Portals descending to platforms (`TRACK 17 · 18` & `TRACK 19 · 20`)
-  [[-66, "TRACKS 17 · 18"], [66, "TRACKS 19 · 20"]].forEach(([sz, label]) => {
-    const well = new THREE.Group();
-    well.position.set(296, 0, sz);
+  const lirrTag = makeTextSprite(
+    "EAST WING · SOM LIRR 33rd ST CONCOURSE (57 FT WIDE × 18 FT HIGH) → TRACKS 17–21",
+    "rgba(29, 78, 216, 0.88)",
+    "#ffffff",
+    1.7
+  );
+  lirrTag.position.set(1860, 250, 0);
+  lirrGroup.add(lirrTag);
 
-    // Safety glass balustrades around stairwell
-    const railMat = new THREE.MeshPhysicalMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.28, roughness: 0.2, side: THREE.DoubleSide });
-    [-26, 26].forEach((rz) => {
-      const glass = new THREE.Mesh(new THREE.BoxGeometry(74, 34, 1.5), railMat);
-      glass.position.set(0, 17, rz);
-      well.add(glass);
-    });
-
-    // Descending stair treads + yellow ADA tactile strip
-    const yellowStrip = new THREE.Mesh(
-      new THREE.BoxGeometry(6, 0.6, 52),
-      new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.6 })
-    );
-    yellowStrip.position.set(-39, 0.3, 0);
-    well.add(yellowStrip);
-
-    const stepMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
-    for (let st = 0; st < 6; st++) {
-      const tread = new THREE.Mesh(new THREE.BoxGeometry(11, 2.5, 50), stepMat);
-      tread.position.set(-30 + st * 11, -1.5 - st * 3.2, 0);
-      well.add(tread);
-    }
-
-    const trkTag = makeTextSprite(`↓ ${label}`, "rgba(29, 78, 216, 0.92)", "#ffffff", 0.68);
-    trkTag.position.set(-28, 46, 0);
-    well.add(trkTag);
-    archGroup.add(well);
+  // Track 17–21 Platform Stairs at East end of LIRR Concourse (`X = +2,360`)
+  [[-165, "TRACKS 17 · 18"], [165, "TRACKS 19 · 21"]].forEach(([sz, lbl]) => {
+    archGroup.add(buildTrackEscalatorIsland(2280, sz, lbl, makeTextSprite));
   });
+  archGroup.add(lirrGroup);
 
-  // 5. West End (`X = -465..-270`): 31st St Loading Dock + Docked Arrival U-Haul
+  // ==================== 6. WEST END: 31st ST LOADING DOCK + TRUE 1:1 `314"` (26-FT) U-HAUL FLEET ====================
   const dockGroup = new THREE.Group();
   const dockApron = new THREE.Mesh(
-    new THREE.BoxGeometry(110, 4, 240),
-    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.88 })
+    new THREE.BoxGeometry(520, 8, 920),
+    new THREE.MeshStandardMaterial({ color: 0x2c3340, roughness: 0.9 })
   );
-  dockApron.position.set(-325, -1.5, 0);
+  dockApron.position.set(-1460, -3.5, 0);
   dockGroup.add(dockApron);
 
-  // Yellow safety bollards flanking the freight portal
-  const bollardMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.4, metalness: 0.3 });
-  [-68, 68].forEach((bz) => {
-    const bol = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 38, 12), bollardMat);
-    bol.position.set(-280, 19, bz);
-    dockGroup.add(bol);
-  });
+  // Render the ACTUAL `314" × 98" × 99"` (26-ft) U-Haul Fleet backed up to the loading bays at 1:1 scale!
+  const truckCount = Math.max(1, Math.min(4, (plan.trucks || []).length || 3));
+  for (let ti = 0; ti < truckCount; ti++) {
+    const tz = (ti - (truckCount - 1) / 2) * 180;
+    // Exact 26-ft U-Haul cargo box: 314" × 98" × 99" on 35" deck height!
+    const cargo = new THREE.Mesh(
+      new THREE.BoxGeometry(314, 99, 98),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.34, roughness: 0.45 })
+    );
+    cargo.position.set(-1540, 35 + 49.5, tz);
+    dockGroup.add(cargo);
 
-  // Scale docked U-Haul truck backed up to the West Loading Dock (`X = -465..-365`)
-  const dockBox = new THREE.Mesh(
-    new THREE.BoxGeometry(128, 86, 92),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.25, roughness: 0.5 })
-  );
-  dockBox.position.set(-446, 46, 0);
-  dockGroup.add(dockBox);
-  const dockWire = new THREE.LineSegments(
-    new THREE.EdgesGeometry(dockBox.geometry),
-    new THREE.LineBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.75 })
-  );
-  dockWire.position.copy(dockBox.position);
-  dockGroup.add(dockWire);
+    const wire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(cargo.geometry),
+      new THREE.LineBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.85 })
+    );
+    wire.position.copy(cargo.position);
+    dockGroup.add(wire);
 
-  // Orange U-Haul stripe
-  const stripe = new THREE.Mesh(
-    new THREE.BoxGeometry(129, 10, 93),
-    new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.5 })
-  );
-  stripe.position.set(-446, 28, 0);
-  dockGroup.add(stripe);
+    const orangeStripe = new THREE.Mesh(
+      new THREE.BoxGeometry(315, 14, 99),
+      new THREE.MeshStandardMaterial({ color: 0xf97316 })
+    );
+    orangeStripe.position.set(-1540, 56, tz);
+    dockGroup.add(orangeStripe);
 
-  const dockSign = makeTextSprite("31st ST LOADING DOCK · UNLOAD ENTRY →", "rgba(249, 115, 22, 0.9)", "#ffffff", 0.78);
-  dockSign.position.set(-345, 108, 0);
+    const cab = new THREE.Mesh(
+      new THREE.BoxGeometry(78, 82, 92),
+      new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5 })
+    );
+    cab.position.set(-1540 - 157 - 40, 44, tz);
+    dockGroup.add(cab);
+  }
+
+  const dockSign = makeTextSprite(
+    `31st ST LOADING DOCK · ${truckCount} × 26-FT U-HAUL (1:1 SCALE) →`,
+    "rgba(249, 115, 22, 0.92)",
+    "#ffffff",
+    1.65
+  );
+  dockSign.position.set(-1520, 195, 0);
   dockGroup.add(dockSign);
   archGroup.add(dockGroup);
 
-  // 6. Storefront Rooms, Glazed Facades, Doorway Cutouts, Unload Flow Paths & Staged Items
+  // ==================== 7. COWORKING SUITES, MEZZANINE LOUNGE & 1:1 STAGED FURNITURE ====================
   const zones = plan.zones || [];
   const orderedVenueItems = [];
 
   zones.forEach((zone) => {
     const spec = VENUE_ZONE_LAYOUT[zone.zone_id];
     if (!spec) return;
-    const [L, W, H] = zone.dims_in;
-    const [doorW, doorH] = zone.door_in || [48, 84];
+    const [L, W, H] = spec.vDims;
+    const openW = spec.doorSpan || 360;
+    const baseElev = spec.floorY || 0;
     const isConcourse = zone.zone_type === "concourse";
 
-    // Unload path dashed line from Loading Dock into this zone's entrance
+    // Ground-level dock-to-zone guide line
     if (spec.dockPath && spec.dockPath.length >= 2) {
-      const pathPts = spec.dockPath.map(([px, pz]) => new THREE.Vector3(px, 0.55, pz));
+      const pathPts = spec.dockPath.map(([px, pz]) => new THREE.Vector3(px, 1.2, pz));
       const pathLine = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(pathPts),
         new THREE.LineDashedMaterial({
           color: new THREE.Color(spec.accentHex),
-          dashSize: 10,
-          gapSize: 6,
+          dashSize: 28,
+          gapSize: 16,
           transparent: true,
-          opacity: 0.7,
+          opacity: 0.62,
         })
       );
       pathLine.computeLineDistances();
@@ -764,127 +1440,89 @@ export function buildPennVenueScene({
     }
 
     const roomGroup = new THREE.Group();
-    roomGroup.position.set(spec.cx, 0, spec.cz);
+    roomGroup.position.set(spec.cx, baseElev, spec.cz);
     roomGroup.rotation.y = spec.rotY;
     worldGroup.add(roomGroup);
 
     if (!isConcourse) {
-      // Storefront floor carpet / tile
       const rFloor = new THREE.Mesh(
         new THREE.PlaneGeometry(L, W),
-        new THREE.MeshStandardMaterial({ color: spec.floorColor, roughness: 0.82, metalness: 0.05 })
+        new THREE.MeshStandardMaterial({ color: spec.floorColor, roughness: 0.76, metalness: 0.05 })
       );
       rFloor.rotation.x = -Math.PI / 2;
-      rFloor.position.set(0, 0.18, 0);
+      rFloor.position.set(0, 0.3, 0);
       roomGroup.add(rFloor);
 
-      // Cutaway architectural perimeter walls (back `-L/2` & side walls `±W/2` at 44" waist-cutaway
-      // + full-height corner framing so interior stays 100% visible from any orbit angle!)
-      const lowWallH = 42;
-      const wallMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.72, metalness: 0.1 });
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7, metalness: 0.12 });
       const glassMat = new THREE.MeshPhysicalMaterial({
         color: 0x93c5fd,
         transparent: true,
-        opacity: 0.18,
-        roughness: 0.15,
+        opacity: 0.16,
+        roughness: 0.12,
         side: THREE.DoubleSide,
         depthWrite: false,
       });
 
-      // Back wall (-L/2)
-      const backLow = new THREE.Mesh(new THREE.BoxGeometry(3, lowWallH, W), wallMat);
-      backLow.position.set(-L / 2 + 1.5, lowWallH / 2, 0);
-      roomGroup.add(backLow);
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(6, 72, W), wallMat);
+      backWall.position.set(-L / 2 + 3, 36, 0);
+      roomGroup.add(backWall);
 
-      // Side walls (±W/2)
-      [-W / 2 + 1.5, W / 2 - 1.5].forEach((sz) => {
-        const sideLow = new THREE.Mesh(new THREE.BoxGeometry(L, lowWallH, 3), wallMat);
-        sideLow.position.set(0, lowWallH / 2, sz);
-        roomGroup.add(sideLow);
+      [-W / 2 + 3, W / 2 - 3].forEach((sz) => {
+        const sideWall = new THREE.Mesh(new THREE.BoxGeometry(L, 60, 6), wallMat);
+        sideWall.position.set(0, 30, sz);
+        roomGroup.add(sideWall);
       });
 
-      // Full-height Storefront Facade on `+L/2` (facing into the Main Concourse!) with real `[doorW × doorH]` opening
-      const wingSpan = Math.max(0, (W - doorW) / 2);
-      if (wingSpan > 2) {
-        [-W / 2 + wingSpan / 2, W / 2 - wingSpan / 2].forEach((wz) => {
-          // Knee bulkhead + storefront display window glass
-          const knee = new THREE.Mesh(new THREE.BoxGeometry(3.5, 22, wingSpan), wallMat);
-          knee.position.set(L / 2 - 1.75, 11, wz);
-          roomGroup.add(knee);
-
-          const paneH = Math.max(10, doorH - 22);
-          const pane = new THREE.Mesh(new THREE.BoxGeometry(1.5, paneH, wingSpan - 2), glassMat);
-          pane.position.set(L / 2 - 1.75, 22 + paneH / 2, wz);
-          roomGroup.add(pane);
-        });
+      if (!spec.isMezzanine) {
+        const wingSpan = Math.max(0, (W - openW) / 2);
+        if (wingSpan > 12) {
+          [-W / 2 + wingSpan / 2, W / 2 - wingSpan / 2].forEach((wz) => {
+            const pane = new THREE.Mesh(new THREE.BoxGeometry(3, H - 36, wingSpan - 4), glassMat);
+            pane.position.set(L / 2 - 2, (H - 36) / 2, wz);
+            roomGroup.add(pane);
+          });
+        }
       }
 
-      // Doorway portal frame (jambs + glowing threshold) in store's stop color
-      const portalMat = new THREE.MeshStandardMaterial({ color: spec.accentHex, roughness: 0.35, metalness: 0.3 });
-      [-doorW / 2, doorW / 2].forEach((dz) => {
-        const jamb = new THREE.Mesh(new THREE.BoxGeometry(4.2, Math.min(doorH, H), 3.2), portalMat);
-        jamb.position.set(L / 2 - 1.5, Math.min(doorH, H) / 2, dz);
-        roomGroup.add(jamb);
-      });
-
-      // Storefront Fascia Header & Illuminated Signboard above doorway (`[doorH .. H]`)
-      const fasciaH = Math.max(16, H - Math.min(doorH, H - 16));
       const signTex = makeSignTexture(
         spec.signTitle,
-        `${zone.item_count} pcs · Door ${Math.round(doorW)}×${Math.round(doorH)}" · ${fmt(zone.floor_pct, 0)}% floor`,
+        `${Math.round(W / 12)}×${Math.round(L / 12)} FT SUITE · ${zone.item_count} PCS STAGED`,
         spec.accentHex
       );
       const fascia = new THREE.Mesh(
-        new THREE.BoxGeometry(4.5, fasciaH, Math.min(W, Math.max(doorW + 44, W * 0.88))),
-        [
-          new THREE.MeshBasicMaterial({ map: signTex }), // +X face facing straight into the Main Concourse!
-          wallMat,
-          wallMat,
-          wallMat,
-          wallMat,
-          wallMat,
-        ]
+        new THREE.BoxGeometry(8, 36, Math.min(W * 0.85, 420)),
+        [new THREE.MeshBasicMaterial({ map: signTex }), wallMat, wallMat, wallMat, wallMat, wallMat]
       );
-      fascia.position.set(L / 2 - 1.5, H - fasciaH / 2, 0);
+      fascia.position.set(L / 2 - 4, spec.isMezzanine ? 156 : H - 18, 0);
       roomGroup.add(fascia);
-
-      // Subtle room volume outline
-      const roomOutline = new THREE.LineSegments(
-        new THREE.EdgesGeometry(new THREE.BoxGeometry(L, H, W)),
-        new THREE.LineBasicMaterial({ color: spec.accentHex, transparent: true, opacity: 0.32 })
-      );
-      roomOutline.position.set(0, H / 2, 0);
-      roomGroup.add(roomOutline);
     } else {
-      // Concourse floating label banner
       const concBanner = makeTextSprite(
-        `STOP 6 · MAIN CONCOURSE HALL (${zone.item_count} pcs)`,
-        "rgba(8, 51, 68, 0.88)",
+        "STOP 6 · MAIN ATRIUM HACKATHON & COWORKING VILLAGE",
+        "rgba(8, 51, 68, 0.9)",
         "#67e8f9",
-        0.92
+        1.85
       );
-      concBanner.position.set(0, 146, 0);
+      concBanner.position.set(0, 196, 0);
       roomGroup.add(concBanner);
     }
 
-    // Add camera target for this zone
     binTargets.push({
       label: `Stop ${zone.dock_stop}`,
-      center: new THREE.Vector3(spec.cx, Math.min(H * 0.45, 52), spec.cz),
-      radius: isConcourse ? 340 : Math.max(L, W, H) * 1.15,
+      center: new THREE.Vector3(spec.cx, baseElev + 48, spec.cz),
+      radius: isConcourse ? 780 : Math.max(L, W) * 0.72,
     });
 
-    // Stage and order items inside this zone
-    const stagedList = stageZoneItemsForVenue(zone);
-    stagedList.sort((a, b) =>
+    const { placements, fixtures } = designCoworkingZone(zone, spec);
+    renderZoneBuiltInFixtures(roomGroup, fixtures);
+
+    placements.sort((a, b) =>
       playDir === "load"
         ? (a.item.load_seq || 0) - (b.item.load_seq || 0)
         : (a.item.unload_seq || 0) - (b.item.unload_seq || 0)
     );
-    stagedList.forEach((entry) => orderedVenueItems.push({ ...entry, zone, roomGroup }));
+    placements.forEach((p) => orderedVenueItems.push({ ...p, zone, roomGroup }));
   });
 
-  // Sort globally by dock_stop (Stop 1 -> Stop 6 on Unload; Stop 6 -> Stop 1 on Load) so playback flows naturally!
   orderedVenueItems.sort((a, b) => {
     if (playDir === "unload") {
       return (a.zone.dock_stop - b.zone.dock_stop) || ((a.item.unload_seq || 0) - (b.item.unload_seq || 0));
@@ -892,40 +1530,32 @@ export function buildPennVenueScene({
     return (b.zone.dock_stop - a.zone.dock_stop) || ((a.item.load_seq || 0) - (b.item.load_seq || 0));
   });
 
-  orderedVenueItems.forEach(({ item: it, pos, size, unfoldedTable, zone, roomGroup }, idx) => {
-    const [L, W] = zone.dims_in;
-    const [x, y, z] = pos;
-    const [dx, dy, dz] = size;
-    const pad = 0.4;
-    const gx = Math.max(dx * 0.86, dx - pad);
-    const gy = Math.max(dz * 0.86, dz - pad);
-    const gz = Math.max(dy * 0.86, dy - pad);
-
+  orderedVenueItems.forEach((p, idx) => {
+    const { item: it, localPos: [lx, ly, lz], dims: [gx, gy, gz], rotY, roomGroup, isTuckedBox } = p;
     const hex = itemColorHex(it);
-    const pieceObj = buildProceduralPiece(it, gx, gy, gz, hex, makeBoxFaceTexture, unfoldedTable);
+    const pieceObj = buildCoworkingPieceMesh(p, hex, makeBoxFaceTexture);
 
-    const localX = x + dx / 2 - L / 2;
-    const localY = z + dz / 2;
-    const localZ = y + dy / 2 - W / 2;
-    pieceObj.position.set(localX, localY, localZ);
-    pieceObj.userData = { itemId: it.id };
+    pieceObj.position.set(lx, ly, lz);
+    pieceObj.rotation.y = rotY || 0;
+    pieceObj.userData = { itemId: it.id, isTuckedBox: Boolean(isTuckedBox) };
     pieceObj.traverse((child) => {
       child.userData = { itemId: it.id };
     });
 
-    // Selection / violation bounding box outline
     const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(gx + 0.6, gy + 0.6, gz + 0.6)),
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(gx + 1.0, gy + 1.0, gz + 1.0)),
       new THREE.LineBasicMaterial({
         color: violatingIds.has(it.id) ? 0xff8080 : 0x0f172a,
         transparent: true,
-        opacity: violatingIds.has(it.id) ? 0.9 : 0.22,
+        opacity: violatingIds.has(it.id) ? 0.95 : 0.0,
       })
     );
     pieceObj.add(edges);
+    if (hideUnpackedBoxes && isTuckedBox) {
+      pieceObj.visible = false;
+    }
     roomGroup.add(pieceObj);
 
-    // Compute world position so fly-to camera works accurately inside rotated rooms
     roomGroup.updateMatrixWorld(true);
     const worldPos = new THREE.Vector3();
     pieceObj.getWorldPosition(worldPos);
@@ -935,67 +1565,75 @@ export function buildPennVenueScene({
       edges,
       item: it,
       worldPos,
-      targetY: localY,
+      targetY: ly,
       seqIndex: idx + 1,
       isVenue: true,
+      hiddenByBoxToggle: Boolean(hideUnpackedBoxes && isTuckedBox),
     });
   });
 
-  // Prepend special Concourse Walkthrough & Loading Dock camera presets!
+  // Eye-level & architectural camera presets calibrated to 1:1 human scale (`Y = 68"` = 5'8" eye height!)
   binTargets.unshift(
     {
-      label: "Walkthrough Cam",
-      center: new THREE.Vector3(60, 56, 0),
-      camPos: new THREE.Vector3(-215, 72, 12),
-      radius: 220,
+      // Standing at human eye height (`68"`) on West Concourse looking East across the 200-ft hall & up at the 92-ft vaults!
+      label: "Human Eye-Level (5'8\")",
+      center: new THREE.Vector3(240, 210, 0),
+      camPos: new THREE.Vector3(-560, 68, 85),
+      radius: 420,
     },
     {
-      label: "Loading Dock",
-      center: new THREE.Vector3(-280, 44, 0),
-      camPos: new THREE.Vector3(-540, 165, 195),
-      radius: 260,
+      // Standing on the +20 ft Mezzanine Metropolitan Lounge balcony looking out over the entire 31,000 sq ft Train Hall!
+      label: "Mezzanine Overlook (+20')",
+      center: new THREE.Vector3(-60, 140, -120),
+      camPos: new THREE.Vector3(480, 318, 920),
+      radius: 520,
+    },
+    {
+      // Close-up of the Keynote Stage & Hacker Pods
+      label: "Hackathon Arena",
+      center: new THREE.Vector3(40, 42, 0),
+      camPos: new THREE.Vector3(-520, 265, 490),
+      radius: 440,
+    },
+    {
+      // SOM 57-ft LIRR 33rd St Concourse view
+      label: "57' LIRR Concourse",
+      center: new THREE.Vector3(1720, 72, -120),
+      camPos: new THREE.Vector3(1240, 115, 210),
+      radius: 420,
     }
   );
 }
 
-/**
- * Compute human-friendly corner/wall label inside `[L, W]` room for staged `[x, y, z]` item.
- */
 export function describeRoomCorner(pos, size, zoneDims, isBox = false) {
+  if (isBox) return "Backstage Supply Alcove";
   const L = Math.max(1, Number(zoneDims[0] || 180));
   const W = Math.max(1, Number(zoneDims[1] || 120));
-  const cx = (pos[0] + 0.5 * size[0]) / L; // 0 = back wall, 1 = front doorway wall
-  const cy = (pos[1] + 0.5 * size[1]) / W; // 0 = left wall, 1 = right wall
-
-  if (isBox && cx < 0.35) {
-    return cy < 0.45 ? "Back-Left Stock Corner" : cy > 0.55 ? "Back-Right Stock Corner" : "Back Stock Wall";
-  }
-  const d = cx < 0.35 ? "Back" : cx > 0.66 ? "Front" : "Mid";
-  const s = cy < 0.35 ? "Left" : cy > 0.65 ? "Right" : "Center";
-  if (d === "Mid" && s === "Center") return "Center Floor";
-  if (d === "Mid") return `${s} Wall`;
-  if (s === "Center") return d === "Back" ? "Back Wall" : "Front Window Bay";
-  return `${d}-${s} Corner`;
+  const cx = (pos[0] + 0.5 * size[0]) / L;
+  const cy = (pos[1] + 0.5 * size[1]) / W;
+  const d = cx < 0.35 ? "Back" : cx > 0.66 ? "Front" : "Center";
+  const s = cy < 0.35 ? "Left" : cy > 0.65 ? "Right" : "Mid";
+  if (d === "Center" && s === "Mid") return "Center Coworking Floor";
+  if (d === "Center") return `${s} Wing`;
+  if (s === "Mid") return d === "Back" ? "Back Feature Wall" : "Front Promenade";
+  return `${d}-${s} Nook`;
 }
 
-/**
- * Update `dest_corner` across `plan.zones` and `plan.trucks` using the Venue staging layout
- * so every item's corner badge matches where it actually sits in the 3D venue!
- */
 export function annotateStagedCorners(plan) {
   if (!plan || !Array.isArray(plan.zones)) return;
   const cornerByPiece = new Map();
 
   plan.zones.forEach((zone) => {
-    const staged = stageZoneItemsForVenue(zone);
+    const spec = VENUE_ZONE_LAYOUT[zone.zone_id];
+    if (!spec) return;
+    const { placements } = designCoworkingZone(zone, spec);
     const tally = {};
-    staged.forEach(({ item, pos, size }) => {
-      const corner = describeRoomCorner(pos, size, zone.dims_in, item.is_box);
+    placements.forEach(({ item, cornerLabel }) => {
       const pid = item.piece_id || item.id;
-      cornerByPiece.set(pid, corner);
+      cornerByPiece.set(pid, cornerLabel);
       const realIt = (zone.items || []).find((x) => (x.piece_id || x.id) === pid);
-      if (realIt) realIt.dest_corner = corner;
-      tally[corner] = (tally[corner] || 0) + 1;
+      if (realIt) realIt.dest_corner = cornerLabel;
+      tally[cornerLabel] = (tally[cornerLabel] || 0) + 1;
     });
     zone.corners_summary = Object.entries(tally)
       .sort((a, b) => b[1] - a[1])
@@ -1007,7 +1645,7 @@ export function annotateStagedCorners(plan) {
     (t.items || []).forEach((it) => {
       const pid = it.piece_id || it.id;
       if (cornerByPiece.has(pid)) it.dest_corner = cornerByPiece.get(pid);
-      else if (!it.dest_corner) it.dest_corner = "Center Floor";
+      else if (!it.dest_corner) it.dest_corner = "Coworking Floor";
 
       const zid = it.dest_zone || "penn_concourse";
       if (!dstMap.has(zid)) {
@@ -1029,11 +1667,6 @@ export function annotateStagedCorners(plan) {
   });
 }
 
-/**
- * Render offscreen 16:9 3D interior corner-cam stills (`zone_id -> dataURL`) directly
- * from the Three.js Penn Station Venue model so every destination room/corner card has
- * a crisp architectural visual even when `data/NYPenn/` has no local video files.
- */
 let snapRenderer = null;
 export function captureVenueCornerStills(ctxArgs) {
   const { plan } = ctxArgs;
@@ -1048,9 +1681,9 @@ export function captureVenueCornerStills(ctxArgs) {
     }
     const tmpScene = new THREE.Scene();
     tmpScene.background = new THREE.Color(0x131822);
-    tmpScene.add(new THREE.AmbientLight(0xffffff, 0.85));
-    const dl = new THREE.DirectionalLight(0xffffff, 0.9);
-    dl.position.set(220, 420, 260);
+    tmpScene.add(new THREE.AmbientLight(0xffffff, 0.88));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.95);
+    dl.position.set(600, 1400, 800);
     tmpScene.add(dl);
 
     const tmpWorld = new THREE.Group();
@@ -1061,26 +1694,27 @@ export function captureVenueCornerStills(ctxArgs) {
       meshEntries: [],
       binTargets: [],
       showRoof: true,
+      hideUnpackedBoxes: true,
     });
 
-    const cam = new THREE.PerspectiveCamera(48, 16 / 9, 2, 3000);
+    const cam = new THREE.PerspectiveCamera(50, 16 / 9, 4, 9000);
     const out = {};
 
     plan.zones.forEach((zone) => {
       const spec = VENUE_ZONE_LAYOUT[zone.zone_id];
       if (!spec) return;
-      const [L, W, H] = zone.dims_in;
+      const [L, W] = spec.vDims;
+      const baseY = spec.floorY || 0;
       if (zone.zone_type === "concourse") {
-        cam.position.set(spec.cx - 210, 108, spec.cz + 115);
-        cam.lookAt(spec.cx + 55, 34, spec.cz - 10);
+        cam.position.set(-480, 145, 220);
+        cam.lookAt(180, 95, -10);
       } else {
-        // Position camera near doorway looking diagonally into the furnished room & corners
         const dirZ = spec.cz < 0 ? 1 : -1;
-        cam.position.set(spec.cx + W * 0.36, Math.min(H * 0.92, 92), spec.cz + dirZ * (L * 0.62));
-        cam.lookAt(spec.cx - W * 0.08, Math.min(H * 0.28, 26), spec.cz - dirZ * (L * 0.14));
+        cam.position.set(spec.cx + W * 0.22, baseY + 108, spec.cz + dirZ * (L * 0.56));
+        cam.lookAt(spec.cx - W * 0.04, baseY + 30, spec.cz - dirZ * (L * 0.05));
       }
       snapRenderer.render(tmpScene, cam);
-      out[zone.zone_id] = snapRenderer.domElement.toDataURL("image/jpeg", 0.82);
+      out[zone.zone_id] = snapRenderer.domElement.toDataURL("image/jpeg", 0.84);
     });
     return out;
   } catch (e) {
@@ -1089,11 +1723,6 @@ export function captureVenueCornerStills(ctxArgs) {
   }
 }
 
-/**
- * Draw a 16:9 wide-angle simulated video keyframe (`320×180` data URL) for mock / sample_venue
- * runs where no raw `.mp4`/`.jpg` file sits on disk, showing room perspective, detection boxes,
- * and source clip + timestamp HUD.
- */
 const simStillCache = new Map();
 export function makeSimulatedVideoStill({ roomName = "Room", source = "clip.mp4", timestampS = 3.5, accentHex = "#3b82f6", detections = [], highlightBox = null }) {
   const cacheKey = `${roomName}|${source}|${timestampS}|${accentHex}|${JSON.stringify(highlightBox || detections.slice(0, 2))}`;
@@ -1104,7 +1733,6 @@ export function makeSimulatedVideoStill({ roomName = "Room", source = "clip.mp4"
   c.height = 180;
   const ctx = c.getContext("2d");
 
-  // Room perspective walls & floor
   const grad = ctx.createLinearGradient(0, 0, 0, 180);
   grad.addColorStop(0, "#1e293b");
   grad.addColorStop(0.62, "#283548");
@@ -1113,7 +1741,6 @@ export function makeSimulatedVideoStill({ roomName = "Room", source = "clip.mp4"
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 320, 180);
 
-  // Perspective room corner lines
   ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
   ctx.lineWidth = 1.5;
   ctx.strokeRect(54, 24, 212, 92);
@@ -1121,14 +1748,13 @@ export function makeSimulatedVideoStill({ roomName = "Room", source = "clip.mp4"
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
   });
 
-  // Stylized room silhouettes + Gemini perception bounding boxes
   const boxes = highlightBox
     ? [{ label: roomName, box_2d: highlightBox, primary: true }]
     : (detections && detections.length
       ? detections.slice(0, 3)
       : [
           { label: "furniture", box_2d: [410, 120, 820, 540] },
-          { label: "stack", box_2d: [360, 590, 840, 860] },
+          { label: "seating", box_2d: [360, 590, 840, 860] },
         ]);
 
   boxes.forEach((b, idx) => {
@@ -1136,7 +1762,7 @@ export function makeSimulatedVideoStill({ roomName = "Room", source = "clip.mp4"
     const rx = (xmin / 1000) * 320;
     const ry = (ymin / 1000) * 180;
     const rw = Math.max(28, ((xmax - xmin) / 1000) * 320);
-    const rh = Math.max(22, ((ymax - ymin) / 1000) * 180);
+    const rh = Math.max(22, ((ymax - ymin) / 1000) * 320 * 0.56);
 
     ctx.fillStyle = idx === 0 ? `${accentHex}55` : "rgba(148, 163, 184, 0.25)";
     ctx.fillRect(rx + 3, ry + 3, rw - 6, rh - 6);
@@ -1156,7 +1782,6 @@ export function makeSimulatedVideoStill({ roomName = "Room", source = "clip.mp4"
     }
   });
 
-  // Top camera HUD bar
   ctx.fillStyle = "rgba(9, 13, 22, 0.76)";
   ctx.fillRect(0, 0, 320, 22);
   ctx.fillStyle = "#ef4444";
