@@ -1,5 +1,6 @@
 // In-browser mock of the Track A routes, for building the pages without a server or key.
 // Loaded by capture.html and review.html; used when the URL has ?mock=1.
+// It loads before ui/api.js, so it may use window.PIU inside functions but not while this file runs.
 // Fixture: mock/inventory.json. State lives in sessionStorage so it survives the capture -> review hop.
 (function () {
   "use strict";
@@ -220,7 +221,7 @@
     const long = Date.now() - 600000;
     fixture.rooms.forEach((r, i) => {
       run.rooms.push({ id: r.room.id, name: r.room.name, fixture: i,
-        files: r.files.map((n) => ({ name: n, kind: /\.(mp4|mov|m4v)$/i.test(n) ? "video" : "image",
+        files: r.files.map((n) => ({ name: n, kind: window.PIU.isVideo(n) ? "video" : "image",
                                      room_id: r.room.id, bytes: 1, uploadedAt: long })) });
     });
     state.runs[DEMO_RUN] = run;
@@ -245,7 +246,7 @@
       let r = run.rooms.find((x) => x.id === rid);
       if (!r) run.rooms.push((r = { id: rid, name: room, fixture: run.rooms.length, files: [] }));
       const now = Date.now();
-      files.forEach((f) => r.files.push({ name: f.name, kind: /^video\//.test(f.type) || /\.(mp4|mov|m4v)$/i.test(f.name) ? "video" : "image",
+      files.forEach((f) => r.files.push({ name: f.name, kind: window.PIU.isVideo(f.name, f.type) ? "video" : "image",
                                           room_id: rid, bytes: f.size, uploadedAt: now }));
       save(state);
       return { run_id: id, room_id: rid, files: files.map((f) => f.name), skipped: [] };
@@ -312,7 +313,7 @@
         return build(run, Date.now()).inventory;
       });
     },
-    cropUrl: (runId, ev, size, label) => window.PIU.placeholder(label, ev && ev.kind !== "user" && !ev.sha256 ? "audio" : ev && ev.kind),
+    cropUrl: (runId, ev, size, label) => window.PIU.placeholder(label, window.PIU.tileKind(ev)), // no media in mock mode
     reset() { save({ runs: {} }); },
   };
 })();

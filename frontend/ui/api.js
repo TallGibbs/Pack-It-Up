@@ -1,4 +1,4 @@
-// Pack It Up: API client for the capture and review pages (Track A).
+// Pack It Up: API client and the helpers both pages share (Track A). Everything is on window.PIU.
 // Real server by default (same origin, or ?api=http://host:port); ?mock=1 uses frontend/mock/mock-api.js.
 // Routes: see backend/ingest/api.py.
 (function () {
@@ -6,6 +6,13 @@
   const params = new URLSearchParams(location.search);
   const MOCK = params.get("mock") === "1";
   const API_BASE = (params.get("api") || "").replace(/\/+$/, "") || location.origin;
+
+  // ---------- small helpers ----------
+  const $ = (selector, el = document) => el.querySelector(selector);
+  // Every piece of server or user text that goes into innerHTML passes through this.
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  // A clip rather than a photo? By MIME type when the browser gives one, else by extension.
+  const isVideo = (name, type) => /^video\//.test(type || "") || /\.(mp4|mov|m4v)$/i.test(name || "");
 
   function store(kind) {
     try { return window[kind]; } catch (e) { return null; }
@@ -79,7 +86,7 @@
     // [{id, name, category, dims_in}]: what "Add an item" offers
     getCatalog: () => json("GET", "/catalog").then((r) => r.items),
     cropUrl(runId, ev, size, label) {
-      if (!ev || !ev.sha256) return placeholder(label, ev && ev.kind);
+      if (!ev || !ev.sha256) return placeholder(label, tileKind(ev));
       const q = new URLSearchParams({ size: String(size || 160) });
       if (ev.box_2d) q.set("box", ev.box_2d.join(","));
       if (ev.timestamp_s != null) q.set("t", String(ev.timestamp_s));
@@ -98,12 +105,37 @@
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   }
 
+  // ---------- thumbnails ----------
+  // Evidence is {source, sha256, kind, timestamp_s, box_2d}. With no file hash there is nothing to
+  // crop: the item was only heard on a soundtrack (mic tile), or the user added it (initials tile).
+  const tileKind = (ev) => (ev && ev.kind !== "user" && !ev.sha256 ? "audio" : ev && ev.kind);
+
+  // Container evidence carries the file name but not its hash; borrow the hash from an item seen in the same file.
+  function withSha(inv, ev) {
+    if (!ev || ev.sha256 || !ev.source || !ev.box_2d || !inv) return ev; // no box: heard-only, keep the mic tile
+    const hit = inv.rooms.flatMap((r) => r.items).find((i) => i.evidence && i.evidence.source === ev.source && i.evidence.sha256);
+    return hit ? { ...ev, sha256: hit.evidence.sha256, kind: ev.kind || hit.evidence.kind } : ev;
+  }
+
+  // <img> for an item's or container's evidence: the server's crop, or a placeholder tile if that fails.
+  function thumbHtml(runId, inv, ev, label, { size = 160, lazy = false } = {}) {
+    ev = withSha(inv, ev);
+    const fallback = placeholder(label, tileKind(ev));
+    const src = window.PIU.api.cropUrl(runId, ev, size, label);
+    return `<img class="thumb"${lazy ? ' loading="lazy"' : ""} alt="" src="${esc(src)}" onerror="this.onerror=null;this.src='${fallback}'">`;
+  }
+
   window.PIU = {
     MOCK,
     API_BASE,
     params,
+    $,
+    esc,
+    isVideo,
     link,
     placeholder,
+    tileKind,
+    thumbHtml,
     rememberRun: (id) => remember(RUN_KEY, id),
     lastRun: () => recall(RUN_KEY),
     forgetRun: () => forget(RUN_KEY),

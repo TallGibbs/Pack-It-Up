@@ -4,7 +4,7 @@
 // item id, a container label or a room id; shown marks the few the server wants the user to see.
 (function () {
   "use strict";
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const { esc } = window.PIU; // ui/api.js loads first
 
   // Written for the model and pointing at images the user can't see: never an open card for the user
   // (decision 2026-11-21 11:38). The Decisions API's best guess stands; the user can still change it.
@@ -108,5 +108,5 @@
     });
   }
 
-  window.PIU_Q = { MODEL_ONLY, options, isOpen, guess, label, pick, target, cardHtml, answeredHtml, bind, esc };
+  window.PIU_Q = { MODEL_ONLY, options, isOpen, guess, label, pick, target, cardHtml, answeredHtml, bind };
 })();
