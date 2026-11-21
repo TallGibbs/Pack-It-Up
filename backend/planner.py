@@ -243,12 +243,12 @@ def _heuristic_violation_repair(
     return {
         "diagnosis": (
             f"Valid 0-violation plan at {prev_rec['score']['fill_pct']}% fleet fill. "
-            "Enabling `downsize_last_truck` with strict dock-stop LIFO to eliminate empty volume in the final truck."
+            "Enabling `downsize_last_truck` with `lifo_heavy_first` to eliminate empty volume in the final truck."
         ),
         "truck_id": "uhaul_26",
         "packer_engine": "constrained",
-        "order_mode": "zone_strict_lifo",
-        "lifo_weight": 1.6,
+        "order_mode": "lifo_heavy_first",
+        "lifo_weight": 1.3,
         "downsize_last_truck": True,
         "allow_all_rotations": False,
         "multi_store_routing": True,

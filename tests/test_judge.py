@@ -335,6 +335,7 @@ def test_judge_api_separate_routes_and_offline_fallback(monkeypatch, tmp_path: P
     _isolate_llm_cache(monkeypatch, tmp_path)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setattr(llm_mod, "_env_loaded", True)
+    monkeypatch.setattr("backend.llm.gemini._client", None)
     monkeypatch.setattr(ingest_common, "RUNS_DIR", tmp_path / "runs")
 
     rid = "20261121-123000-malin_test"
