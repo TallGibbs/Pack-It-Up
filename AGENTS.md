@@ -5,8 +5,8 @@ Pack It Up is being built at the Gemini 4 NYC hackathon on Nov 21, 2026. Several
 ## Before you start
 
 1. `git pull --rebase`.
-2. If you have the team's private planning repo (on Chris's laptop it is the sibling folder `../pack_perfect_hackathon`), read its `memory/README.md` and follow it. In short: read the decisions log, add your row to the sessions table, and keep out of files another active session claims. Plans and specs are in its `plan/` folder; for Track A, `plan/INGESTION_SPEC.md` is the spec.
-3. If you don't have that repo, ask the user what is decided before changing anything outside your track.
+2. Read [memory/README.md](memory/README.md) and follow it. In short: read the decisions log, add your row to the sessions table, and keep out of files another active session claims. Plans and specs are in [plan/](plan/); for Track A, `plan/INGESTION_SPEC.md` is the spec.
+3. The private planning repo keeps only research and plans written before the event. Don't copy from it into this repo without asking the user.
 
 ## Who owns what
 
