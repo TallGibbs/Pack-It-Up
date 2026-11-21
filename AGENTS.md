@@ -25,6 +25,27 @@ Change files outside your track only when the user asks, and say so in the commi
 - **The inventory contract** is the resolved `inventory.json` from `backend/ingest/` (each item has a `size` block). Track B reads sizes and weights from it rather than from the catalog.
 - **Log failures.** One line in `FAILURES.md` for each thing that breaks: input, what went wrong, what we changed.
 
+## Gemini API skills
+
+Before writing or changing any Gemini API code (in practice, anything in `backend/llm/`), load Google's public skills from [google-gemini/gemini-skills](https://github.com/google-gemini/gemini-skills) (Apache-2.0):
+
+| Skill | Use it for |
+|---|---|
+| `gemini-api-dev` | The `google-genai` SDK: Interactions API, structured output, function calling, the Decisions API (`gemini-decision-1`), TTS, managed agents, Deep Research, current model IDs |
+| `gemini-live-api-dev` | Live API streaming over WebSocket (only if we add live capture) |
+| `gemini-api-cli` | Calling the API from the shell for quick checks |
+| `gemini-omni-flash-api` | Video generation (not in our plan) |
+
+How to get them:
+- **Claude Code:** `/plugin marketplace add google-gemini/gemini-skills`, then `/plugin install gemini-skills@gemini-skills`.
+- **Antigravity:** bundled. Settings → Customizations → Build with Google Plugins, or `agy plugin install https://github.com/google-gemini/gemini-skills`.
+- **Other agents:** `npx skills add google-gemini/gemini-skills --skill gemini-api-dev`. Install into your own agent setup; don't commit the skill files here.
+- **No install possible:** read [skills/gemini-api-dev/SKILL.md](https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-api-dev/SKILL.md) before writing model code.
+
+Rules from the skill that apply here: use `google-genai` (Python) or `@google/genai` (JS), never the deprecated `google-generativeai` or `@google/generative-ai`; never use `gemini-2.5-*`, `gemini-2.0-*` or `gemini-1.5-*` models.
+
+**Where the skill and this repo disagree, this repo wins.** The skill describes the API in general; `backend/llm/models.toml` and `FAILURES.md` record what we measured with our event keys. Example: the skill puts the Decisions API on `v1beta`, but our keys list `gemini-decision-1` only under `v1alpha` (v1beta returns 404), so `models.toml` sets `api_version = "v1alpha"`. Keep the rule that only `backend/llm/` imports a model SDK, even when a skill example imports it somewhere else.
+
 ## Never commit
 
 - API keys or account details. Keys live in `.env`, which is git-ignored.
