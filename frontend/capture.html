@@ -50,14 +50,15 @@
     <input type="text" class="room-name" autocomplete="off" enterkeyhint="done">
     <div class="pick">
       <label class="btn primary">
-        <span>Film or photograph</span><small>opens the camera</small>
+        <span>Film or photograph</span><small>quick; lower video quality</small>
         <input class="sr-only cam" type="file" accept="image/*,video/*" capture="environment">
       </label>
       <label class="btn">
-        <span>Choose files</span><small>several at once</small>
+        <span>Choose files</span><small>best quality; several at once</small>
         <input class="sr-only lib" type="file" accept="image/*,video/*" multiple>
       </label>
     </div>
+    <p class="hint">🎥 For video, film in your phone's Camera app, then add it with <b>Choose files</b>. Phones record video from a web page at low resolution (about 480p on iPhone), so we see far less.</p>
     <p class="hint">🎙️ Talk while you film: <i>“these chairs stack”</i>, <i>“the cabinet's full of books”</i>, <i>“the sofa stays”</i>. We'll hear it.</p>
     <p class="warn hidden size-warn"></p>
     <ul class="files"></ul>
