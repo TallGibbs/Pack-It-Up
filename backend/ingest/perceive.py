@@ -88,7 +88,8 @@ def perceive_file(run_id: str, entry: dict, job_name: str = "perceive") -> dict:
     return result
 
 
-def perceive_all(run_id: str, room_id: str | None = None, job_name: str = "perceive") -> list[dict]:
+def perceive_all(run_id: str, room_id: str | None = None, job_name: str = "perceive",
+                 on_file_done=None) -> list[dict]:
     """Perceive every file in the manifest (optionally one room). Clips go first: their upload is the slow part."""
     rd = run_dir(run_id)
     manifest = read_json(rd / "manifest.json")
@@ -103,5 +104,11 @@ def perceive_all(run_id: str, room_id: str | None = None, job_name: str = "perce
                 results.append(fut.result())
             except LLMError:
                 failed.append(futs[fut]["name"])
+                continue
+            if on_file_done:
+                try:
+                    on_file_done(results[-1])
+                except Exception as e:  # a partial rebuild must not stop the run
+                    update_status(rd, error=f"partial rebuild after {results[-1]['file']}: {e}")
     update_status(rd, stage="perceive_done", perceive_failed=failed)
     return sorted(results, key=lambda r: r["file"])

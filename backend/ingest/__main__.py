@@ -8,11 +8,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from .common import new_run_id
+from .common import new_run_id, run_dir
 from .intake import collect_folder, intake
 from .merge import merge
 from .perceive import perceive_all
-from .resolve import resolve
+from .pipeline import run_pipeline
 
 
 def print_summary(inv: dict) -> None:
@@ -40,6 +40,7 @@ def main(argv=None) -> int:
     ap.add_argument("--room", help="room name (default: folder name)")
     ap.add_argument("--run-id", help="add to an existing run (multi-room move)")
     ap.add_argument("--until", default="resolve", choices=["intake", "perceive", "merge", "resolve"], help="stop after this stage")
+    ap.add_argument("--no-questions", action="store_true", help="skip stage 5 (no decide calls)")
     args = ap.parse_args(argv)
 
     files = collect_folder(args.folder)
@@ -56,14 +57,16 @@ def main(argv=None) -> int:
         print(f"  skipped {s['name']}: {s['reason']}")
     if args.until == "intake":
         return 0
-    perceive_all(run_id)
     if args.until == "perceive":
+        perceive_all(run_id)
         return 0
-    merge(run_id)
     if args.until == "merge":
+        perceive_all(run_id)
+        merge(run_id)
         return 0
-    inv = resolve(run_id)
+    inv = run_pipeline(run_id, questions=not args.no_questions)
     print_summary(inv)
+    print(f"\nrun folder: {run_dir(run_id)}")
     return 0
 
 

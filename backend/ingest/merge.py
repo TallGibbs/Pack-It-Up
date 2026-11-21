@@ -244,10 +244,8 @@ def merge(run_id: str) -> dict:
         ps = [p for p in perc if p["room_id"] == room["id"]]
         if ps:
             rooms.append(merge_room(ps, room))
+    # Answers and edits are re-applied afterwards by gaps.reapply_answers().
     merged = {"run_id": run_id, "rooms": rooms, "answers_applied": []}
-    old = read_json(rd / "merged.json")
-    if old and old.get("answers_applied"):
-        merged["answers_applied"] = []  # answers are re-applied by gaps.reapply_answers()
     write_json(rd / "merged.json", merged)
     update_status(rd, stage="merge_done")
     return merged
