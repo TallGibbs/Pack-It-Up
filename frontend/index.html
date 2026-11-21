@@ -185,6 +185,23 @@
     border-color: var(--accent); background: var(--accent-soft); color: var(--accent);
   }
 
+  /* Planner rounds (B6): the plan model changes the settings, the checker scores each round */
+  .planner-box { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .planner-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .planner-head .btn { flex: none; }
+  .planner-rounds { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+  .planner-round {
+    border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px;
+    background: var(--bg); font-size: 12.5px; line-height: 1.4;
+  }
+  .planner-round.best { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 7%, var(--card)); }
+  .planner-round .pr-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-weight: 600; }
+  .planner-round .pr-score { font-variant-numeric: tabular-nums; }
+  .planner-round .pr-kept { color: var(--ok); font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
+  .planner-round .pr-bad { color: var(--bad); }
+  .planner-round .pr-change { margin-top: 3px; }
+  .planner-round .pr-why { margin-top: 2px; color: var(--muted); }
+
   /* Verifier checks & balance gauge */
   .checks-grid { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
   .check-chip {
@@ -405,6 +422,14 @@
         <div class="whatif-toggles">
           <button type="button" class="chip-toggle" id="tog-piano" aria-pressed="false">🎹 +1 Upright Piano (500 lb)</button>
           <button type="button" class="chip-toggle" id="tog-downsize" aria-pressed="false">📐 Downsize last truck</button>
+        </div>
+        <!-- B6: POST /plan. The plan model reads the checker's result and changes the settings; best round is shown -->
+        <div class="planner-box">
+          <div class="planner-head">
+            <span class="small muted" id="planner-status" aria-live="polite">Gemini 4 Neon reads the checker's result and changes the settings, up to 3 rounds.</span>
+            <button type="button" class="btn sm" id="btn-plan">Plan with Neon</button>
+          </div>
+          <ol class="planner-rounds hidden" id="planner-rounds"></ol>
         </div>
       </section>
 
@@ -1485,6 +1510,120 @@ function renderPanels() {
   });
 }
 
+/* ---------- Settings from the controls, and putting a solved plan on screen ---------- */
+function currentStrategy() {
+  return {
+    truck_id: $("#sel-truck").value,
+    packer_engine: $("#sel-engine").value,
+    order_mode: "lifo_heavy_first",
+    downsize_last_truck: downsizeLast,
+  };
+}
+function currentExtraItems() {
+  return addPiano
+    ? [{ id: "judge_piano", label: "Judge What-If: Upright Piano", catalog_id: "piano_upright", dims_in: [58, 25, 48], weight_lb: 500, fragile: true, must_stay_upright: true, two_person: true, stackable: "no" }]
+    : [];
+}
+function showPlan(result, resetCam) {
+  plan = result;
+  violatingIds = new Set((plan.score?.violations || []).flatMap((v) => v.item_ids || []));
+  roomColorMap = {};
+  const roomIds = Array.from(new Set((plan.trucks || []).flatMap((t) => (t.items || []).map((i) => i.room_id))));
+  roomIds.forEach((rid, idx) => { roomColorMap[rid] = ROOM_PALETTE[idx % ROOM_PALETTE.length]; });
+
+  renderPanels();
+  rebuildScene(resetCam);
+}
+
+/* ---------- Planner loop (B6): POST /plan, show each round, load the winning plan ---------- */
+const SETTING_NAMES = {
+  packer_engine: "Packer", truck_id: "Truck size", truck_sequence: "Fleet order",
+  order_mode: "Load order", allow_all_rotations: "Tip pieces on a side", downsize_last_truck: "Downsize last truck",
+};
+function settingText(v) {
+  if (Array.isArray(v)) return v.length ? v.map((t) => String(t).replace("uhaul_", "") + " ft").join(", ") : "one size";
+  if (typeof v === "boolean") return v ? "on" : "off";
+  const sv = String(v);
+  if (sv.startsWith("uhaul_")) return sv.replace("uhaul_", "") + " ft";
+  return { constrained: "physics-constrained", raw_py3dbp: "raw py3dbp baseline" }[sv] || sv.replaceAll("_", " ");
+}
+function renderPlannerRounds(pl) {
+  const first = pl.rounds[0]?.score ?? 0;
+  $("#planner-rounds").innerHTML = pl.rounds.map((r) => {
+    const delta = r.round === 1 ? "" : ` (${r.score - first >= 0 ? "+" : "−"}${fmt(Math.abs(r.score - first), 1)})`;
+    const changes = Object.entries(r.changed || {})
+      .map(([k, [a, b]]) => `${esc(SETTING_NAMES[k] || k)}: ${esc(settingText(a))} → <b>${esc(settingText(b))}</b>`).join(" · ");
+    const viol = r.violation_count
+      ? `<span class="pr-bad">${fmt(r.violation_count)} violation${r.violation_count === 1 ? "" : "s"}</span>`
+      : `<span>0 violations</span>`;
+    return `<li class="planner-round${r.round === pl.best_round ? " best" : ""}">
+      <div class="pr-top">
+        <span>Round ${r.round}</span>
+        <span class="pr-score">${fmt(r.score, 1)} / 100${delta}</span>
+        <span>${esc(String(r.fleet).replace(/uhaul_(\d+)/g, "$1 ft"))}</span>
+        ${viol}
+        ${r.round === pl.best_round ? `<span class="pr-kept">✓ kept</span>` : ""}
+      </div>
+      ${changes ? `<div class="pr-change">${changes}</div>` : ""}
+      <div class="pr-why">${r.source === "model" ? "Neon: " : ""}${esc(r.reason)}</div>
+    </li>`;
+  }).join("");
+  $("#planner-rounds").classList.remove("hidden");
+}
+async function planWithModel() {
+  const status = $("#planner-status");
+  if (MOCK) {
+    status.textContent = "Plan with Neon needs the Python server; mock mode has no model.";
+    return;
+  }
+  $("#err-box").classList.add("hidden");
+  $("#btn-plan").disabled = true;
+  $("#btn-resolve").disabled = true;
+  status.textContent = "Neon is reading the checker's result and choosing new settings… about 10 seconds a round.";
+  const t0 = performance.now();
+  try {
+    const res = await fetch(`${API_BASE}/plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: rawRunId, strategy: currentStrategy(), extra_items: currentExtraItems() }),
+    });
+    if (!res.ok) {
+      const detail = (await res.json().catch(() => ({}))).detail || res.statusText;
+      throw new Error(detail);
+    }
+    const result = await res.json();
+    const pl = result.planner || { rounds: [], best_round: 1 };
+    const secs = fmt((performance.now() - t0) / 1000, 0);
+    renderPlannerRounds(pl);
+
+    // Show the winning settings on the controls. Re-solve still sends only what the controls hold.
+    const st = result.strategy || {};
+    $("#sel-truck").value = st.truck_id || "uhaul_26";
+    $("#sel-engine").value = st.packer_engine || "constrained";
+    downsizeLast = Boolean(st.downsize_last_truck);
+    $("#tog-downsize").setAttribute("aria-pressed", String(downsizeLast));
+
+    const best = pl.rounds[pl.best_round - 1];
+    const gain = best ? best.score - pl.first_score : 0;
+    // The model layer keeps answers by prompt, so the same move with the same start is answered from its cache.
+    const modelRounds = pl.rounds.filter((r) => r.source === "model");
+    const cached = modelRounds.length > 0 && modelRounds.every((r) => (r.model_latency_s ?? 1) < 0.2);
+    status.textContent = pl.rounds.length > 1
+      ? `${pl.model || "Model"}: ${pl.rounds.length} rounds in ${secs} s. Round ${pl.best_round} kept` +
+        (gain > 0 ? `, +${fmt(gain, 1)} points` : pl.best_round === 1 ? "; no round beat the start" : "") + "." +
+        (cached ? " Same inputs as an earlier run, so Neon's answers came from the cache." : "") +
+        (pl.note ? ` ${pl.note}` : "")
+      : (pl.note || "Only the starting round ran.");
+    $("#engine-badge").textContent = `Move: ${result.run_id} · Python 3D solver · planned by ${pl.model || "the plain solve"}`;
+    showPlan(result, true);
+  } catch (e) {
+    status.textContent = `Couldn't plan with Neon: ${e.message}. The plan on screen is unchanged.`;
+  } finally {
+    $("#btn-plan").disabled = false;
+    $("#btn-resolve").disabled = false;
+  }
+}
+
 /* ---------- Solve Fetcher (Python FastAPI /solve -> Browser Mock Fallback) ---------- */
 async function loadAndSolve(resetCam = false) {
   const errBox = $("#err-box");
@@ -1492,15 +1631,8 @@ async function loadAndSolve(resetCam = false) {
   $("#btn-resolve").disabled = true;
   $("#verdict-status").textContent = "Solving…";
 
-  const strategy = {
-    truck_id: $("#sel-truck").value,
-    packer_engine: $("#sel-engine").value,
-    order_mode: "lifo_heavy_first",
-    downsize_last_truck: downsizeLast,
-  };
-  const extraItems = addPiano
-    ? [{ id: "judge_piano", label: "Judge What-If: Upright Piano", catalog_id: "piano_upright", dims_in: [58, 25, 48], weight_lb: 500, fragile: true, must_stay_upright: true, two_person: true, stackable: "no" }]
-    : [];
+  const strategy = currentStrategy();
+  const extraItems = currentExtraItems();
 
   try {
     let result = null;
@@ -1541,14 +1673,10 @@ async function loadAndSolve(resetCam = false) {
       $("#engine-badge").textContent = MOCK ? `Mock move · Browser 3D solver` : `Move: ${rawRunId} · Browser 3D solver`;
     }
 
-    plan = result;
-    violatingIds = new Set((plan.score?.violations || []).flatMap((v) => v.item_ids || []));
-    roomColorMap = {};
-    const roomIds = Array.from(new Set((plan.trucks || []).flatMap((t) => (t.items || []).map((i) => i.room_id))));
-    roomIds.forEach((rid, idx) => { roomColorMap[rid] = ROOM_PALETTE[idx % ROOM_PALETTE.length]; });
-
-    renderPanels();
-    rebuildScene(resetCam);
+    showPlan(result, resetCam);
+    if (!$("#planner-rounds").classList.contains("hidden")) {
+      $("#planner-status").textContent = "The view now shows your Re-solve. The rounds below are from the last Neon run.";
+    }
   } catch (e) {
     errBox.textContent = `Couldn't load packing plan: ${e.message}`;
     errBox.classList.remove("hidden");
@@ -1620,6 +1748,7 @@ $("#step-slider").addEventListener("input", (e) => {
 $("#sel-truck").addEventListener("change", () => loadAndSolve(true));
 $("#sel-engine").addEventListener("change", () => loadAndSolve(false));
 $("#btn-resolve").addEventListener("click", () => loadAndSolve(false));
+$("#btn-plan").addEventListener("click", planWithModel);
 
 $("#tog-piano").addEventListener("click", () => {
   addPiano = !addPiano;
