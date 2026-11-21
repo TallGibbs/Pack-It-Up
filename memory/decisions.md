@@ -284,3 +284,10 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Decision:** The app links to a Usage view for the move you are in (`/app/models.html?run_id=<move>`), and that view shows an estimated cost: the tokens each model reported for the move, times Google's list price for that model. All moves together have the same summary, and the table of every run has a cost column.
 - **Why:** People should see what their use of the app cost. (Chris)
 - **Limits:** It is an estimate at list prices (`backend/analysis/prices.toml`, read from Google's pricing page on Nov 21), not a bill: cached calls cost nothing, failed attempts and Google's discount for repeated input are not counted, and the event key may not be charged at all. Argon's price doubles on Dec 1, 2026; the file holds the price through Nov 30.
+
+## 2026-11-21 15:41 · Supply kit: fewer stores over the cheapest store per item
+- **Decision:** The Move Supply Kit picks stores for the whole kit, not item by item. A store is dropped when moving its lines to stores already in the kit costs less than an estimated $15 shipping fee per store (`EST_SHIPPING_PER_STORE_CENTS` in `backend/commerce.py`). The browser fallback in `frontend/ui/commerce.js` uses the same rule.
+- **Why:** Each Shopify store is its own cart and its own shipping charge; a $5.80 tape cart was charged $25 shipping. One cart per store is a Shopify limit, so fewer stores is the only way to fewer carts. (Chris)
+- **Limits:** $15 is a guess; real shipping is only known at checkout. A store stays when it is the only one in the kit offering a line within $15.
+- **By:** Chris. Track B files (George's), changed at Chris's request.
+- **See:** commit 12aa644, FAILURES.md 15:41 row
