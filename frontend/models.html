@@ -32,6 +32,13 @@
   .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
   .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
   .stat span { font-size: 12px; color: var(--muted); }
+  .stat.total { border-top: 4px solid var(--accent); grid-column: span 2; }
+  .stat.total b { font-size: 34px; line-height: 1.1; }
+  .stat.total span { font-size: 13px; }
+  #cost-note { margin: 8px 0 0; }
+  #cost-note summary { cursor: pointer; display: inline; text-decoration: underline; }
+  #cost-note details { display: inline; }
+  #cost-note details[open] { display: block; margin-top: 4px; }
 
   .tl { overflow-x: auto; }
   .tl svg { display: block; min-width: 560px; width: 100%; height: auto; }
@@ -83,7 +90,7 @@
 </head>
 <body>
 <main class="wide">
-  <h1>Which model did what</h1>
+  <h1>Usage</h1>
   <p class="muted" id="sub">Every model call this app made, read from the run's call log.</p>
 
   <div class="bar-top">
@@ -97,14 +104,15 @@
   <p class="error hidden" id="err"></p>
   <p class="notice hidden" id="archived-note"></p>
 
-  <section id="jobs" class="jobs" aria-live="polite"></section>
-
   <section id="cost">
     <h2 id="cost-title">What this move cost</h2>
-    <div class="stats" id="cost-stats"></div>
+    <div class="stats" id="cost-stats" aria-live="polite"></div>
     <div class="card scroll" id="cost-models"></div>
-    <p class="small muted" id="cost-note"></p>
+    <div class="small muted" id="cost-note"></div>
   </section>
+
+  <h2>Which model did what</h2>
+  <section id="jobs" class="jobs" aria-live="polite"></section>
 
   <section id="trends-sec" class="hidden">
     <h2>Run by run</h2>
@@ -225,24 +233,27 @@
     show("cost", true);
     $("cost-title").textContent = isAll ? `What all ${fmt(runs)} runs cost` : "What this move cost";
     const sum = (k) => c.by_model.reduce((a, m) => a + (m[k] || 0), 0);
-    $("cost-stats").innerHTML = [[usd(c.total_usd), "estimated cost"], [fmt(sum("live_calls")), "calls sent to a model"],
+    $("cost-stats").innerHTML = [[usd(c.total_usd), isAll ? "estimated cost of every run's API calls" : "estimated cost of this move's API calls"],
+      [fmt(sum("live_calls")), "calls sent to a model"],
       [fmt(sum("tokens_in")), "tokens in"], [fmt(sum("tokens_out") + sum("thoughts")), "tokens out, with thinking"]]
-      .map(([b, s]) => `<div class="stat"><b>${b}</b><span>${esc(s)}</span></div>`).join("");
+      .map(([b, s], i) => `<div class="stat${i ? "" : " total"}"><b>${b}</b><span>${esc(s)}</span></div>`).join("");
     const mono = `style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"`;
-    $("cost-models").innerHTML = c.by_model.length ? `<table class="t"><thead><tr><th>Model</th><th class="n">Calls sent</th><th class="n">Tokens in</th>
-      <th class="n">Tokens out</th><th class="n">Thinking</th><th class="n">Price per 1M, in / out</th><th class="n">Est. cost</th></tr></thead><tbody>` +
-      c.by_model.map((m) => `<tr><td><span ${mono}>${esc(m.model)}</span></td><td class="n">${fmt(m.live_calls)}</td>
+    $("cost-models").innerHTML = c.by_model.length ? `<table class="t"><thead><tr><th>Model</th><th class="n">Est. cost</th><th class="n">Calls sent</th><th class="n">Tokens in</th>
+      <th class="n">Tokens out</th><th class="n">Thinking</th><th class="n">Price per 1M, in / out</th></tr></thead><tbody>` +
+      c.by_model.map((m) => `<tr><td><span ${mono}>${esc(m.model)}</span></td><td class="n"><b>${usd(m.cost_usd)}</b></td><td class="n">${fmt(m.live_calls)}</td>
         <td class="n">${fmt(m.tokens_in)}</td><td class="n">${fmt(m.tokens_out)}</td><td class="n">${fmt(m.thoughts)}</td>
-        <td class="n">${m.price_in == null ? "no price on file" : "$" + fmt(m.price_in, 2) + " / " + (m.price_out ? "$" + fmt(m.price_out, 2) : "none")}</td>
-        <td class="n"><b>${usd(m.cost_usd)}</b></td></tr>`).join("") +
-      `<tr><td><b>Total</b></td><td class="n">${fmt(sum("live_calls"))}</td><td class="n">${fmt(sum("tokens_in"))}</td><td class="n">${fmt(sum("tokens_out"))}</td>
-        <td class="n">${fmt(sum("thoughts"))}</td><td></td><td class="n"><b>${usd(c.total_usd)}</b></td></tr></tbody></table>`
+        <td class="n">${m.price_in == null ? "no price on file" : "$" + fmt(m.price_in, 2) + " / " + (m.price_out ? "$" + fmt(m.price_out, 2) : "none")}</td></tr>`).join("") +
+      `<tr><td><b>Total</b></td><td class="n"><b>${usd(c.total_usd)}</b></td><td class="n">${fmt(sum("live_calls"))}</td><td class="n">${fmt(sum("tokens_in"))}</td>
+        <td class="n">${fmt(sum("tokens_out"))}</td><td class="n">${fmt(sum("thoughts"))}</td><td></td></tr></tbody></table>`
       : `<p class="empty">No model calls logged yet.</p>`;
     const src = String(c.source || "").startsWith("https://") ? `<a href="${esc(c.source)}" target="_blank" rel="noopener">Google's list prices</a>` : "Google's list prices";
+    // One line stays in view; the fine print opens on request so the cards below stay close to the top.
+    const open = $("cost-note").querySelector("details");
     $("cost-note").innerHTML = `An estimate, not a bill: the tokens each call reported, at ${src} for the Gemini API as read on ${esc(c.as_of || "")}.
-      Thinking tokens are billed as output. Cached calls replay a saved answer and cost nothing. Failed attempts and Google's own discount for repeated input
-      are not counted, and an event or free-tier key may not be charged at all.
-      ${c.unpriced.length ? `<b>No price on file for ${esc(c.unpriced.join(", "))}</b>, so those calls add nothing to the total.` : ""}`;
+      ${c.unpriced.length ? `<b>No price on file for ${esc(c.unpriced.join(", "))}</b>, so those calls add nothing to the total.` : ""}
+      <details${open && open.open ? " open" : ""}><summary>What is and isn't counted</summary>Thinking tokens are billed as output. Cached calls replay a saved
+      answer and cost nothing. Failed attempts and Google's own discount for repeated input are not counted, and an event or free-tier key may not
+      be charged at all.</details>`;
   }
 
   // ---------- timeline: one lane per job, bars from start to end ----------
