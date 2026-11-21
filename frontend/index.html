@@ -1511,12 +1511,16 @@ function renderPanels() {
 }
 
 /* ---------- Settings from the controls, and putting a solved plan on screen ---------- */
+// Settings the planner chose that have no control on this page (load order, rotations, mixed fleet).
+// Empty until "Plan with Neon" has run; after that Re-solve keeps them, so a what-if builds on Neon's plan.
+let plannerExtras = {};
 function currentStrategy() {
   return {
     truck_id: $("#sel-truck").value,
     packer_engine: $("#sel-engine").value,
     order_mode: "lifo_heavy_first",
     downsize_last_truck: downsizeLast,
+    ...plannerExtras,
   };
 }
 function currentExtraItems() {
@@ -1602,6 +1606,11 @@ async function planWithModel() {
     $("#sel-engine").value = st.packer_engine || "constrained";
     downsizeLast = Boolean(st.downsize_last_truck);
     $("#tog-downsize").setAttribute("aria-pressed", String(downsizeLast));
+    plannerExtras = pl.rounds.length > 1 ? {
+      order_mode: st.order_mode || "lifo_heavy_first",
+      allow_all_rotations: Boolean(st.allow_all_rotations),
+      truck_sequence: st.truck_sequence || [],
+    } : {};
 
     const best = pl.rounds[pl.best_round - 1];
     const gain = best ? best.score - pl.first_score : 0;
@@ -1675,7 +1684,7 @@ async function loadAndSolve(resetCam = false) {
 
     showPlan(result, resetCam);
     if (!$("#planner-rounds").classList.contains("hidden")) {
-      $("#planner-status").textContent = "The view now shows your Re-solve. The rounds below are from the last Neon run.";
+      $("#planner-status").textContent = "The view now shows your Re-solve, which keeps Neon's load order and rotation settings. The rounds below are from the last Neon run.";
     }
   } catch (e) {
     errBox.textContent = `Couldn't load packing plan: ${e.message}`;
@@ -1745,7 +1754,10 @@ $("#step-slider").addEventListener("input", (e) => {
   applyStepVisibility();
 });
 
-$("#sel-truck").addEventListener("change", () => loadAndSolve(true));
+$("#sel-truck").addEventListener("change", () => {
+  if (plannerExtras.truck_sequence) plannerExtras.truck_sequence = [];  // a truck picked by hand replaces Neon's mixed fleet
+  loadAndSolve(true);
+});
 $("#sel-engine").addEventListener("change", () => loadAndSolve(false));
 $("#btn-resolve").addEventListener("click", () => loadAndSolve(false));
 $("#btn-plan").addEventListener("click", planWithModel);
