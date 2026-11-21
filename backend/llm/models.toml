@@ -118,7 +118,7 @@ retries = 0
 
 [jobs.slides]
 model = "gemini:gemini-4-carbon"          # judging slide deck, HTML (scripts/slides/build.py); demo outputs are made by Gemini (AGENTS.md)
-thinking = "high"
+thinking = "medium"                     # high took 5-9 min per call (FAILURES.md 16:12); medium on Chris's choice
 media_resolution = "medium"
 timeout_s = 600
 retries = 1

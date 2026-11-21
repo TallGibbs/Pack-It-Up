@@ -58,7 +58,7 @@ This file is the input to the Gemini job `slides` (scripts/slides/build.py). It 
 
 ## Slide order (8 slides)
 
-1. Cover: name, one-line promise, the event, the QR code small in a corner.
+1. Cover: name, one-line promise, the event, and the QR code large, front and centre.
 2. How it works: the 7 steps above as a simple flow, naming the model at each step.
 3. Film: the capture page screenshot.
 4. Check the list: the review page screenshots (answers from the Decisions API, and the item list).
@@ -66,6 +66,8 @@ This file is the input to the Gemini job `slides` (scripts/slides/build.py). It 
 6. Which model did what: the models page screenshot and the table above.
 7. What we measured: the numbers above with their caveats.
 8. Try it yourself: QR code, the address, the GitHub link.
+
+Slides 2 to 8 each carry the same small QR badge in the bottom-right corner, so judges can scan it at any moment.
 
 ## Never on a slide
 
