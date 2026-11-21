@@ -128,16 +128,34 @@ def _check_support_and_stacking(
     z1: float,
     dx: float,
     dy: float,
+    dz: float,
     wt: float,
+    piece_stackable: str,
+    piece_fragile: bool,
     placed: list[dict],
     placed_boxes: list[tuple[float, float, float, float, float, float]],
     *,
     min_support: float,
     light_max_lb: float,
 ) -> bool:
+    x2, y2, z2 = x1 + dx, y1 + dy, z1 + dz
+
+    # Guard against sliding a `no_stack` / `light_only` / `fragile` item directly underneath
+    # the overhanging bottom face (`bz1 == z2`) of an already-placed heavy item above it.
+    if piece_stackable != "yes" or piece_fragile:
+        for i, above in enumerate(placed):
+            bx1, by1, bz1, bx2, by2, _ = placed_boxes[i]
+            if abs(bz1 - z2) > verify.SUPPORT_Z_TOL:
+                continue
+            if min(x2, bx2) - max(x1, bx1) <= EPS or min(y2, by2) - max(y1, by1) <= EPS:
+                continue
+            if piece_stackable == "no":
+                return False
+            if (piece_stackable == "light_only" or piece_fragile) and above["weight_lb"] > light_max_lb + EPS:
+                return False
+
     if z1 <= EPS:
         return True
-    x2, y2 = x1 + dx, y1 + dy
     sup_area = 0.0
     for i, sup in enumerate(placed):
         bx1, by1, bz1, bx2, by2, bz2 = placed_boxes[i]
@@ -265,7 +283,10 @@ def _pack_single_bin_constrained(
                 if _overlaps_3d(x, y, z, x + dx, y + dy, z + dz, placed_boxes):
                     continue
                 if not _check_support_and_stacking(
-                    x, y, z, dx, dy, wt, placed, placed_boxes,
+                    x, y, z, dx, dy, dz, wt,
+                    str(piece.get("stackable", "no")),
+                    bool(piece.get("fragile", False)),
+                    placed, placed_boxes,
                     min_support=min_support, light_max_lb=light_max_lb,
                 ):
                     continue
