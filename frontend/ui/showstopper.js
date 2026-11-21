@@ -688,7 +688,10 @@
       });
       if (!res.ok) {
         const errTxt = await res.text();
-        throw new Error(errTxt.slice(0, 180));
+        let msg = errTxt;
+        try { msg = JSON.parse(errTxt).detail || errTxt; } catch (_) {}
+        if (/^\s*<(!doctype|html)/i.test(msg)) msg = `server returned HTTP ${res.status} (proxy error page)`;
+        throw new Error(String(msg).slice(0, 180));
       }
       const data = await res.json();
       lastArrivalData = data;

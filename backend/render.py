@@ -47,7 +47,7 @@ def _normalize_16x9_png(raw_bytes_or_path: bytes | Path, out_path: Path, size: t
     """Normalize an image to exact 16:9 RGB PNG on disk so Omni Flash keyframes match 1:1."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if isinstance(raw_bytes_or_path, Path):
-        im = mu._open_image(raw_bytes_or_path)
+        im = mu.load_image(raw_bytes_or_path)
     else:
         im = Image.open(io.BytesIO(raw_bytes_or_path))
         im = ImageOps.exif_transpose(im).convert("RGB")
@@ -74,9 +74,9 @@ def ensure_empty_penn_frame(rd: Path | None = None) -> tuple[Media, str]:
             if out_png.exists() and out_png.stat().st_size > 500:
                 return Media(out_png, "image", "image/png", mu.sha256_file(out_png)), f"nypenn_media:{src.name}"
             if src.suffix.lower() in mu.VIDEO_EXT:
-                dur = mu.probe_duration(src) or 4.0
+                dur = mu.video_info(src).get("duration_s") or 4.0
                 jpg_tmp = RENDER_DIR / f"penn_frame_{h}.jpg"
-                mu.extract_frame(src, min(2.0, dur * 0.35), jpg_tmp)
+                mu.frame_at(src, min(2.0, dur * 0.35)).save(jpg_tmp, "JPEG", quality=90)
                 return _normalize_16x9_png(jpg_tmp, out_png), f"nypenn_video:{src.name}"
             return _normalize_16x9_png(src, out_png), f"nypenn_photo:{src.name}"
 
@@ -141,11 +141,10 @@ def collect_source_item_crops(run_id: str | None, inv: dict[str, Any], max_crops
                 out_crop = crop_dir / f"crop_{key}.jpg"
                 if not out_crop.exists():
                     if src_path.suffix.lower() in mu.VIDEO_EXT:
-                        frame_jpg = crop_dir / f"frame_{key}.jpg"
-                        mu.extract_frame(src_path, float(ev.get("timestamp_s") or 1.5), frame_jpg)
-                        mu.crop_image(frame_jpg, box, out_crop)
+                        src_img = mu.frame_at(src_path, float(ev.get("timestamp_s") or 1.5))
                     else:
-                        mu.crop_image(src_path, box, out_crop)
+                        src_img = mu.load_image(src_path)
+                    mu.crop_box(src_img, box).save(out_crop, "JPEG", quality=90)
                 crops.append(
                     Media(
                         out_crop,

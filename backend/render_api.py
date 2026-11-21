@@ -67,7 +67,7 @@ def api_render_arrival(req: RenderArrivalRequest) -> dict[str, Any]:
             zone_focus=req.zone_focus,
         )
     except Exception as e:
-        raise HTTPException(502, f"Arrival render failed: {e}") from e
+        raise HTTPException(500, f"Arrival render failed: {e}") from e
 
 
 @router.post("/render/timelapse/start")
@@ -82,7 +82,7 @@ def api_timelapse_start(req: TimelapseStartRequest) -> dict[str, Any]:
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
     except Exception as e:
-        raise HTTPException(502, f"Timelapse start failed: {e}") from e
+        raise HTTPException(500, f"Timelapse start failed: {e}") from e
 
 
 @router.get("/render/timelapse/{job_id}")
