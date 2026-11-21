@@ -2,7 +2,7 @@
 // the top open question, and coming back to a move. Needs ui/api.js and ui/questions.js first.
 (function () {
   "use strict";
-  const { api, link, MOCK, params, $, isVideo, thumbHtml, totalBoxes, LOCAL_API } = window.PIU;
+  const { api, link, MOCK, params, $, isVideo, thumbHtml, totalBoxes, boxCount, LOCAL_API } = window.PIU;
   const ACCEPT_EXT = /\.(jpe?g|png|heic|heif|webp|mp4|mov|m4v)$/i;
   // Through the demo address every upload passes Cloudflare, which refuses a request over 100 MB
   // (the phone would only see "upload failed (413)"). So there: no file over MAX_MB, and files are
@@ -192,8 +192,11 @@
     if (r.phase === "failed") return { text: r.err || "failed", cls: "failed" };
     if (r.phase === "dropped") return { text: "not added: a copy of one already here, or a type we can't read", cls: "failed" };
     const s = r.server || {};
-    // "seen", not "items": the count includes fixtures and small things that end up in boxes
-    if (s.perceive === "done") return { text: `done · ${s.items ?? "?"} seen${s.seconds != null ? ` · ${Math.round(s.seconds)} s` : ""}`, cls: "done" };
+    // No count here. The server's per-file number is lines the model listed (kinds of things, fixtures
+    // and small loose things included), not pieces of furniture, and files overlap: rows reading 14, 12,
+    // 5 and 25 "seen" sat above a footer of 48 items + 13 boxes (FAILURES.md 13:40). The room's line
+    // below the rows gives the merged count, in the footer's units.
+    if (s.perceive === "done") return { text: `done${s.items === 0 ? " · nothing found" : ""}${s.seconds ? ` · ${Math.round(s.seconds)} s` : ""}`, cls: "done" };
     if (s.perceive === "failed") return { text: "couldn't read this file" + (s.error ? `: ${s.error.slice(0, 80)}` : ""), cls: "failed" };
     if (s.perceive === "running") return { text: r.kind === "video" ? "watching and listening…" : "looking…", cls: "", busy: true };
     if (s.intake === "done") return { text: "received, queued", cls: "", busy: true };
@@ -275,17 +278,34 @@
 
   // What an inventory holds, in words: "12 items + 4 boxes". Boxes count too: a shelf of small decor
   // is 0 items and 4 boxes, and "0 items" alone reads as "found nothing" (FAILURES.md 12:45).
-  function foundText(inv) {
-    const n = inv.totals.item_count;
-    const boxes = totalBoxes(inv);
+  function countText(n, boxes) {
     if (n && boxes) return `${plural(n, "item")} + ${plural(boxes, "box")}`;
     return boxes ? `${plural(boxes, "box")} of small things` : plural(n, "item");
+  }
+  const foundText = (inv) => countText(inv.totals.item_count, totalBoxes(inv));
+
+  // Each room card says what the list holds for that room, counted the way the footer counts, so the
+  // rooms add up to the footer: "Room 1: 26 items + 1 box" and "Room 2: 22 items + 12 boxes" under a
+  // footer of "48 items + 13 boxes".
+  const slugOf = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "room_1"; // as slug() in backend/ingest/common.py
+  function updateRoomSums(inv) {
+    rooms.forEach((room) => {
+      const el = $(".room-sum", room.el);
+      const r = inv && room.locked && inv.rooms.find((x) => x.room.id === slugOf(room.name));
+      if (!r) { el.classList.add("hidden"); return; }
+      const working = room.files.some((f) => f.phase === "queued" || f.phase === "uploading" ||
+        (f.phase === "sent" && !["done", "failed"].includes((f.server || {}).perceive)));
+      const boxes = (r.containers || []).reduce((a, c) => a + boxCount(c), 0);
+      el.textContent = `${working ? "In this room so far" : "In this room"}: ${countText(r.totals.item_count, boxes)}`;
+      el.classList.remove("hidden");
+    });
   }
 
   function updateFooter(run) {
     const btn = $("#review-btn");
     const plan = $("#plan-btn");
     const inv = run.inventory;
+    updateRoomSums(inv);
     const done = allFinished(run);
     btn.href = link("review.html", { run_id: runId });
     plan.href = link("index.html", { run_id: runId });
