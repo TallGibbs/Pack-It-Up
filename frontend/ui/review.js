@@ -26,7 +26,8 @@
   let lastTotals = {};
   let answeredOpen = false; // the folded list of answered questions stays as the user left it across re-renders
 
-  $("#add-more").href = link("capture.html", { run_id: runId }); // back to the same move, not a new one
+  // Every link back to filming (steps line, top button, bottom button) returns to the same move, not a new one.
+  document.querySelectorAll(".to-capture").forEach((a) => (a.href = link("capture.html", { run_id: runId })));
 
   if (!runId) {
     $("#sub").textContent = "No move yet.";

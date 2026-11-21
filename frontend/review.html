@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1f6feb">
 <title>Pack It Up · Check the list</title>
-<link rel="stylesheet" href="ui/style.css?v=3">
+<link rel="stylesheet" href="ui/style.css?v=4">
 </head>
 <body>
 <div id="mock-banner" class="mock-banner hidden">Mock mode: invented items, no server.</div>
@@ -18,14 +18,16 @@
   </div>
 </div>
 <main>
-  <p class="steps">1 Film · <b>2 Check</b> · 3 Pack</p>
+  <p class="steps"><a class="to-capture" href="capture.html">‹ 1 Film</a> · <b>2 Check</b> · 3 Pack</p>
   <h1>Check the list</h1>
   <p class="muted" id="sub">Loading…</p>
   <p class="error hidden" id="err"></p>
+  <!-- The way back to filming, where it can be seen: the only link used to sit under the last item (FAILURES.md 13:50). -->
+  <p><a class="btn block to-capture" href="capture.html">← Add a room or more photos</a></p>
 
   <section id="questions"></section>
   <section id="rooms"></section>
-  <p class="small"><a id="add-more" class="btn link" href="capture.html">+ Film another room</a></p>
+  <p><a class="btn block to-capture" href="capture.html">+ Film another room</a></p>
 </main>
 
 <div class="footer">
@@ -63,9 +65,9 @@
   </form>
 </dialog>
 
-<script src="mock/mock-api.js?v=3"></script>
-<script src="ui/api.js?v=3"></script>
-<script src="ui/questions.js?v=3"></script>
-<script src="ui/review.js?v=3"></script>
+<script src="mock/mock-api.js?v=4"></script>
+<script src="ui/api.js?v=4"></script>
+<script src="ui/questions.js?v=4"></script>
+<script src="ui/review.js?v=4"></script>
 </body>
 </html>
