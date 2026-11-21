@@ -404,43 +404,6 @@ def _group_label(gk: str, base: list[dict]) -> str:
     return out if len(out) <= 80 else out[:77] + "..."
 
 
-def _keep_item_ids(rd, rooms: list[dict]) -> None:
-    """Give every item the id its group had in earlier merges of this run.
-
-    merge_room numbers items by their place in a sorted list, so a new photo of the room that adds one
-    group renumbered the ones after it. Edits and answers are stored by item id, so a Toss on the
-    "communal work table" landed on the "floor lamp" after the next upload (FAILURES.md 13:10: 109 of
-    172 tries). runs/<id>/item_ids.json remembers {room: {group_key: id}}; a group keeps its id for
-    good, a new group takes the next free number, and numbers are never reused.
-    """
-    path = rd / "item_ids.json"
-    known = read_json(path)
-    if known is None:  # a run from before this file: start from the ids its last merge gave
-        known = {}
-        for room in (read_json(rd / "merged.json") or {}).get("rooms", []):
-            for it in room["items"]:
-                if it.get("group_key") and re.fullmatch(re.escape(room["id"]) + r"_item_\d+", it["id"]):
-                    known.setdefault(room["id"], {}).setdefault(it["group_key"], it["id"])
-    for room in rooms:
-        ids = known.setdefault(room["id"], {})
-        last = max([int(v.rsplit("_", 1)[1]) for v in ids.values()] + [0])
-        renamed, used = {}, set()
-        for it in room["items"]:
-            key = it["group_key"]
-            while key in used:  # two lines with one group key: keep them apart
-                key += "+"
-            used.add(key)
-            if key not in ids:
-                last += 1
-                ids[key] = f"{room['id']}_item_{last:02d}"
-            renamed[it["id"]] = ids[key]
-        for it in room["items"]:
-            it["id"] = renamed[it["id"]]
-        for flag in room.get("merge_flags", []):
-            flag["item_id"] = renamed.get(flag["item_id"], flag["item_id"])
-    write_json(path, known)
-
-
 def merge(run_id: str) -> dict:
     rd = run_dir(run_id)
     manifest = read_json(rd / "manifest.json")
@@ -450,7 +413,6 @@ def merge(run_id: str) -> dict:
         ps = [p for p in perc if p["room_id"] == room["id"]]
         if ps:
             rooms.append(merge_room(ps, room))
-    _keep_item_ids(rd, rooms)
     # Answers and edits are re-applied afterwards by gaps.reapply_answers().
     merged = {"run_id": run_id, "rooms": rooms, "answers_applied": []}
     write_json(rd / "merged.json", merged)
