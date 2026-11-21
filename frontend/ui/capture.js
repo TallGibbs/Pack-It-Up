@@ -152,8 +152,12 @@
       });
       adoptRun(res.run_id);
       const skipped = new Set((res.skipped || []).map((s) => (typeof s === "string" ? s : s.name)));
+      // The reply's `files` lists what the room now holds. A file in neither list was dropped without a
+      // word (a second copy of a photo already here, or a type the server doesn't take), and its row
+      // used to sit at "received" with the footer at "Still looking…" for good (FAILURES.md 13:10).
+      const kept = Array.isArray(res.files) ? new Set(res.files) : null;
       job.rows.forEach((r) => {
-        r.phase = skipped.has(r.name) ? "failed" : "sent";
+        r.phase = skipped.has(r.name) ? "failed" : kept && !kept.has(r.name) ? "dropped" : "sent";
         if (r.phase === "failed") r.err = "server skipped this file";
       });
       if (!firstSentAt) firstSentAt = Date.now();
@@ -179,6 +183,7 @@
     if (r.phase === "queued") return { text: "waiting", cls: "" , bar: 0 };
     if (r.phase === "uploading") return { text: `uploading ${Math.round(r.pct * 100)}%`, cls: "", bar: r.pct };
     if (r.phase === "failed") return { text: r.err || "failed", cls: "failed" };
+    if (r.phase === "dropped") return { text: "not added: a copy of one already here, or a type we can't read", cls: "failed" };
     const s = r.server || {};
     // "seen", not "items": the count includes fixtures and small things that end up in boxes
     if (s.perceive === "done") return { text: `done · ${s.items ?? "?"} seen${s.seconds != null ? ` · ${Math.round(s.seconds)} s` : ""}`, cls: "done" };
