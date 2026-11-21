@@ -2362,7 +2362,12 @@ function animate(now) {
 }
 requestAnimationFrame(animate);
 
-loadAndSolve(true);
+// The shop and route panels (ui/commerce.js, ui/journey.js) add their settings to /solve by wrapping
+// fetch when they mount, at DOMContentLoaded, which fires after this module has run. Solving right
+// here sent the first request without them (no Orior white-glove setting), so the first Re-solve
+// changed the plan with nothing changed. Their listeners were added before this one, so they run first.
+if (document.readyState === "complete") loadAndSolve(true);
+else document.addEventListener("DOMContentLoaded", () => loadAndSolve(true), { once: true });
 </script>
 </body>
 </html>
