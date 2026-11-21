@@ -362,6 +362,66 @@ def _assign_walk_in_load_seq(placed: list[dict]) -> None:
         it["load_seq"] = seq
 
 
+def _unload_blockers(boxes: list[tuple[float, ...]], i: int, remaining: set[int], tol: float) -> int:
+    """Count remaining items that stop item `i` from coming off the truck right now.
+
+    An item is blocked by anything resting above its footprint (it must be lifted off first) and by
+    anything between it and the rear door (`x=L`) in its own width/height cross-section (the slide-out path).
+    """
+    ax1, ay1, az1, ax2, ay2, az2 = boxes[i]
+    n_block = 0
+    for j in remaining:
+        if j == i:
+            continue
+        bx1, by1, bz1, bx2, by2, bz2 = boxes[j]
+        y_ov = min(ay2, by2) - max(ay1, by1) > tol
+        if not y_ov:
+            continue
+        above = bz1 >= az2 - tol and min(ax2, bx2) - max(ax1, bx1) > tol
+        doorward = bx1 >= ax2 - tol and min(az2, bz2) - max(az1, bz1) > tol
+        if above or doorward:
+            n_block += 1
+    return n_block
+
+
+def _assign_free_path_unload_seq(placed: list[dict]) -> None:
+    """Set `unload_seq` so every item has a free path out of the rear door when its turn comes.
+
+    Greedy peel from the door end: at each step take an item with nothing on top of it and nothing
+    between it and the door, preferring the one nearest the door, then the highest. This replaces
+    "reverse of load_seq", which could call for a cab-end item while the truck was still full.
+    If no item is free (an interlocked placement), the least-blocked door-most item goes next.
+    """
+    n = len(placed)
+    if n == 0:
+        return
+    tol = verify.SUPPORT_Z_TOL
+    boxes = [
+        (
+            float(it["pos_in"][0]),
+            float(it["pos_in"][1]),
+            float(it["pos_in"][2]),
+            float(it["pos_in"][0] + it["size_in"][0]),
+            float(it["pos_in"][1] + it["size_in"][1]),
+            float(it["pos_in"][2] + it["size_in"][2]),
+        )
+        for it in placed
+    ]
+    remaining = set(range(n))
+    seq = 1
+    while remaining:
+        best_key = None
+        best_i = -1
+        for i in remaining:
+            x1, y1, z1, x2, _, z2 = boxes[i]
+            key = (_unload_blockers(boxes, i, remaining, tol), -round(x2, 2), -round(z2, 2), round(y1, 2), i)
+            if best_key is None or key < best_key:
+                best_key, best_i = key, i
+        placed[best_i]["unload_seq"] = seq
+        seq += 1
+        remaining.discard(best_i)
+
+
 def _pack_single_bin_constrained(
     pieces: list[dict],
     bin_dims: list[float],
@@ -723,12 +783,11 @@ def solve_pieces(pieces: list[dict], strategy: dict | None = None) -> dict[str, 
         p_vol = sum(it["size_in"][0] * it["size_in"][1] * it["size_in"][2] for it in placed)
         t_wt = round(sum(it["weight_lb"] for it in placed), 1)
 
-        # Attach truck index & unload_seq (reverse of load_seq) for B8/B10 convenience
-        total_in_truck = len(placed)
+        # Attach truck index & a free-path unload_seq (rear door first, nothing on top or in the way)
         for it in placed:
             it["truck_index"] = t_idx
             it["truck_id"] = tid
-            it["unload_seq"] = total_in_truck - it["load_seq"] + 1
+        _assign_free_path_unload_seq(placed)
 
         trucks_out.append({
             "truck_id": tid,

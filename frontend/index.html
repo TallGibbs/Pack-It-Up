@@ -1104,7 +1104,8 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
         }
       }
     }
-    placed.forEach((it) => { it.truck_index = tIdx; it.truck_id = tid; it.unload_seq = placed.length - it.load_seq + 1; });
+    placed.forEach((it) => { it.truck_index = tIdx; it.truck_id = tid; });
+    assignFreePathUnloadSeq(placed);
     const pVol = placed.reduce((a, i) => a + i.size_in[0] * i.size_in[1] * i.size_in[2], 0);
     const tVol = tSpec.dims_in[0] * tSpec.dims_in[1] * tSpec.dims_in[2];
     trucks.push({
@@ -1684,6 +1685,67 @@ scene.add(worldGroup);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
+/* ---------- Free-path unload order (mirrors backend/solver.py _assign_free_path_unload_seq) ---------- */
+// pos_in/size_in are [x, y, z] with x=0 at the cab wall and x=L at the rear door.
+// A piece can come off only when nothing rests above its footprint and nothing sits
+// between it and the door in its own width/height cross-section.
+const UNLOAD_TOL = 0.25;
+function unloadBoxes(items) {
+  return items.map((it) => {
+    const [x, y, z] = it.pos_in.map(Number);
+    const [dx, dy, dz] = it.size_in.map(Number);
+    return [x, y, z, x + dx, y + dy, z + dz];
+  });
+}
+function unloadBlockers(boxes, i, remaining) {
+  const [ax1, ay1, az1, ax2, ay2, az2] = boxes[i];
+  let n = 0;
+  for (const j of remaining) {
+    if (j === i) continue;
+    const [bx1, by1, bz1, bx2, by2, bz2] = boxes[j];
+    if (Math.min(ay2, by2) - Math.max(ay1, by1) <= UNLOAD_TOL) continue;
+    const above = bz1 >= az2 - UNLOAD_TOL && Math.min(ax2, bx2) - Math.max(ax1, bx1) > UNLOAD_TOL;
+    const doorward = bx1 >= ax2 - UNLOAD_TOL && Math.min(az2, bz2) - Math.max(az1, bz1) > UNLOAD_TOL;
+    if (above || doorward) n++;
+  }
+  return n;
+}
+function assignFreePathUnloadSeq(items) {
+  if (!items || !items.length) return;
+  const boxes = unloadBoxes(items);
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const remaining = new Set(items.map((_, i) => i));
+  let seq = 1;
+  while (remaining.size) {
+    let bestKey = null;
+    let best = -1;
+    for (const i of remaining) {
+      const [, y1, , x2, , z2] = boxes[i];
+      const key = [unloadBlockers(boxes, i, remaining), -r2(x2), -r2(z2), r2(y1), i];
+      let less = bestKey === null;
+      for (let k = 0; !less && k < key.length; k++) {
+        if (key[k] !== bestKey[k]) { less = key[k] < bestKey[k]; break; }
+      }
+      if (less) { bestKey = key; best = i; }
+    }
+    items[best].unload_seq = seq++;
+    remaining.delete(best);
+  }
+}
+// True when every piece, taken in unload_seq order, has a free path out of the rear door.
+function unloadOrderIsFree(items) {
+  if (!items || !items.length) return true;
+  if (items.some((it) => !it.unload_seq || !it.pos_in || !it.size_in)) return false;
+  const boxes = unloadBoxes(items);
+  const order = items.map((_, i) => i).sort((a, b) => items[a].unload_seq - items[b].unload_seq);
+  const remaining = new Set(order);
+  for (const i of order) {
+    if (unloadBlockers(boxes, i, remaining) > 0) return false;
+    remaining.delete(i);
+  }
+  return true;
+}
+
 /* ---------- Application State ---------- */
 let plan = null;
 let sceneMode = "trucks";     // "trucks" | "venue" | "zones"
@@ -1701,7 +1763,13 @@ let roomKeyframeIdx = {};     // room_id -> selected keyframe index on real uplo
 let storyboardTruckIdx = -1;  // -1 = all trucks, >=0 = specific truck in video storyboard
 let highlightRoomId = null;   // optional source room highlight from clicking a room video still
 let venueCornerStills = {};   // zone_id -> offscreen 3D corner cam dataURL
-let currentStep = 0;          // 0..orderedMeshes.length
+let currentStep = 0;          // 0..orderedMeshes.length (load: pieces placed so far; unload: pieces taken off so far)
+let builtDir = null;          // playDir the scene was last built for
+// Truck view + unload: playback starts with a full truck and pieces come OFF one by one.
+// Venue/zone views keep "pieces appear" semantics (unloading stocks the stores).
+function removingFromTruck() { return playDir === "unload" && sceneMode === "trucks"; }
+// Step at which everything is shown: every piece loaded, or none unloaded yet.
+function fullTruckStep() { return removingFromTruck() ? 0 : meshEntries.length; }
 let playing = false;
 let lastTickMs = 0;
 let selectedItemId = null;
@@ -2135,9 +2203,11 @@ function rebuildScene(resetCamera = false) {
 
   const maxSteps = meshEntries.length;
   $("#step-slider").max = String(maxSteps);
-  if (currentStep === 0 || currentStep > maxSteps || resetCamera) {
-    currentStep = maxSteps;
+  const builtKey = `${playDir}|${sceneMode}`;
+  if (builtDir !== builtKey || currentStep > maxSteps || resetCamera || (!removingFromTruck() && currentStep === 0)) {
+    currentStep = fullTruckStep();
   }
+  builtDir = builtKey;
   applyStepVisibility();
   if (resetCamera) focusCamera(focusBinIndex);
 }
@@ -2223,7 +2293,9 @@ function applyStepVisibility() {
   let activeEntry = null;
   meshEntries.forEach((entry) => {
     const isSelected = selectedItemId && entry.item.id === selectedItemId;
-    const visible = (entry.seqIndex <= currentStep) && (!entry.hiddenByBoxToggle || isSelected);
+    // Load: pieces 1..step are in the truck. Unload: pieces 1..step have already come off the rear door.
+    const inTruck = removingFromTruck() ? entry.seqIndex > currentStep : entry.seqIndex <= currentStep;
+    const visible = inTruck && (!entry.hiddenByBoxToggle || isSelected);
     entry.mesh.visible = visible;
     if (entry.seqIndex === currentStep) activeEntry = entry;
 
@@ -2240,9 +2312,11 @@ function applyStepVisibility() {
           : 0.55;
   });
 
-  if (activeEntry && currentStep < total) {
+  const stepActive = removingFromTruck() ? currentStep > 0 : currentStep < total;
+  if (activeEntry && stepActive) {
     const it = activeEntry.item;
-    const verb = playDir === "load" ? `Load #${it.load_seq}` : `Unload #${it.unload_seq}`;
+    const verb = playDir === "load" ? `Load #${it.load_seq}`
+      : removingFromTruck() ? `Unloaded #${it.unload_seq} (out the rear door)` : `Unload #${it.unload_seq}`;
     $("#now-loading").innerHTML = `<b>${esc(verb)}: ${esc(it.label)}</b> · ${fmt(it.weight_lb)} lb → Stop ${esc(it.dock_stop)} (${esc(it.dest_zone_name)} · ${esc(it.dest_corner || "Floor")})`;
   } else if (highlightRoomId) {
     const rmName = (plan?.rooms || []).find((r) => r.id === highlightRoomId)?.name || highlightRoomId;
@@ -2253,7 +2327,7 @@ function applyStepVisibility() {
   }
 
   $$(".step-row").forEach((row) => {
-    row.classList.toggle("active", row.dataset.itemId === (selectedItemId || (activeEntry && currentStep < total ? activeEntry.item.id : "")));
+    row.classList.toggle("active", row.dataset.itemId === (selectedItemId || (activeEntry && stepActive ? activeEntry.item.id : "")));
   });
 }
 
@@ -2267,7 +2341,7 @@ function selectItemById(itemId, flyTo = false) {
     return;
   }
   if (!entry.mesh.visible) {
-    currentStep = meshEntries.length;
+    currentStep = fullTruckStep();
   }
   const it = entry.item;
   $("#ins-title").textContent = it.box_short_name ? `📦 ${it.box_short_name} · ${it.label}` : it.label;
@@ -2539,6 +2613,20 @@ function currentExtraItems() {
 }
 function showPlan(result, resetCam) {
   plan = result;
+  // Older runs and the in-browser packer may carry "reverse of load" unload numbers; re-order any
+  // truck whose order would reach for a piece that is still buried, and copy the fix to zone items.
+  const fixedSeq = new Map();
+  (plan.trucks || []).forEach((t) => {
+    if (unloadOrderIsFree(t.items)) return;
+    assignFreePathUnloadSeq(t.items);
+    t.items.forEach((it) => fixedSeq.set(it.piece_id || it.id, it.unload_seq));
+  });
+  if (fixedSeq.size) {
+    (plan.zones || []).forEach((z) => (z.items || []).forEach((it) => {
+      const s = fixedSeq.get(it.piece_id || it.id);
+      if (s) it.unload_seq = s;
+    }));
+  }
   violatingIds = new Set((plan.score?.violations || []).flatMap((v) => v.item_ids || []));
   roomColorMap = {};
   const roomIds = Array.from(new Set((plan.trucks || []).flatMap((t) => (t.items || []).map((i) => i.room_id))));
@@ -2772,7 +2860,7 @@ $("#btn-next").addEventListener("click", () => {
 });
 $("#btn-all").addEventListener("click", () => {
   playing = false; $("#btn-play").textContent = "▶ Play";
-  currentStep = meshEntries.length;
+  currentStep = fullTruckStep();
   applyStepVisibility();
 });
 $("#step-slider").addEventListener("input", (e) => {
