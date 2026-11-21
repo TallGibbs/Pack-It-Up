@@ -267,3 +267,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Limits:** George has not been asked. His route, widget and route test were changed from Chris's session. The two loops still pick different plans for the same inventory (FAILURES.md 15:11).
 - **By:** Chris (go-ahead to fix and restart).
 - **See:** commit de14707, FAILURES.md 15:01 and 15:11 rows
+
+## 2026-11-21 15:14 · Submission video: voice, music, opening, end card, name
+- **Decision:** The 1-minute video in `plan/VIDEO_SCRIPT.md` uses voice Charon (`gemini-3.8-flash-tts`), no music, a 4 s generated opening (`gemini-omni-1.2-flash`, labelled "generated" on screen and in the description), an end card with the QR code, the demo address and the GitHub link, and the original move 133201 as it is (its id and name show on screen; no renamed copy). The build code is written now; narration, capture and the final render wait for Chris's go.
+- **Why:** Chris's answers to D1-D6 in the plan.
+- **By:** Chris.
+- **See:** `plan/VIDEO_SCRIPT.md` section 7
