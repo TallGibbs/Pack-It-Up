@@ -6,6 +6,7 @@ GET  /inventory/{run_id}              inventory.json
 POST /answer/{run_id}                 {question_id, answer} -> updated inventory
 PATCH /inventory/{run_id}/items/{id}  {quantity?, disposition?, catalog_id?} -> updated inventory
 GET  /media/{run_id}/{file_hash}/crop?box=ymin,xmin,ymax,xmax&t=4.0  -> JPEG crop
+GET  /media/{run_id}/{file_hash}/audio?start=2.5&end=3.8           -> MP3 of a quote
 """
 from __future__ import annotations
 
@@ -110,6 +111,19 @@ def patch_item(run_id: str, item_id: str, body: dict):
     except ValueError as e:
         raise HTTPException(400, str(e))
     return rebuild(run_id)
+
+
+@router.get("/media/{run_id}/{file_hash}/audio")
+def audio(run_id: str, file_hash: str, start: float = Query(..., ge=0), end: float = Query(...)):
+    """MP3 of a clip's soundtrack between start and end seconds, to replay a narrator's quote."""
+    rd = _rd(run_id)
+    manifest = read_json(rd / "manifest.json") or {"files": []}
+    entry = next((f for f in manifest["files"] if f["sha256"].startswith(file_hash) and len(file_hash) >= 8), None)
+    if entry is None or entry["kind"] != "video" or not entry.get("has_audio"):
+        raise HTTPException(404, "no clip with audio for that hash in this run")
+    if not 0 < end - start <= 30:
+        raise HTTPException(400, "end must be after start, at most 30 s later")
+    return Response(mu.audio_clip(rd / entry["path"], start, end), media_type="audio/mpeg")
 
 
 @router.get("/media/{run_id}/{file_hash}/crop")

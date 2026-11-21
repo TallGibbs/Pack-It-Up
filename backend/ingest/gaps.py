@@ -19,7 +19,7 @@ from .common import read_json, run_dir, write_json
 from .merge import canon_key
 
 EDITABLE = {"quantity", "disposition", "catalog_id", "label"}
-DISPOSITIONS = {"keep", "sell", "donate", "trash", "undecided"}
+DISPOSITIONS = {"keep", "sell", "donate", "trash", "stays", "undecided"}
 
 
 def _find_item(merged: dict, item_id: str) -> tuple[dict, dict] | tuple[None, None]:
@@ -168,6 +168,8 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
         fixture_nouns = {canon_key(f["label"]) for f in m_room["fixtures"]}
 
         for it in inv_room["items"]:
+            if it["disposition"] in ("stays", "trash", "sell", "donate") or it.get("heard_only"):
+                continue  # not going on the truck, or only heard (unfilmed_area covers it)
             s, ev = it["size"], it["evidence"]
             crop = lambda tag, it=it, ev=ev: _crop_media(rd, files_by_name, ev["source"], ev.get("box_2d"),
                                                           ev.get("timestamp_s"), tag)
@@ -211,6 +213,18 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
                                        "free_standing": "free-standing furniture; it moves"},
                            "ask": "decisions_api", "volume_at_stake": s["volume_cuft_total"],
                            "confidence": it["confidence"], "media": [crop(f"Photo of the {it['label']}")]})
+
+        # unfilmed_area: only heard, never seen -> the user confirms, with the quote
+        for it in inv_room["items"]:
+            if not it.get("heard_only"):
+                continue
+            quote = next((r["quote"] for r in it.get("set_by_speech", []) if r["field"] == "heard_only"),
+                         next((r["quote"] for r in it.get("set_by_speech", [])), ""))
+            qs.append({"id": _qid("unfilmed_area", it["id"]), "kind": "unfilmed_area", "refers_to": it["id"],
+                       "text": f"You said \"{quote}\" but it isn't in the footage. Should the {it['label']} go on "
+                               f"the truck? (A photo or clip of it would give us its real size.)",
+                       "quote": quote, "options": {"yes": "yes, it's moving", "no": "no, leave it out"}, "ask": "user",
+                       "volume_at_stake": it["size"]["volume_cuft_total"], "confidence": 0.5, "media": []})
 
         # same_item: merge flagged differing labels across files
         for f in m_room.get("merge_flags", []):
@@ -258,10 +272,27 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
                        "text": f"We left out {pb['personal_belongings']} personal belongings ({kinds}). Leave them out?",
                        "options": {"yes": "leave them out", "no": "they are part of the move"}, "ask": "user",
                        "volume_at_stake": 1.0, "confidence": 0.5, "media": []})
+    # Speech first: a question the narrator already answered is shown as answered, with the quote.
+    said = {}
+    for room in inv["rooms"]:
+        for it in room["items"]:
+            said[it["id"]] = it.get("set_by_speech", [])
+        for c in room["containers"]:
+            said[c["label"]] = c.get("set_by_speech", [])
     for q in qs:
         q["media"] = [m for m in q["media"] if m is not None]
         q["rank_score"] = round(q["volume_at_stake"] * (1 - q["confidence"]), 2)
+        fields = SPEECH_ANSWERS.get(q["kind"])
+        if fields:
+            rec = next((r for r in said.get(q["refers_to"], []) if r["field"].split(".")[0] in fields), None)
+            if rec:
+                q["speech"] = rec
     return qs
+
+
+# Which spoken fields settle which question kinds.
+SPEECH_ANSWERS = {"count_check": {"quantity"}, "size_check": {"size"}, "identify_item": {"label", "catalog_id"},
+                  "fixture_check": {"disposition"}, "hidden_contents": {"contents", "fullness"}}
 
 
 def _patch_for(q: dict, answer: str) -> dict:
@@ -272,6 +303,9 @@ def _patch_for(q: dict, answer: str) -> dict:
         return {"op": "set_item", "item_id": q["refers_to"], "changes": {"quantity": int(answer)}}
     if kind == "same_item":
         return {"op": "split_member", "item_id": q["refers_to"], "member": q["member"]} if answer == "different" else {"op": "none"}
+    if kind == "unfilmed_area":
+        return {"op": "set_item", "item_id": q["refers_to"],
+                "changes": {"disposition": "removed"} if answer == "no" else {"confidence": 1.0}}
     if kind == "fixture_check":
         return {"op": "move_to_fixtures", "item_id": q["refers_to"]} if answer == "built_in" else {"op": "none"}
     if kind == "hidden_contents":
@@ -300,7 +334,8 @@ def build_questions(run_id: str) -> list[dict]:
     old = {q["id"]: q for q in read_json(rd / "questions.json", {"questions": []})["questions"]}
     qs = _candidates(rd, inv, merged, files_by_name)
 
-    to_ask = [q for q in qs if q["id"] not in answered and q["ask"].startswith("decisions_api") and q["media"]]
+    to_ask = [q for q in qs if q["id"] not in answered and "speech" not in q
+              and q["ask"].startswith("decisions_api") and q["media"]]
     job = for_job("decide", run_dir=rd)
 
     def ask(q):
@@ -317,6 +352,11 @@ def build_questions(run_id: str) -> list[dict]:
         if q["id"] in answered:
             a = answered[q["id"]]
             q.update(status="answered", answer=a["answer"], answered_by=a["source"], confidence=a.get("confidence", 1.0))
+            continue
+        if "speech" in q:  # already applied in merge; nothing to store
+            s = q.pop("speech")
+            q.update(status="answered", answer=str(s["value"]), answered_by="speech", quote=s["quote"],
+                     quote_source=s["source"], quote_timestamp_s=s.get("timestamp_s"))
             continue
         r = results.get(q["id"])
         if r and "answer" in r:

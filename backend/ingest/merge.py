@@ -17,7 +17,11 @@ import re
 import statistics
 from collections import defaultdict
 
+from backend import catalog
+
 from .common import read_json, run_dir, update_status, write_json
+from .perceive import parse_ref
+from .schemas import DISPOSITIONS
 
 # Canonical nouns for unknown items, so "leather pouf" and "round ottoman" land in one group.
 CANON = [
@@ -122,19 +126,35 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
     containers: dict[tuple, dict] = {}
     uncertain: list[dict] = []
 
+    loose_facts: list[dict] = []  # facts that point at a non-movable item or at nothing
     for p in perceptions:
         for q in p.get("uncertain", []):
             uncertain.append({"file": p["file"], "text": q})
+        # Rule 6: each spoken fact follows the item or container it refers to.
+        for f in p.get("spoken_facts", []):
+            f = {**f, "source": p["file"]}
+            ref = parse_ref(f.get("refers_to"))
+            if ref and ref[0] == "item":
+                p["items"][ref[1]].setdefault("_facts", []).append(f)
+            elif ref and ref[0] == "container":
+                p["containers"][ref[1]].setdefault("_facts", []).append(f)
+            else:
+                loose_facts.append(f)
         for it in p["items"]:
             mc = it["move_class"]
-            if mc == "movable":
+            if it.get("heard_only"):  # rule 7: kept as its own line, never folded into a seen item
+                groups["heard:" + canon_key(it["label"])].append((p, it))
+            elif mc == "movable":
                 groups[group_key(it)].append((p, it))
             elif mc == "fixture":
                 k = canon_key(it["label"]) + ":" + it["label"].lower()
                 f = fixtures.setdefault(k, {"label": it["label"], "quantity": 0, "seen_in": []})
                 f["quantity"] = max(f["quantity"], it["quantity"])
                 f["seen_in"].append(p["file"])
+                # A fixture can still hold things ("the built-in shelf is full of books").
+                loose_facts += [{**x, "_item_label": it["label"]} for x in it.get("_facts", [])]
             elif mc == "personal_belonging":
+                loose_facts += [{**x, "_item_label": it["label"]} for x in it.get("_facts", [])]
                 personal_per_file[p["file"]][canon_key(it["label"])] += it["quantity"]
             else:  # small_loose
                 k = it["label"].lower()
@@ -143,13 +163,15 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
                                          "fragile": it["fragile"]})
                 s["quantity"] = max(s["quantity"], it["quantity"])
                 s["seen_in"].append(p["file"])
+                loose_facts += [{**x, "_item_label": it["label"]} for x in it.get("_facts", [])]
         for c in p.get("containers", []):
             k = (c["kind"], c["contents"], canon_key(c["label"]) if c["kind"] != "open_surfaces" else "")
             cur = containers.get(k)
             if cur is None:
-                containers[k] = {**c, "seen_in": [p["file"]]}
+                containers[k] = {**c, "seen_in": [p["file"]], "_facts": list(c.get("_facts", []))}
             else:
                 cur["seen_in"].append(p["file"])
+                cur["_facts"] += c.get("_facts", [])
                 if cur["fullness"] == "not_visible" and c["fullness"] != "not_visible":
                     cur["fullness"] = c["fullness"]
                 cur["est_item_count"] = max(cur.get("est_item_count", 0), c.get("est_item_count", 0))
@@ -201,8 +223,19 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
             "members": members,
             "disposition": "undecided",
             "notes": "",
+            "heard_only": gk.startswith("heard:"),
+            "set_by_speech": [],
         }
+        if item["heard_only"]:
+            item["partially_visible"] = False
+            item["evidence"]["box_2d"] = None  # nothing to crop: it was only heard
         items.append(item)
+        for _, it in entries:
+            for f in it.get("_facts", []):
+                if f["kind"] == "contents":
+                    loose_facts.append({**f, "_item_label": item["label"]})
+                else:
+                    apply_item_fact(item, f)
         # Rule 4: entries in other files whose colours match nothing in the best file.
         for f, ms in by_file.items():
             if f == best_file:
@@ -211,6 +244,31 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
                 if not any(compatible(m["label"], b["label"]) for b in base):
                     # Ask whether m is any of the pieces already counted (all of `base`), not just one of them.
                     flags.append({"kind": "same_item", "item_id": item_id, "base": base, "b": m})
+
+    # Contents facts set a container (created for the item if the model listed none); facts that point at
+    # nothing but name an unfilmed item become a heard-only line.
+    cont_list = list(containers.values())
+    for c in cont_list:
+        for f in c.pop("_facts", []):
+            apply_container_fact(c, f)
+        c.setdefault("set_by_speech", [])
+    for f in loose_facts:
+        if f["kind"] == "contents" and f.get("_item_label"):
+            noun = canon_key(f["_item_label"])
+            c = next((c for c in cont_list if canon_key(c["label"]) == noun), None)
+            if c is None:
+                shelfy = noun in ("shelving_unit", "bookshelf") or "shel" in f["_item_label"].lower()
+                c = {"label": f["_item_label"], "kind": "bookshelf" if shelfy else "other", "contents": "mixed",
+                     "fullness": "not_visible", "size": "medium", "est_item_count": 0, "seen_in": [f["source"]],
+                     "evidence": None, "set_by_speech": [], "created_by_speech": True}
+                cont_list.append(c)
+            apply_container_fact(c, f)
+        elif f["kind"] == "unfilmed_item" and not any(i["heard_only"] for i in items):
+            label = (f.get("label") or f.get("value") or "item mentioned").strip()
+            items.append(_heard_item(rid, len(items) + 1, label, f))
+        else:
+            uncertain.append({"file": f["source"], "text": f"Narrator said: \"{f['quote']}\" (not applied)",
+                              "spoken": True})
 
     return {
         "id": rid, "name": room["name"],
@@ -221,10 +279,77 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
         "fixtures": sorted(fixtures.values(), key=lambda f: f["label"].lower()),
         "personal_belongings": {"count": sum(personal.values()), "kinds": dict(personal)},
         "small_loose": sorted(small.values(), key=lambda s: s["label"].lower()),
-        "containers": list(containers.values()),
+        "containers": cont_list,
+        "transcripts": {p["file"]: p.get("transcript", []) for p in perceptions if p.get("transcript")},
         "uncertain": uncertain,
         "merge_flags": flags,
     }
+
+
+def _speech_record(field: str, value, f: dict) -> dict:
+    return {"field": field, "value": value, "quote": f["quote"], "source": f["source"],
+            "timestamp_s": f.get("timestamp_s")}
+
+
+def apply_item_fact(item: dict, f: dict) -> None:
+    """Rule 6: a narrator fact beats the catalog and the model (only a typed answer beats it)."""
+    kind, rec = f["kind"], item["set_by_speech"]
+    if kind in ("disposition", "not_moving"):
+        d = "stays" if kind == "not_moving" else (f.get("disposition") or "")
+        if d in DISPOSITIONS and d != "undecided":
+            item["disposition"] = d
+            rec.append(_speech_record("disposition", d, f))
+    elif kind == "count" and f.get("count"):
+        item["quantity"] = int(f["count"])
+        rec.append(_speech_record("quantity", item["quantity"], f))
+    elif kind == "fragile":
+        item["fragile"] = True
+        rec.append(_speech_record("fragile", True, f))
+    elif kind == "size" and f.get("size_in"):
+        dim = f.get("size_dim") or "length"
+        item.setdefault("speech_size", {})[dim] = float(f["size_in"])
+        rec.append(_speech_record(f"size.{dim}", float(f["size_in"]), f))
+    elif kind == "identity" and (f.get("label") or f.get("value")):
+        item["label"] = (f.get("label") or f["value"]).strip()
+        rec.append(_speech_record("label", item["label"], f))
+        cid = (f.get("catalog_id") or "").strip()
+        if cid and (cid == "unknown" or catalog.get(cid)):
+            item["catalog_id"] = cid
+            rec.append(_speech_record("catalog_id", cid, f))
+    elif kind == "unfilmed_item":
+        if f.get("count"):
+            item["quantity"] = int(f["count"])
+        rec.append(_speech_record("heard_only", True, f))
+    else:
+        item["notes"] = (item.get("notes", "") + f" Narrator: \"{f['quote']}\"").strip()
+        rec.append(_speech_record("notes", f["quote"], f))
+
+
+def apply_container_fact(c: dict, f: dict) -> None:
+    rec = c.setdefault("set_by_speech", [])
+    if f["kind"] != "contents":
+        rec.append(_speech_record("notes", f["quote"], f))
+        return
+    if f.get("contents"):
+        c["contents"] = f["contents"]
+        rec.append(_speech_record("contents", f["contents"], f))
+    if f.get("fullness") and f["fullness"] != "not_visible":
+        c["fullness"] = f["fullness"]
+        rec.append(_speech_record("fullness", f["fullness"], f))
+
+
+def _heard_item(rid: str, n: int, label: str, f: dict) -> dict:
+    """A heard-only line built from a fact alone, when the model named the item but listed none."""
+    return {"id": f"{rid}_item_{n:02d}", "group_key": "heard:" + canon_key(label), "label": label,
+            "catalog_id": f.get("catalog_id") if catalog.get(f.get("catalog_id") or "") else "unknown",
+            "quantity": int(f.get("count") or 1), "stack_count": 1, "confidence": 0.6, "move_class": "movable",
+            "material": "mixed", "est_dims_in": [], "est_weight_lb": 0, "fragile": False, "must_stay_upright": False,
+            "disassemble": False, "two_person": False, "stackable": False, "partially_visible": False,
+            "evidence": {"source": f["source"], "sha256": None, "kind": "video", "timestamp_s": f.get("timestamp_s"),
+                         "box_2d": None},
+            "also_seen_in": [], "per_file_counts": {}, "variants": [label], "members": [],
+            "disposition": "undecided", "notes": "", "heard_only": True,
+            "set_by_speech": [_speech_record("heard_only", True, f)]}
 
 
 def _group_label(gk: str, base: list[dict]) -> str:

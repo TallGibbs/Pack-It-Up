@@ -30,6 +30,12 @@ model = "gemini:gemini-decision-1"    # Decisions API (client.decisions.create);
 api_version = "v1alpha"
 media_resolution = "high"
 
+[jobs.transcribe]
+# Only used when the perceive model can't hear (no audio_in). No dedicated transcription model is
+# listed for this key, so Hydrogen, which takes audio, does it.
+model = "gemini:gemini-4-hydrogen"
+thinking = "low"
+
 [jobs.decide_fallback]
 model = "gemini:gemini-4-hydrogen"    # generic enum generate_json, used when the Decisions API call fails
 thinking = "low"

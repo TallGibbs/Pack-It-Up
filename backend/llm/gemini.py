@@ -48,7 +48,7 @@ def _usage(resp) -> Usage:
 
 class GeminiProvider:
     name = "gemini"
-    capabilities = {"image_in", "video_in", "json_schema", "decide_native", "image_out"}
+    capabilities = {"image_in", "video_in", "audio_in", "json_schema", "decide_native", "image_out"}
 
     def __init__(self, model: str):
         self.model = model
@@ -78,9 +78,9 @@ class GeminiProvider:
         for m in media:
             if m.caption:
                 parts.append(types.Part.from_text(text=m.caption))
-            if m.kind == "image":
+            if m.kind in ("image", "audio"):  # short soundtracks go inline like photos
                 parts.append(types.Part.from_bytes(data=Path(m.path).read_bytes(), mime_type=m.mime))
-            else:
+            else:  # video: Gemini hears the soundtrack along with the frames
                 f = self.upload_video(m)
                 vm = {}
                 if settings.get("video_fps"):

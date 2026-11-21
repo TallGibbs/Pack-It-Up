@@ -38,6 +38,7 @@ CATEGORY_DEFAULT_DIMS = {
 GENERIC_DEFAULT_DIMS = [24, 24, 24]
 
 BOX_CUFT = 3.0  # box_medium, for open_surfaces estimates
+NOT_ON_TRUCK = ("trash", "sell", "donate", "stays")  # "stays": the narrator said it is not moving
 PACK_FACTOR = 2.0  # loose items take about twice their own volume once boxed and padded
 
 
@@ -101,6 +102,12 @@ def pick_weight(volume_each: float, material: str, model_lb: float | None, row: 
 def resolve_item(item: dict) -> dict:
     row = catalog.get(item["catalog_id"]) if item["catalog_id"] != "unknown" else None
     dims, size_source, size_check = pick_size(item, row)
+    if item.get("speech_size"):  # the narrator gave a size: that dimension from speech, the rest as picked
+        idx = {"length": 0, "width": 1, "height": 2}
+        dims = list(dims)
+        for dim, inches in item["speech_size"].items():
+            dims[idx.get(dim, 0)] = inches
+        dims, size_source, size_check = _orient(dims), "speech", None
     dims = [round(d, 1) for d in dims]
     vol_each = round(dims[0] * dims[1] * dims[2] / 1728, 2)
     material = item.get("material") or "mixed"
@@ -108,7 +115,11 @@ def resolve_item(item: dict) -> dict:
     qty = item["quantity"]
 
     # Handling specs: catalog row wins, model fills the rest.
+    spoken = {r["field"] for r in item.get("set_by_speech", [])}
+
     def spec(cat_col: str, model_key: str) -> bool:
+        if model_key in spoken:  # speech beats the catalog
+            return bool(item.get(model_key))
         v = _yes(row.get(cat_col)) if row else None
         return bool(item.get(model_key)) if v is None else v
 
@@ -146,6 +157,8 @@ def resolve_item(item: dict) -> dict:
         "also_seen_in": item.get("also_seen_in", []),
         "per_file_counts": item.get("per_file_counts", {}),
         "notes": item.get("notes", ""),
+        "heard_only": bool(item.get("heard_only")),
+        "set_by_speech": item.get("set_by_speech", []),
     }
     if size_check:
         out["size_check"] = size_check
@@ -163,7 +176,8 @@ def _containers(room: dict) -> list[dict]:
         out.append({"id": f"{rid}_cont_{len(out) + 1:02d}", "label": c["label"], "kind": c["kind"],
                     "contents": c["contents"], "fullness": c["fullness"], "size": c["size"],
                     "est_item_count": c.get("est_item_count", 0), "seen_in": c.get("seen_in", []),
-                    "evidence": {"source": c["seen_in"][0], **(c.get("evidence") or {})} if c.get("seen_in") else None})
+                    "evidence": {"source": c["seen_in"][0], **(c.get("evidence") or {})} if c.get("seen_in") else None,
+                    "set_by_speech": c.get("set_by_speech", []), "created_by_speech": c.get("created_by_speech", False)})
     # One open_surfaces container per room for loose decor, sized from the small_loose items.
     small = room.get("small_loose", [])
     small_count = sum(s["quantity"] for s in small)
@@ -183,7 +197,7 @@ def _containers(room: dict) -> list[dict]:
 def resolve_room(room: dict) -> dict:
     items = [resolve_item(it) for it in room["items"] if it.get("disposition") != "removed"]
     containers = _containers(room)
-    keep = [i for i in items if i["disposition"] not in ("trash", "sell", "donate")]
+    keep = [i for i in items if i["disposition"] not in NOT_ON_TRUCK]
     box_vol = sum(c.get("est_volume_cuft", 0) for c in containers)
     return {
         "room": {"id": room["id"], "name": room["name"]},

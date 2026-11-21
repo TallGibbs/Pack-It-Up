@@ -14,7 +14,7 @@ from typing import Literal, Protocol
 @dataclass
 class Media:
     path: Path
-    kind: Literal["image", "video"]
+    kind: Literal["image", "video", "audio"]
     mime: str
     sha256: str
     start_s: float | None = None  # optional clip window
@@ -40,7 +40,7 @@ class ProviderError(RuntimeError):
 class Provider(Protocol):
     name: str
     model: str
-    capabilities: set[str]  # {"image_in", "video_in", "json_schema", "decide_native", "image_out"}
+    capabilities: set[str]  # {"image_in", "video_in", "audio_in", "json_schema", "decide_native", "image_out"}
 
     def generate_json(self, prompt: str, media: list[Media], schema: dict, settings: dict) -> tuple[dict, Usage]: ...
 

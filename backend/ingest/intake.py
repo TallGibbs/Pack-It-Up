@@ -82,7 +82,10 @@ def intake(paths: list[Path], room_name: str | None, run_id: str, original_names
                 info = mu.video_info(dst)
                 entry.update(kind="video", mime=mu.VIDEO_EXT[ext], duration_s=info["duration_s"], fps=info["fps"],
                              width=(info["size"] or [None, None])[0], height=(info["size"] or [None, None])[1],
-                             codec=info["codec"])
+                             codec=info["codec"], has_audio=info["has_audio"])
+                if info["has_audio"]:  # for the transcription fallback and quote playback
+                    wav = mu.extract_audio(dst, rd / "audio" / f"{sha[:16]}.wav")
+                    entry["audio_path"] = str(wav.relative_to(rd)).replace("\\", "/")
             entry["path"] = str(dst.relative_to(rd)).replace("\\", "/")
         except Exception as e:  # one bad file must not sink the run
             manifest["skipped"].append({"name": name, "reason": f"{type(e).__name__}: {e}"})

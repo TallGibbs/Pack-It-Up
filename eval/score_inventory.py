@@ -16,7 +16,7 @@ import re
 import sys
 from pathlib import Path
 
-SKIP_DISPOSITIONS = {"trash", "sell", "donate"}
+SKIP_DISPOSITIONS = {"trash", "sell", "donate", "stays", "removed"}
 
 
 def _has(label: str, words: list[str]) -> bool:

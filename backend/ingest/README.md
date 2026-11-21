@@ -43,7 +43,13 @@ Every model call is logged to `runs/<run_id>/calls.jsonl` and cached in `.cache/
 ```
 
 - `dims_in` is `[length, width, height]` with length >= width; height stays height.
-- `size_source`: `catalog`, `vision_estimate` or `category_default`. `weight_source`: `catalog`, `density` or `vision_estimate`.
+- `size_source`: `speech` (the narrator gave a size), `catalog`, `vision_estimate` or `category_default`. `weight_source`: `catalog`, `density` or `vision_estimate`.
 - `stackable` uses the catalog's values: `yes`, `no`, `light_only`.
-- Skip items whose `disposition` is `trash`, `sell` or `donate`.
+- Skip items whose `disposition` is `trash`, `sell`, `donate` or `stays` (the narrator said it isn't moving). They stay in the list for the review screen.
+- `heard_only: true` marks an item the narrator named but never filmed; its size comes from the catalog or a category default. It packs unless the user answers its `unfilmed_area` question with "no".
+- `set_by_speech` lists what the narrator's words changed: `[{"field", "value", "quote", "source", "timestamp_s"}]`, so the review screen can show "you said: …". Containers carry the same list.
+
+## Audio
+
+Gemini hears each clip's soundtrack in the same perceive call. The model returns a timestamped `transcript` (narrator vs background) and `spoken_facts`; merge applies them. Order of trust: a typed answer, then the narrator, then the catalog, then the model's visual estimate. Transcripts are saved to `runs/<id>/transcripts/` and never committed. If the perceive model can't hear (no `audio_in`), shared code in `backend/llm/` transcribes the soundtrack with the `transcribe` job first and puts the transcript in the prompt; `MODEL_PERCEIVE_DISABLE=video_in,audio_in` forces that path for testing.
 - Containers with `kind: open_surfaces` carry `est_volume_cuft` and `est_boxes` for loose decor.

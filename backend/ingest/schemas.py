@@ -8,6 +8,9 @@ CONTAINER_KINDS = ["closet", "kitchen_cabinet", "bookshelf", "dresser_drawers", 
 CONTENTS = ["clothes_hanging", "clothes_folded", "books", "dishes_glassware", "pots_pans", "pantry_food", "linens",
             "toiletries", "papers_office", "toys", "tools", "decor", "mixed"]
 FULLNESS = ["empty", "quarter", "half", "three_quarters", "full", "not_visible"]
+FACT_KINDS = ["disposition", "not_moving", "contents", "count", "fragile", "size", "identity", "unfilmed_item", "other"]
+# "stays" = not moving (stays behind or belongs to someone else); kept in the inventory, left off the truck.
+DISPOSITIONS = ["keep", "sell", "donate", "trash", "stays", "undecided"]
 
 _box = {"type": "array", "items": {"type": "integer"}, "minItems": 4, "maxItems": 4,
         "description": "[ymin, xmin, ymax, xmax] on a 0-1000 scale"}
@@ -72,5 +75,44 @@ PERCEPTION_SCHEMA = {
             },
         },
         "uncertain": {"type": "array", "items": {"type": "string"}},
+        "transcript": {
+            "type": "array",
+            "description": "clips only: speech in the soundtrack; empty when nobody speaks",
+            "items": {
+                "type": "object",
+                "required": ["start_s", "end_s", "text", "speaker"],
+                "properties": {"start_s": {"type": "number", "minimum": 0}, "end_s": {"type": "number", "minimum": 0},
+                               "text": {"type": "string"},
+                               "speaker": {"type": "string", "enum": ["narrator", "background"]}},
+            },
+        },
+        "spoken_facts": {
+            "type": "array",
+            "description": "clips only: things the narrator said that change the inventory",
+            "items": {
+                "type": "object",
+                "required": ["timestamp_s", "quote", "kind", "refers_to", "value"],
+                "properties": {
+                    "timestamp_s": {"type": "number", "minimum": 0},
+                    "quote": {"type": "string", "description": "the words, verbatim"},
+                    "kind": {"type": "string", "enum": FACT_KINDS},
+                    "refers_to": {"type": "string",
+                                  "description": "item:<index> or container:<index> (0-based, in this response), or none"},
+                    "value": {"type": "string", "description": "what was said, normalised, e.g. stays, full of books, 12"},
+                    "disposition": {"type": "string", "enum": DISPOSITIONS},
+                    "contents": {"type": "string", "enum": CONTENTS},
+                    "fullness": {"type": "string", "enum": FULLNESS},
+                    "count": {"type": "integer", "minimum": 0},
+                    "size_in": {"type": "number", "minimum": 0},
+                    "size_dim": {"type": "string", "enum": ["length", "width", "height"]},
+                    "label": {"type": "string", "description": "for identity: what the narrator says it is"},
+                    "catalog_id": {"type": "string", "description": "for identity: closest catalog row, or unknown"},
+                },
+            },
+        },
     },
 }
+PERCEPTION_SCHEMA["properties"]["items"]["items"]["properties"]["heard_only"] = {
+    "type": "boolean", "description": "named in the audio but never seen on camera"}
+PERCEPTION_SCHEMA["properties"]["items"]["items"]["required"].append("heard_only")
+PERCEPTION_SCHEMA["required"] += ["transcript", "spoken_facts"]

@@ -73,7 +73,27 @@ def for_job(name: str, run_dir: Path | str | None = None) -> "Job":
     settings = {**cfg.get("defaults", {}), **jobs[name]}
     spec = os.environ.get(f"MODEL_{name.upper()}") or settings.pop("model")
     settings.pop("model", None)
-    return Job(name, spec, _make_provider(spec), settings, Path(run_dir) if run_dir else None)
+    provider = _make_provider(spec)
+    # Testing switch: MODEL_PERCEIVE_DISABLE=video_in,audio_in makes a capable model act like one that
+    # can't watch or hear, so the frame-sampling and transcription fallbacks can be exercised today.
+    disabled = os.environ.get(f"MODEL_{name.upper()}_DISABLE") or ",".join(settings.pop("disable", []))
+    if disabled:
+        provider.capabilities = set(provider.capabilities) - {c.strip() for c in disabled.split(",")}
+    return Job(name, spec, provider, settings, Path(run_dir) if run_dir else None)
+
+
+TRANSCRIPT_SCHEMA = {
+    "type": "object", "required": ["segments"],
+    "properties": {"segments": {"type": "array", "items": {
+        "type": "object", "required": ["start_s", "end_s", "text", "speaker"],
+        "properties": {"start_s": {"type": "number", "minimum": 0}, "end_s": {"type": "number", "minimum": 0},
+                       "text": {"type": "string"},
+                       "speaker": {"type": "string", "enum": ["narrator", "background"],
+                                   "description": "narrator = the person filming, close to the microphone"}}}}},
+}
+TRANSCRIBE_PROMPT = ("Transcribe the speech in this audio with timestamps in seconds. Mark each segment's speaker as "
+                     "`narrator` (the person recording, close to the microphone, describing the room) or `background` "
+                     "(other people nearby, announcements, music). Return an empty list if nobody speaks.")
 
 
 def _sha(obj) -> str:
@@ -113,6 +133,7 @@ class Job:
     def _key(self, kind: str, prompt: str, media: list[Media], prompt_version: str, extra=None) -> str:
         settings = {k: v for k, v in self.settings.items() if k not in ("timeout_s", "retries")}
         return _sha({"job": self.name, "kind": kind, "model": self.spec, "pv": prompt_version,
+                     "caps": sorted(self.provider.capabilities),
                      "prompt": _sha(prompt), "media": [m.cache_token() for m in media],
                      "settings": settings, "extra": extra})
 
@@ -129,12 +150,32 @@ class Job:
         os.replace(tmp, CACHE_DIR / f"{key}.json")
 
     # ---------- media adaptation ----------
+    def _transcribe_clip(self, m: Media) -> str:
+        """Fallback for a model that can't hear: transcribe the soundtrack with the `transcribe` job."""
+        if not media_utils.has_audio(m.path):
+            return ""
+        wav = media_utils.extract_audio(m.path, CACHE_DIR / "audio" / f"{m.sha256[:16]}.wav")
+        audio = Media(wav, "audio", "audio/wav", media_utils.sha256_file(wav), m.start_s, m.end_s)
+        tr = for_job("transcribe", self.run_dir).generate_json(TRANSCRIBE_PROMPT, media=[audio], schema=TRANSCRIPT_SCHEMA,
+                                                                prompt_version="transcribe_v1", label=m.path.name)
+        lines = [f"[{s['start_s']:.1f}-{s['end_s']:.1f} s, {s['speaker']}] {s['text']}" for s in tr["segments"]]
+        return (f"\n\nSoundtrack transcript of {m.path.name} (made separately because you receive no audio; "
+                f"timestamps in seconds):\n" + ("\n".join(lines) if lines else "(no speech)"))
+
     def _adapt_media(self, prompt: str, media: list[Media]) -> tuple[str, list[Media], str | None]:
-        """If the provider can't take video, replace each clip with sampled frames."""
-        if "video_in" in self.provider.capabilities or not any(m.kind == "video" for m in media):
-            return prompt, media, None
-        out: list[Media] = []
+        """If the provider can't hear, transcribe each clip first; if it can't take video, send sampled frames."""
+        caps = self.provider.capabilities
         notes = []
+        videos = [m for m in media if m.kind == "video"]
+        if videos and not {"video_in", "audio_in"} <= caps:
+            for m in videos:
+                text = self._transcribe_clip(m)
+                if text:
+                    prompt += text
+                    notes.append(f"transcribed {m.path.name}")
+        if "video_in" in caps or not videos:
+            return prompt, media, ("; ".join(notes) or None)
+        out: list[Media] = []
         fps = float(self.settings.get("video_fps", 2))
         for m in media:
             if m.kind != "video":
@@ -147,7 +188,7 @@ class Job:
             notes.append(f"{m.path.name}: {len(frames)} frames at {fps} fps")
         prompt += ("\n\nThe video was supplied as still frames; each frame is labelled with its timestamp. "
                    "Use those timestamps for timestamp_s.")
-        return prompt, out, "frames: " + "; ".join(notes)
+        return prompt, out, "; ".join(notes)
 
     # ---------- jobs ----------
     def _run(self, kind: str, prompt: str, media: list[Media], prompt_version: str, call, validate=None,

@@ -15,7 +15,7 @@ from backend.llm import LLMError, Media, for_job
 from .common import read_json, run_dir, update_status, write_json
 from .schemas import PERCEPTION_SCHEMA
 
-PROMPT_VERSION = "perceive_v1"
+PROMPT_VERSION = "perceive_v2"
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / f"{PROMPT_VERSION}.md"
 MAX_PARALLEL = 6
 
@@ -45,7 +45,56 @@ def build_prompt(entry: dict) -> str:
         ts_rule = " Leave out `timestamp_s` for a photo."
     return (tpl.replace("{media_desc}", media_desc).replace("{catalog}", catalog_table())
             .replace("{video_rule}", video_rule).replace("{frame_word}", frame_word)
-            .replace("{timestamp_rule}", ts_rule))
+            .replace("{timestamp_rule}", ts_rule).replace("{audio_rules}", audio_rules(entry)))
+
+
+AUDIO_RULES_CLIP = """Listen to the soundtrack as well as watching the frames.
+
+- `transcript`: every stretch of speech, with start and end times in seconds. Mark `speaker` as `narrator` for the person filming (closest to the microphone, talking about this room) and `background` for anyone else: people talking nearby, announcements, music, phone calls.
+- `spoken_facts`: only from the narrator, and only for things said that change what has to be moved or how. Ignore background speech completely, even if it mentions furniture. General commentary ("this is the lounge", "let's take inventory") is not a fact.
+  - `kind`: `disposition` (keep, sell, donate, trash), `not_moving` (stays behind or belongs to someone else: set `disposition: stays`), `contents` (what is inside or on it and how full: set `contents` and `fullness`), `count` (set `count`), `fragile`, `size` (set `size_in` in inches and `size_dim`), `identity` (what something really is: set `label` and the closest `catalog_id`), `unfilmed_item` (named but never on camera), `other`.
+  - `quote`: the narrator's exact words. `timestamp_s`: when they were said. `value`: a short normalised summary.
+  - `refers_to`: `item:<n>` or `container:<n>`, the 0-based index into your own `items` or `containers` list. When the narrator says "this one" or "that shelf", link to what is on screen at that moment. Use `none` only when nothing fits.
+- An item the narrator names that never appears on camera ("there's a piano in the back room") goes into `items` with `heard_only: true`, `confidence` reflecting how clearly it was said, `est_dims_in` from typical sizes, and an `unfilmed_item` fact pointing at it. Every other item has `heard_only: false`.
+- Speech never deletes an item: an item the narrator says is staying is still listed, with a `not_moving` fact.
+- If nobody speaks, or only background voices, return empty `transcript` and `spoken_facts` lists."""
+
+AUDIO_RULES_PHOTO = ("This is a photo: there is no audio. Return empty `transcript` and `spoken_facts` lists and set "
+                     "`heard_only: false` on every item.")
+
+
+def audio_rules(entry: dict) -> str:
+    if entry["kind"] == "video" and entry.get("has_audio", True):
+        return AUDIO_RULES_CLIP
+    if entry["kind"] == "video":
+        return "This clip has no soundtrack. " + AUDIO_RULES_PHOTO.split(": there is no audio. ")[1]
+    return AUDIO_RULES_PHOTO
+
+
+def parse_ref(ref: str | None) -> tuple[str, int] | None:
+    """'item:3' -> ('item', 3); anything else -> None."""
+    m = re.fullmatch(r"\s*(item|container)\s*[:#]?\s*(\d+)\s*", str(ref or ""))
+    return (m.group(1), int(m.group(2))) if m else None
+
+
+def check_facts(out: dict, entry: dict) -> list[dict]:
+    """Keep only narrator facts from clips, with a quote and a reference that exists (or none)."""
+    if entry["kind"] != "video":
+        return []
+    kept = []
+    for f in out.get("spoken_facts", []):
+        if not f.get("quote", "").strip():
+            continue
+        ref = parse_ref(f.get("refers_to"))
+        if ref:
+            kind, idx = ref
+            pool = out["items"] if kind == "item" else out.get("containers", [])
+            if idx >= len(pool):
+                f["refers_to"], f["ref_error"] = "none", f"index {idx} out of range"
+        else:
+            f["refers_to"] = "none"
+        kept.append(f)
+    return kept
 
 
 def clean_label(label: str) -> str:
@@ -80,9 +129,16 @@ def perceive_file(run_id: str, entry: dict, job_name: str = "perceive") -> dict:
             it["catalog_id"] = "unknown"
         if entry["kind"] == "image":
             it["evidence"].pop("timestamp_s", None)
+    out["spoken_facts"] = check_facts(out, entry)
+    if entry["kind"] != "video":
+        out["transcript"] = []
     result = {"file": name, "sha256": entry["sha256"], "kind": entry["kind"], "room_id": entry["room_id"],
               "model": job.spec, "prompt_version": PROMPT_VERSION, **out}
     write_json(rd / "perception" / f"{name}.json", result)
+    if entry["kind"] == "video":  # git-ignored with the run: transcripts can hold bystanders' words
+        write_json(rd / "transcripts" / f"{name}.json", {"file": name, "has_audio": entry.get("has_audio"),
+                                                          "transcript": out["transcript"],
+                                                          "spoken_facts": out["spoken_facts"]})
     update_status(rd, files={name: {"perceive": "done", "items": len(out["items"]),
                                     "seconds": round(time.time() - t0, 1)}})
     return result

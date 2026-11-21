@@ -44,7 +44,33 @@ def video_info(path: Path) -> dict:
         "size": list(meta.get("size") or []),
         "codec": meta.get("codec"),
         "rotate": meta.get("rotate"),
+        "has_audio": has_audio(path),
     }
+
+
+def has_audio(path: Path) -> bool:
+    """True if ffmpeg reports an audio stream."""
+    err = subprocess.run([FFMPEG, "-hide_banner", "-i", str(path)], capture_output=True).stderr.decode("utf-8", "replace")
+    return any("Stream #" in line and "Audio:" in line for line in err.splitlines())
+
+
+def extract_audio(path: Path, out_path: Path) -> Path:
+    """Soundtrack as 16 kHz mono WAV, for the transcription fallback and quote playback."""
+    if out_path.exists():
+        return out_path
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out_path.with_suffix(".tmp.wav")
+    subprocess.run([FFMPEG, "-v", "error", "-y", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000",
+                    "-c:a", "pcm_s16le", str(tmp)], check=True, capture_output=True)
+    tmp.replace(out_path)
+    return out_path
+
+
+def audio_clip(path: Path, start_s: float, end_s: float) -> bytes:
+    """A short MP3 of [start_s, end_s] from a clip's soundtrack, for replaying a quote."""
+    cmd = [FFMPEG, "-v", "error", "-ss", f"{max(0, start_s):.2f}", "-to", f"{end_s:.2f}", "-i", str(path),
+           "-vn", "-ac", "1", "-c:a", "libmp3lame", "-q:a", "5", "-f", "mp3", "-"]
+    return subprocess.run(cmd, capture_output=True, check=True).stdout
 
 
 def frame_at(path: Path, t: float, max_side: int = 1280) -> Image.Image:
