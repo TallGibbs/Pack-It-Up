@@ -1,0 +1,49 @@
+# Ingestion pipeline (Track A)
+
+Photos and clips of a room go in; `runs/<run_id>/inventory.json` comes out.
+
+```powershell
+python -m backend.ingest data/Inputs/Malin --room "Malin lounge"
+```
+
+| Stage | File | Model job | Writes (in `runs/<run_id>/`) |
+|---|---|---|---|
+| 1 Intake | `intake.py` | none | `manifest.json`, `media/` |
+| 2 Perceive | `perceive.py` | `perceive` | `perception/<file>.json` |
+| 3 Merge | `merge.py` | none | `merged.json` |
+| 4 Resolve | `resolve.py` | none | `inventory.json` |
+| 5 Questions | `gaps.py` | `decide` | `questions.json` |
+
+Every model call is logged to `runs/<run_id>/calls.jsonl` and cached in `.cache/llm/`.
+
+## Inventory contract (for Track B)
+
+`inventory.json` has `rooms[]`; each room has `items[]`, `containers[]`, `fixtures[]`, `left_out` and `totals`. Read sizes and weights from each item's `size` block, not from the catalog, so `unknown` items still pack:
+
+```json
+{
+  "id": "malin_lounge_item_04",
+  "label": "Room divider bookshelf",
+  "catalog_id": "bookshelf_tall",
+  "quantity": 1,
+  "stack_count": 1,
+  "size": {
+    "dims_in": [96, 16, 84],
+    "size_source": "vision_estimate",
+    "volume_cuft_each": 74.67, "volume_cuft_total": 74.67,
+    "weight_lb_each": 220, "weight_lb_total": 220,
+    "weight_source": "vision_estimate",
+    "material": "wood_solid"
+  },
+  "fragile": false, "must_stay_upright": false, "load_on_edge": false,
+  "disassemble": true, "two_person": true, "stackable": "no",
+  "disposition": "undecided",
+  "evidence": {"source": "IMG_6703.MP4", "timestamp_s": 5.0, "box_2d": [0, 345, 761, 839]}
+}
+```
+
+- `dims_in` is `[length, width, height]` with length >= width; height stays height.
+- `size_source`: `catalog`, `vision_estimate` or `category_default`. `weight_source`: `catalog`, `density` or `vision_estimate`.
+- `stackable` uses the catalog's values: `yes`, `no`, `light_only`.
+- Skip items whose `disposition` is `trash`, `sell` or `donate`.
+- Containers with `kind: open_surfaces` carry `est_volume_cuft` and `est_boxes` for loose decor.
