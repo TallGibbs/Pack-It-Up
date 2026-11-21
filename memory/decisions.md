@@ -183,3 +183,10 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Chris wants the record kept apart from local files. Not MongoDB (Chris's choice). Not Google Cloud: the event key reaches only the Gemini API, and the event's account is temporary.
 - **Limits:** Databricks stores data only; no model runs there, so the demo stays on Gemini 4. The workspace address and token live only in `.env`.
 - **By:** Chris.
+
+## 2026-11-21 13:27 · Item ids come from the item's group; cabinets and shelves get box estimates
+- **Decision:** Merge the review session's three server fixes. An item's id is built from its group (`room_1_armchair`), so an edit or answer stays on its item when another photo of the room arrives; only the latest answer to a question is applied; every container carries `est_volume_cuft` and `est_boxes`.
+- **Why:** On a copy of a Malin run a Toss moved to a different item in 103 of 172 tries, and no cabinet, shelf or closet had ever added a box (0 of 53).
+- **Limits:** The box sizes (space inside per kind and size class, capped at 60% of the furniture) are the review session's rough figures; Chris merged them knowing that, and George has not agreed them. `est_boxes` keys now include `box_small`, `box_large`, `box_dish_pack` and `box_wardrobe`.
+- **By:** Chris, on the review session's recommendation. The phone test session's own id fix (ids kept in `item_ids.json`) was taken back out in favour of this one.
+- **See:** [backend/ingest/README.md](../backend/ingest/README.md), FAILURES.md 13:10 and 13:25 rows
