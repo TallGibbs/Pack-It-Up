@@ -46,3 +46,12 @@ Every model call goes through `backend/llm/` and is set per job in [backend/llm/
 4. Inventory a folder of photos and clips: `python -m backend.ingest data/Inputs/Malin --room "Malin lounge"`.
 5. API: `uvicorn backend.app:app --port 8000`, then `curl -F room="Lounge" -F files=@photo.jpg localhost:8000/upload` and `curl localhost:8000/inventory/<run_id>`.
 6. Score against a hand count: `python eval/score_inventory.py runs/<run_id> eval/hand_counts/malin.json`.
+
+## Open the pages (phone upload and review)
+
+Plain HTML in `frontend/`, no build step. `capture.html` films or picks photos and clips per room and shows each file's progress; `review.html` shows the inventory with question cards, quantity and keep/sell/donate/trash edits, and hands off to the 3D view (`index.html?run_id=…`).
+
+- **Without a server (mock data):** `python -m http.server 8080 --directory frontend`, then open `http://localhost:8080/capture.html?mock=1` or `http://localhost:8080/review.html?mock=1`.
+- **Against the API:** run the API on all interfaces (`uvicorn backend.app:app --host 0.0.0.0 --port 8000`) and the pages as above, then open `http://<laptop IP>:8080/capture.html?api=http://<laptop IP>:8000` on the phone. `review.html?run_id=<run_id>&api=…` opens a finished run.
+- **Phone can't reach the laptop** (venue wifi often blocks device-to-device traffic, and Windows blocks inbound ports on Public networks): check `http://<laptop IP>:8000/health` from the phone first. If it fails, use a tunnel such as `cloudflared tunnel --url http://localhost:8000`, which gives an HTTPS address (100 MB per upload). A tunnel exposes one port, so the pages then need to be served by the API app too.
+- A plain file input opens the phone's camera over HTTP; nothing here needs HTTPS.
