@@ -2,7 +2,7 @@
  *
  * Drop `<script src="ui/arena.js"></script>` into `frontend/index.html` to mount the
  * live AI Strategy Arena card above `#verifier-panel` without touching `index.html` internals.
- * Works both against the live FastAPI server (`/arena/plan`, `/agents/start`, `/agents/{job_id}`)
+ * Works both against the live FastAPI server (`/plan`, `/agents/start`, `/agents/{job_id}`)
  * and in `?mock=1` standalone browser mode.
  */
 (function () {
@@ -19,8 +19,16 @@
     }[c]));
   }
 
-  // Intercept a single `/solve` fetch when applying an exact arena/Neon winner placement
+  // Intercept `/solve` when applying an arena winner, and attach AbortController to `POST /plan` ("Plan with Neon")
   let pendingPlanOverride = null;
+  let planAbortCtrl = null;
+  let arenaAbortCtrl = null;
+
+  function setStopPlanVisible(vis) {
+    const stopBtn = document.getElementById("btn-stop-plan");
+    if (stopBtn) stopBtn.classList.toggle("hidden", !vis);
+  }
+
   const origFetch = window.fetch.bind(window);
   window.fetch = async function (input, init) {
     const url = typeof input === "string" ? input : (input && input.url) || "";
@@ -31,6 +39,20 @@
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
+    }
+    if (/\/plan(\b|\?|$)/.test(url) && !/\/arena\/plan(\b|\?|$)/.test(url) && !(init && init.signal)) {
+      if (planAbortCtrl) planAbortCtrl.abort();
+      const ctrl = new AbortController();
+      planAbortCtrl = ctrl;
+      setStopPlanVisible(true);
+      try {
+        return await origFetch(input, { ...(init || {}), signal: ctrl.signal });
+      } finally {
+        if (planAbortCtrl === ctrl) {
+          planAbortCtrl = null;
+          setStopPlanVisible(false);
+        }
+      }
     }
     return origFetch(input, init);
   };
@@ -81,8 +103,25 @@
         font-size: 12px; font-weight: 700; color: var(--muted); display: inline-flex; align-items: center; gap: 6px;
       }
       .arena-label small { font-weight: 500; font-size: 11px; }
-      .arena-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+      .arena-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
       .arena-actions .btn { min-height: 32px; justify-content: center; font-size: 12px; padding: 5px 10px; border-radius: 8px; }
+      .planner-btn-group { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+      .btn-stop-sq {
+        width: 34px; height: 34px; min-width: 34px; min-height: 34px; padding: 0;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 8px; cursor: pointer; flex-shrink: 0;
+        border: 1.5px solid color-mix(in srgb, var(--bad, #ef4444) 55%, var(--line));
+        background: color-mix(in srgb, var(--bad, #ef4444) 14%, var(--card));
+        color: var(--bad, #ef4444);
+        transition: background 0.12s, color 0.12s, border-color 0.12s;
+      }
+      .btn-stop-sq:hover {
+        background: var(--bad, #ef4444); color: #ffffff; border-color: var(--bad, #ef4444);
+      }
+      .btn-stop-sq.hidden { display: none !important; }
+      .btn-stop-sq .stop-sq-icon {
+        width: 11px; height: 11px; border-radius: 2px; background: currentColor; display: block;
+      }
       .arena-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
       .arena-list.hidden { display: none; }
       .arena-row {
@@ -98,9 +137,42 @@
       .arena-score.ok { color: var(--ok, #2da44e); }
       .arena-score.bad { color: var(--bad, #cf222e); }
       .arena-sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
-      @media print { #arena-panel { display: none !important; } }
+      @media print { #arena-panel, #btn-stop-plan { display: none !important; } }
     `;
     document.head.appendChild(style);
+  }
+
+  function mountStopOnPlanWithNeon() {
+    const btnPlan = document.getElementById("btn-plan");
+    if (!btnPlan || document.getElementById("btn-stop-plan")) return;
+    const grp = document.createElement("span");
+    grp.className = "planner-btn-group";
+    btnPlan.parentNode.insertBefore(grp, btnPlan);
+    grp.appendChild(btnPlan);
+
+    const stopBtn = document.createElement("button");
+    stopBtn.type = "button";
+    stopBtn.id = "btn-stop-plan";
+    stopBtn.className = "btn-stop-sq hidden";
+    stopBtn.title = "Stop Plan with Neon";
+    stopBtn.setAttribute("aria-label", "Stop Plan with Neon");
+    stopBtn.innerHTML = `<span class="stop-sq-icon" aria-hidden="true"></span>`;
+    grp.appendChild(stopBtn);
+
+    stopBtn.addEventListener("click", () => {
+      if (planAbortCtrl) {
+        planAbortCtrl.abort();
+        planAbortCtrl = null;
+      }
+      setStopPlanVisible(false);
+      btnPlan.disabled = false;
+      const btnResolve = document.getElementById("btn-resolve");
+      if (btnResolve) btnResolve.disabled = false;
+      setTimeout(() => {
+        const st = document.getElementById("planner-status");
+        if (st) st.textContent = "Stopped Neon planning. The plan on screen is unchanged.";
+      }, 0);
+    });
   }
 
   function mountPanel() {
@@ -108,6 +180,7 @@
     const verifier = document.getElementById("verifier-panel");
     if ((!whatif && !verifier) || document.getElementById("arena-panel")) return;
     injectStyles();
+    mountStopOnPlanWithNeon();
 
     const card = document.createElement("div");
     card.className = whatif ? "arena-docked" : "panel-card";
@@ -121,6 +194,7 @@
         <div class="arena-actions">
           <button type="button" class="btn primary" id="btn-run-agents" title="Run 4 competing Managed Agents in parallel">⚡ 4 Agents</button>
           <button type="button" class="btn" id="btn-run-neon" title="Run 3-round Gemini 4 Neon critique loop">🧠 Neon Loop</button>
+          <button type="button" class="btn-stop-sq hidden" id="btn-stop-arena" title="Stop AI Arena run" aria-label="Stop AI Arena run"><span class="stop-sq-icon" aria-hidden="true"></span></button>
         </div>
       </div>
       <ul class="arena-list hidden" id="arena-list"></ul>
@@ -133,6 +207,12 @@
 
     document.getElementById("btn-run-agents").addEventListener("click", runAgentRace);
     document.getElementById("btn-run-neon").addEventListener("click", runNeonLoop);
+    document.getElementById("btn-stop-arena").addEventListener("click", () => {
+      if (arenaAbortCtrl) {
+        arenaAbortCtrl.abort();
+        arenaAbortCtrl = null;
+      }
+    });
   }
 
   function renderAgentRows(agents, statusText) {
@@ -189,11 +269,36 @@
     }).join("");
   }
 
+  function abortableSleep(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal && signal.aborted) {
+        reject(new DOMException("Aborted", "AbortError"));
+        return;
+      }
+      const t = setTimeout(resolve, ms);
+      if (signal) {
+        signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(t);
+            reject(new DOMException("Aborted", "AbortError"));
+          },
+          { once: true }
+        );
+      }
+    });
+  }
+
   async function runAgentRace() {
     const btnA = document.getElementById("btn-run-agents");
     const btnN = document.getElementById("btn-run-neon");
+    const btnStop = document.getElementById("btn-stop-arena");
+    if (arenaAbortCtrl) arenaAbortCtrl.abort();
+    const ctrl = new AbortController();
+    arenaAbortCtrl = ctrl;
     btnA.disabled = true;
     btnN.disabled = true;
+    if (btnStop) btnStop.classList.remove("hidden");
 
     try {
       if (MOCK) {
@@ -206,7 +311,7 @@
         const live = mockSpecs.map((s) => ({ name: s.name, status: "running", persona: "Executing sandbox solver…" }));
         renderAgentRows(live, "0 / 4 finished");
         for (let i = 0; i < mockSpecs.length; i++) {
-          await new Promise((r) => setTimeout(r, 480));
+          await abortableSleep(480, ctrl.signal);
           live[i] = { ...mockSpecs[i], status: "completed", is_winner: i === 3 && i === mockSpecs.length - 1 };
           renderAgentRows(live, `${i + 1} / 4 finished`);
         }
@@ -218,14 +323,15 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ run_id: runId }),
+        signal: ctrl.signal,
       });
       if (!startRes.ok) throw new Error(`HTTP ${startRes.status}`);
       let snap = await startRes.json();
       renderAgentRows(snap.agents || [], `${snap.completed_count || 0} / ${snap.total_count || 4} finished`);
 
       while (snap.status === "running") {
-        await new Promise((r) => setTimeout(r, 550));
-        const pollRes = await origFetch(`${API_BASE}/agents/${encodeURIComponent(snap.job_id)}`);
+        await abortableSleep(550, ctrl.signal);
+        const pollRes = await origFetch(`${API_BASE}/agents/${encodeURIComponent(snap.job_id)}`, { signal: ctrl.signal });
         if (!pollRes.ok) throw new Error(`Poll HTTP ${pollRes.status}`);
         snap = await pollRes.json();
         renderAgentRows(snap.agents || [], `${snap.completed_count || 0} / ${snap.total_count || 4} finished`);
@@ -236,8 +342,11 @@
         applyWinnerToViewer(snap.winner);
       }
     } catch (e) {
-      document.getElementById("arena-status").textContent = `Error: ${e.message}`;
+      document.getElementById("arena-status").textContent =
+        e && e.name === "AbortError" ? "Stopped" : `Error: ${e.message}`;
     } finally {
+      if (arenaAbortCtrl === ctrl) arenaAbortCtrl = null;
+      if (btnStop) btnStop.classList.add("hidden");
       btnA.disabled = false;
       btnN.disabled = false;
     }
@@ -246,8 +355,13 @@
   async function runNeonLoop() {
     const btnA = document.getElementById("btn-run-agents");
     const btnN = document.getElementById("btn-run-neon");
+    const btnStop = document.getElementById("btn-stop-arena");
+    if (arenaAbortCtrl) arenaAbortCtrl.abort();
+    const ctrl = new AbortController();
+    arenaAbortCtrl = ctrl;
     btnA.disabled = true;
     btnN.disabled = true;
+    if (btnStop) btnStop.classList.remove("hidden");
     document.getElementById("arena-status").textContent = "Running Neon rounds…";
 
     try {
@@ -260,25 +374,37 @@
         ];
         for (let i = 1; i <= mockRounds.length; i++) {
           renderNeonRounds(mockRounds.slice(0, i), `Round ${i - 1} / 3`);
-          await new Promise((r) => setTimeout(r, 420));
+          await abortableSleep(420, ctrl.signal);
         }
         applyWinnerToViewer({ strategy: { truck_id: "uhaul_26", packer_engine: "constrained", downsize_last_truck: true } });
         return;
       }
 
       // /arena/plan: POST /plan belongs to the What-If card's "Plan with Neon" and replies in another shape.
-      const res = await origFetch(`${API_BASE}/arena/plan`, {
+      let res = await origFetch(`${API_BASE}/arena/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ run_id: runId, max_rounds: 3 }),
+        body: JSON.stringify({ run_id: runId, max_rounds: 2 }),
+        signal: ctrl.signal,
       });
+      if (res.status === 404) {
+        res = await origFetch(`${API_BASE}/plan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_id: runId, max_rounds: 2 }),
+          signal: ctrl.signal,
+        });
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       renderNeonRounds(data.rounds || [], data.model || "Gemini 4 Neon");
       if (data.winner) applyWinnerToViewer(data.winner);
     } catch (e) {
-      document.getElementById("arena-status").textContent = `Error: ${e.message}`;
+      document.getElementById("arena-status").textContent =
+        e && e.name === "AbortError" ? "Stopped" : `Error: ${e.message}`;
     } finally {
+      if (arenaAbortCtrl === ctrl) arenaAbortCtrl = null;
+      if (btnStop) btnStop.classList.add("hidden");
       btnA.disabled = false;
       btnN.disabled = false;
     }

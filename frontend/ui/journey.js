@@ -107,13 +107,14 @@
     const st = document.createElement("style");
     st.id = "piu-journey-styles";
     st.textContent = `
-      /* Single-row 6-tab bar (Unload · Stores · QR · Crew · Route · Shop) */
+      /* Single-row tab bar (5 or 6 tabs: Unload · Stores · QR · [Crew] · Route · Shop) */
       .tab-bar[role="tablist"] {
-        display: grid !important;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        display: flex !important;
+        flex-wrap: nowrap;
         gap: 3px;
       }
       .tab-bar[role="tablist"] > button {
+        flex: 1 1 0;
         min-width: 0;
         padding: 6px 3px;
         font-size: 12px;
@@ -123,7 +124,8 @@
         text-align: center;
       }
       @media (max-width: 380px) {
-        .tab-bar[role="tablist"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .tab-bar[role="tablist"] { flex-wrap: wrap; }
+        .tab-bar[role="tablist"] > button { flex: 1 1 30%; }
       }
 
       .rt-acc {

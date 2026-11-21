@@ -262,6 +262,18 @@
   .planner-box { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
   .planner-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .planner-head .btn { flex: none; }
+  .btn-stop-sq {
+    width: 34px; height: 34px; min-width: 34px; min-height: 34px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 8px; cursor: pointer; flex-shrink: 0;
+    border: 1.5px solid color-mix(in srgb, var(--bad, #ef4444) 55%, var(--line));
+    background: color-mix(in srgb, var(--bad, #ef4444) 14%, var(--card));
+    color: var(--bad, #ef4444);
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .btn-stop-sq:hover { background: var(--bad, #ef4444); color: #ffffff; border-color: var(--bad, #ef4444); }
+  .btn-stop-sq.hidden { display: none !important; }
+  .btn-stop-sq .stop-sq-icon { width: 11px; height: 11px; border-radius: 2px; background: currentColor; display: block; }
   .planner-rounds { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
   .planner-round {
     border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px;
@@ -608,7 +620,10 @@
         <div class="planner-box">
           <div class="planner-head">
             <span class="small muted" id="planner-status" aria-live="polite">Gemini 4 Neon reads the checker's result and changes the settings, up to 3 rounds.</span>
-            <button type="button" class="btn sm" id="btn-plan">Plan with Neon</button>
+            <span style="display:inline-flex;align-items:center;gap:6px;flex-shrink:0">
+              <button type="button" class="btn sm" id="btn-plan">Plan with Neon</button>
+              <button type="button" class="btn-stop-sq hidden" id="btn-stop-plan" title="Stop Plan with Neon" aria-label="Stop Plan with Neon"><span class="stop-sq-icon" aria-hidden="true"></span></button>
+            </span>
           </div>
           <ol class="planner-rounds hidden" id="planner-rounds"></ol>
         </div>
@@ -2685,22 +2700,39 @@ function renderPlannerRounds(pl) {
   }).join("");
   $("#planner-rounds").classList.remove("hidden");
 }
+let planNeonAbort = null;
 async function planWithModel() {
   const status = $("#planner-status");
+  const stopBtn = $("#btn-stop-plan");
   if (MOCK) {
     status.textContent = "Plan with Neon needs the Python server; mock mode has no model.";
     return;
   }
+  if (planNeonAbort) planNeonAbort.abort();
+  const ctrl = new AbortController();
+  planNeonAbort = ctrl;
   $("#err-box").classList.add("hidden");
   $("#btn-plan").disabled = true;
   $("#btn-resolve").disabled = true;
-  status.textContent = "Neon is reading the checker's result and choosing new settings… about 10 seconds a round.";
+  if (stopBtn) stopBtn.classList.remove("hidden");
+  const maxRounds = params.get("who") === "Demo" ? 3 : 2;
   const t0 = performance.now();
+  status.textContent = "Neon is reading the checker's result and choosing new settings… 0s";
+  const tickTimer = setInterval(() => {
+    const elapsed = Math.floor((performance.now() - t0) / 1000);
+    status.textContent = `Neon is reading the checker's result and choosing new settings… ${elapsed}s`;
+  }, 500);
   try {
     const res = await fetch(`${API_BASE}/plan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ run_id: rawRunId, strategy: currentStrategy(), extra_items: currentExtraItems() }),
+      body: JSON.stringify({
+        run_id: rawRunId,
+        strategy: currentStrategy(),
+        extra_items: currentExtraItems(),
+        max_rounds: maxRounds,
+      }),
+      signal: ctrl.signal,
     });
     if (!res.ok) {
       const detail = (await res.json().catch(() => ({}))).detail || res.statusText;
@@ -2737,8 +2769,15 @@ async function planWithModel() {
     $("#engine-badge").textContent = `Move: ${result.run_id} · Python 3D solver · planned by ${pl.model || "the plain solve"}`;
     showPlan(result, true);
   } catch (e) {
-    status.textContent = `Couldn't plan with Neon: ${e.message}. The plan on screen is unchanged.`;
+    if (e && e.name === "AbortError") {
+      status.textContent = "Stopped Neon planning. The plan on screen is unchanged.";
+    } else {
+      status.textContent = `Couldn't plan with Neon: ${e.message}. The plan on screen is unchanged.`;
+    }
   } finally {
+    clearInterval(tickTimer);
+    if (planNeonAbort === ctrl) planNeonAbort = null;
+    if (stopBtn) stopBtn.classList.add("hidden");
     $("#btn-plan").disabled = false;
     $("#btn-resolve").disabled = false;
   }
@@ -2876,6 +2915,12 @@ $("#sel-truck").addEventListener("change", () => {
 $("#sel-engine").addEventListener("change", () => loadAndSolve(false));
 $("#btn-resolve").addEventListener("click", () => loadAndSolve(false));
 $("#btn-plan").addEventListener("click", planWithModel);
+$("#btn-stop-plan")?.addEventListener("click", () => {
+  if (planNeonAbort) {
+    planNeonAbort.abort();
+    planNeonAbort = null;
+  }
+});
 
 $("#tog-piano").addEventListener("click", () => {
   addPiano = !addPiano;

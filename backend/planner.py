@@ -313,6 +313,9 @@ def plan_with_model(
         rec["model_latency_s"] = latency
         rounds.append(rec)
         history.append({"round": n, "settings": settings, "why_you_chose_it": reason, "result": _result_digest(plan)})
+        if answer.get("stop") and n < max_rounds:
+            note = f"Stopped after round {n}: the model chose to stop."
+            break
 
     best = max(rounds, key=_rank)
     return {
