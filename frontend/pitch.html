@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pack It Up · Phone Pitch Cards</title>
+  <style>
+    :root {
+      --bg: #111315;
+      --card: #1a1e23;
+      --border: #2c333c;
+      --text: #f5f3ef;
+      --muted: #a7afb8;
+      --chris: #60a5fa;
+      --george: #c084fc;
+      --accent: #6ee7b7;
+      --vibe: #fcd34d;
+      --danger: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 460px;
+      margin-inline: auto;
+      padding: 12px 14px 36px;
+      line-height: 1.42;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(17, 19, 21, 0.96);
+      backdrop-filter: blur(8px);
+      padding: 8px 0 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+    .timer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .timer-clock {
+      font-size: 1.5rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+    }
+    .timer-clock.warn { color: var(--vibe); }
+    .timer-clock.over { color: var(--danger); }
+    .timer-btns { display: flex; gap: 6px; }
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.active {
+      background: #28303b;
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .tabs button {
+      padding: 8px 4px;
+      font-size: 0.84rem;
+      text-align: center;
+    }
+    .vibe-banner {
+      background: rgba(252, 211, 77, 0.08);
+      border: 1px solid rgba(252, 211, 77, 0.28);
+      border-radius: 10px;
+      padding: 8px 11px;
+      margin-bottom: 12px;
+      font-size: 0.86rem;
+      color: #fde68a;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .card.chris { border-left: 4px solid var(--chris); }
+    .card.george { border-left: 4px solid var(--george); }
+    .card.prep { border-left: 4px solid var(--vibe); }
+    .beat-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .speaker {
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .speaker.chris { color: var(--chris); }
+    .speaker.george { color: var(--george); }
+    .speaker.prep { color: var(--vibe); }
+    .time {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    h2 {
+      margin: 0 0 6px;
+      font-size: 1.03rem;
+      font-weight: 700;
+    }
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+    li {
+      margin-bottom: 6px;
+      font-size: 0.96rem;
+    }
+    li:last-child { margin-bottom: 0; }
+    strong { color: #fff; }
+    .say {
+      color: var(--accent);
+      font-style: italic;
+    }
+    .hidden { display: none !important; }
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-bottom: 8px;
+      font-size: 0.94rem;
+    }
+    .check-item input {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="timer-row">
+      <div>
+        <span id="clock" class="timer-clock">3:00</span>
+        <span id="beatHint" style="font-size:0.8rem;color:var(--muted);margin-left:6px;">Breathe · Look around the room</span>
+      </div>
+      <div class="timer-btns">
+        <button id="startBtn" onclick="toggleTimer()">Start</button>
+        <button onclick="resetTimer()">Reset</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button id="tab-chris" onclick="setFilter('chris')">Chris</button>
+      <button id="tab-george" class="active" onclick="setFilter('george')">George</button>
+      <button id="tab-both" onclick="setFilter('both')">3:00 Flow</button>
+      <button id="tab-prep" onclick="setFilter('prep')">Q&amp;A / 5PM</button>
+    </div>
+  </div>
+
+  <div class="vibe-banner">
+    <strong>Vibe:</strong> Warm &amp; conversational — we've all lived in this room since 9 AM. Talk <em>with</em> them, gesture to the tables &amp; backpacks around us.
+  </div>
+
+  <!-- 0:00 - 0:13 CHRIS HOOK -->
+  <section class="card chris" data-who="chris">
+    <div class="beat-head">
+      <span class="speaker chris">Chris · Welcome In</span>
+      <span class="time">0:00 – 0:13</span>
+    </div>
+    <h2>We've All Shared This Room Today</h2>
+    <ul>
+      <li><span class="say">"We've all been living in this space together since nine this morning."</span></li>
+      <li>My last move: guessed <strong>too big</strong> on the truck — empty floor space meant <strong>listening to my things slide &amp; break</strong>.</li>
+      <li><em>Glance to George.</em></li>
+    </ul>
+  </section>
+
+  <!-- 0:13 - 0:28 GEORGE HOOK -->
+  <section class="card george" data-who="george">
+    <div class="beat-head">
+      <span class="speaker george">George · Our Shared Move</span>
+      <span class="time">0:13 – 0:28</span>
+    </div>
+    <h2>WNY, NJ → UES &amp; Packing Our Room</h2>
+    <ul>
+      <li>My move was just a tiny hop across the river — <strong>West New York, NJ to the Upper East Side</strong> — and with a <strong>smaller truck</strong>, tight city turns would've been so much easier.</li>
+      <li><span class="say">"Instead of a canned demo, let's pack up this exact room we're all sitting in — and move us 10 minutes north to Penn Station."</span></li>
+    </ul>
+  </section>
+
+  <!-- 0:28 - 0:58 CHRIS CAPTURE -->
+  <section class="card chris" data-who="chris">
+    <div class="beat-head">
+      <span class="speaker chris">Chris · Walk the Space</span>
+      <span class="time">0:28 – 0:58</span>
+    </div>
+    <h2>Talk to the Room · Leave Everyone's Bags Out</h2>
+    <ul>
+      <li>Upload clip of the room around us; talk naturally: <span class="say">"these chairs stack, the plants stay here."</span></li>
+      <li><strong>Hydrogen</strong> spots the furniture — and automatically <strong>leaves out everyone's laptops, jackets &amp; backpacks</strong> (they belong to us, not the room).</li>
+      <li>Tap <strong>1 quick Decision 1 question</strong> (it quietly settled the rest in ~200 ms) → tap <strong>"Plan the truck load →"</strong>.</li>
+    </ul>
+  </section>
+
+  <!-- 0:58 - 1:55 GEORGE 3D + PENN STATION -->
+  <section class="card george" data-who="george">
+    <div class="beat-head">
+      <span class="speaker george">George · Snug Truck, Real Homes</span>
+      <span class="time">0:58 – 1:55</span>
+    </div>
+    <h2>Nothing Slides · Every Piece Gets a Corner</h2>
+    <ul>
+      <li><strong>Smallest U-Haul that fits:</strong> snug so nothing slides like Chris's move, nimble enough for NYC blocks like mine.</li>
+      <li><strong>Care checks (0 violations):</strong> ≥75% base support, balanced left-to-right weight, nothing heavy crushing fragile pieces.</li>
+      <li><strong>Antigravity Managed Agents + Neon</strong> test layouts in sandboxes to fix any tight spots.</li>
+      <li><strong>At Penn Station:</strong> chairs, tables &amp; shelves stock 6 real corners (café, bookshop, lounge) in exact back-to-front unload order + <strong>offline QR box scan</strong> + <strong>live Shopify <code>shop.dev</code> cart</strong> that buys the exact boxes, pads &amp; straps needed.</li>
+    </ul>
+  </section>
+
+  <!-- 1:55 - 2:25 GEORGE INVITE A JUDGE -->
+  <section class="card george" data-who="george">
+    <div class="beat-head">
+      <span class="speaker george">George · Stories From This Room + Judge Pick</span>
+      <span class="time">1:55 – 2:25</span>
+    </div>
+    <h2>Tribute to Orior · Film Crew · Judge What-If</h2>
+    <ul>
+      <li><strong>✨ Orior White-Glove Tribute (Newry, Ireland):</strong> <span class="say">"The Malin team shared that their parent company is Orior — custom Irish stone &amp; bouclé crafted just for this room that would never really move from here. Using it as a proof-of-concept for another venue, Orior White-Glove Care forbids stacking anything on velvet or stone and adds breathable cotton covers via shop.dev."</span></li>
+      <li><strong>🎬 Film Crew → Adorama &amp; ARRI Rental:</strong> <span class="say">"And the 2-person crew filming us today pointed to Adorama &amp; ARRI Rental trucks."</span> Tap <strong>+ Cinema Rig</strong> (Pelican 1650 floor base, unstacked 1510 glass, locked C-stand cart) — or let a judge add a piano / 10-ft van!</li>
+      <li>Tap re-solve → <strong>Move Plan Judge (Decision 1 → Neon)</strong> verifies safety live.</li>
+    </ul>
+  </section>
+
+  <!-- 2:25 - 2:45 CHRIS HONESTY -->
+  <section class="card chris" data-who="chris">
+    <div class="beat-head">
+      <span class="speaker chris">Chris · Honest Craft</span>
+      <span class="time">2:25 – 2:45</span>
+    </div>
+    <h2>What This Room Taught Us Today</h2>
+    <ul>
+      <li><strong>Single-call baseline</strong> floats &amp; overlaps furniture; our checked plan hits <strong>0 violations</strong>.</li>
+      <li><strong>Honest miss in this building:</strong> mirrors, chairs tucked behind our bags &amp; closed cabinets fooled pass 1 — so now closed cabinets assume empty and ask you directly.</li>
+    </ul>
+  </section>
+
+  <!-- 2:45 - 3:00 GEORGE WARM CLOSE -->
+  <section class="card george" data-who="george">
+    <div class="beat-head">
+      <span class="speaker george">George · Warm Close</span>
+      <span class="time">2:45 – 3:00</span>
+    </div>
+    <h2>Built Here Today, With Antigravity</h2>
+    <ul>
+      <li><span class="say">"I actually downloaded Google Antigravity this morning just to build this here in this room with all of you."</span></li>
+      <li><strong>Hydrogen</strong> listens as you walk · <strong>Antigravity Agents + Neon</strong> pack with care · <strong>Decision 1</strong> double-checks the load — getting everything in this space safely to the next one.</li>
+    </ul>
+  </section>
+
+  <!-- Q&A + 5PM PREP -->
+  <section class="card prep" data-who="prep">
+    <div class="beat-head">
+      <span class="speaker prep">2:00 Q&amp;A Pocket Answers</span>
+      <span class="time">Judges</span>
+    </div>
+    <h2>Conversational Q&amp;A</h2>
+    <ul>
+      <li><strong>How'd two of you build this since 10:30?</strong> Downloaded <strong>Google Antigravity</strong> at kickoff, connected <code>gemini-skills</code> + Gemini Docs MCP, and ran 5 parallel <strong>Gemini 4 Carbon</strong> worktrees sharing notes in <code>memory/sessions.md</code>.</li>
+      <li><strong>Built today vs brought in?</strong> Every line of code written after 10:30 AM; starter item sizes &amp; Penn Station reference shots openly listed under <em>Brought in</em> in <code>README.md</code>.</li>
+      <li><strong>Why multiple models?</strong> Hydrogen watches &amp; hears fast; Decision 1 answers yes/no &amp; rubrics in ~200 ms (0 output tokens); Neon + Antigravity Agents reason through 3D packing fixes.</li>
+      <li><strong>Is the arrival image the plan?</strong> No — the 3D coordinates &amp; physics checks are the real plan; Nano Banana is a warm visual preview.</li>
+      <li><strong>Who pays for this daily (beyond home moves)?</strong> Film &amp; commercial crews loading camera trucks out of <strong>Adorama Rental</strong> &amp; <strong>ARRI Rental</strong> (Pelican 1650/1510 rules + outward QR check-in), and bespoke design houses like <strong>Orior</strong> (Ireland — parent of <strong>The Malin</strong>) coordinating white-glove new-location installs + <strong>Shopify <code>shop.dev</code></strong> crating/protection kits.</li>
+    </ul>
+  </section>
+
+  <section class="card prep" data-who="prep">
+    <div class="beat-head">
+      <span class="speaker prep">Pre-5:00 PM Countdown</span>
+      <span class="time">4:15 – 5:00</span>
+    </div>
+    <h2>Submission Checklist</h2>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:15 PM:</strong> Record 1-min screen + warm voiceover video (today's code only).</span></label>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:35 PM:</strong> Open video link in an incognito window to verify access.</span></label>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:40 PM:</strong> Confirm repo is public, no <code>.env</code> or media committed, Chris + George both listed.</span></label>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:45 PM:</strong> Do 2 relaxed 3:00 run-throughs together at conversational pace.</span></label>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:55 PM:</strong> Submit before 5:00 PM sharp!</span></label>
+  </section>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    let currentFilter = params.get("who") || "george";
+    let remainSec = 180;
+    let timerId = null;
+
+    function setFilter(who) {
+      currentFilter = who;
+      document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+      const btn = document.getElementById("tab-" + who);
+      if (btn) btn.classList.add("active");
+      document.querySelectorAll("section.card").forEach(sec => {
+        const tag = sec.getAttribute("data-who");
+        const show = (who === "both" && (tag === "chris" || tag === "george")) || tag === who;
+        sec.classList.toggle("hidden", !show);
+      });
+    }
+
+    function renderClock() {
+      const el = document.getElementById("clock");
+      const hint = document.getElementById("beatHint");
+      const abs = Math.abs(remainSec);
+      const m = Math.floor(abs / 60);
+      const s = String(abs % 60).padStart(2, "0");
+      el.textContent = (remainSec < 0 ? "-" : "") + m + ":" + s;
+      el.className = "timer-clock" + (remainSec < 0 ? " over" : remainSec <= 30 ? " warn" : "");
+      const elapsed = 180 - remainSec;
+      if (!timerId && elapsed === 0) hint.textContent = "Breathe · Look around the room";
+      else if (elapsed < 28) hint.textContent = "Shared room + Chris & George stories";
+      else if (elapsed < 58) hint.textContent = "Chris: Walk room + leave bags out";
+      else if (elapsed < 115) hint.textContent = "George: Snug truck + Penn corners";
+      else if (elapsed < 145) hint.textContent = "George: Invite a judge to pick an item";
+      else if (elapsed < 165) hint.textContent = "Chris: What this room taught us";
+      else if (elapsed <= 180) hint.textContent = "George: Warm Antigravity close";
+      else hint.textContent = "Time · Easy 2m conversation";
+    }
+
+    function toggleTimer() {
+      const btn = document.getElementById("startBtn");
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+        btn.textContent = "Resume";
+        return;
+      }
+      btn.textContent = "Pause";
+      timerId = setInterval(() => {
+        remainSec -= 1;
+        renderClock();
+      }, 1000);
+    }
+
+    function resetTimer() {
+      if (timerId) clearInterval(timerId);
+      timerId = null;
+      remainSec = 180;
+      document.getElementById("startBtn").textContent = "Start";
+      renderClock();
+    }
+
+    setFilter(currentFilter);
+    renderClock();
+  </script>
+</body>
+</html>

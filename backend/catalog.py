@@ -22,6 +22,7 @@ _ITEM_NUM = {"length_in", "width_in", "height_in", "weight_lb"}
 _TRUCK_NUM = {
     "length_in", "width_in", "height_in", "max_weight_lb",
     "door_width_in", "door_height_in", "deck_height_in",
+    "ext_height_in", "ext_length_in", "gvwr_lb", "axles",
 }
 _ZONE_NUM = {
     "length_in", "width_in", "height_in",
@@ -122,6 +123,12 @@ def load_trucks() -> dict[str, dict]:
             row["dims_in"] = dims
             row["door_in"] = [row["door_width_in"], row["door_height_in"]]
             row["volume_cuft"] = volume_cuft(*dims)
+            ext_h = float(row.get("ext_height_in") or (row["height_in"] + row["deck_height_in"] + 10.0))
+            ext_l = float(row.get("ext_length_in") or (row["length_in"] + 90.0))
+            row["ext_height_in"] = ext_h
+            row["ext_length_in"] = ext_l
+            row["ext_height_label"] = f"{int(ext_h // 12)}'{int(round(ext_h % 12))}\""
+            row["dual_rear_wheel"] = _yes(row.get("dual_rear_wheel"))
             trucks[row["truck_id"]] = row
     return trucks
 

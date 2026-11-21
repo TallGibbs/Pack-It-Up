@@ -1,12 +1,14 @@
-"""Track B HTTP routes: 3D truck + Penn Station store packing & verification.
+"""Track B HTTP routes: 3D truck + Penn Station store packing, verification & video stills.
 
 Mounted by `backend/app.py` alongside Track A's `ingest_router`.
 
 Routes:
-  GET  /trucks             Available U-Haul trucks and Penn Station store zones
-  POST /solve              {run_id?, inventory?, strategy?, extra_items?} -> placement JSON
-  GET  /solve/{run_id}     Convenience GET solve for a run_id (or 'sample_venue' / 'mock-demo')
-  POST /plan               Same body as /solve; the planner loop (backend/planner.py) -> best plan + "planner" rounds
+  GET  /trucks                           Available U-Haul trucks and Penn Station store zones
+  POST /solve                            {run_id?, inventory?, strategy?, extra_items?} -> placement JSON
+  GET  /solve/{run_id}                   Convenience GET solve for a run_id (or 'sample_venue' / 'mock-demo')
+  POST /plan                             Same body as /solve; the planner loop (backend/planner.py) -> best plan + "planner" rounds
+  GET  /destination-media                Available destination photos/clips in data/NYPenn/
+  GET  /destination-media/{slot}/still   JPEG video frame / photo still for destination room/zone
 """
 from __future__ import annotations
 
@@ -16,15 +18,47 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
 
 from backend import catalog, planner, solver
 from backend.ingest.common import read_json, run_dir, write_json
+from backend.llm import media as mu
 
 router = APIRouter(tags=["pack"])
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAMPLE_VENUE_PATH = REPO_ROOT / "data" / "sample_venue.json"
 MOCK_INV_PATH = REPO_ROOT / "frontend" / "mock" / "inventory.json"
+NYPENN_DIR = REPO_ROOT / "data" / "NYPenn"
+
+
+def _list_nypenn_files() -> list[Path]:
+    if not NYPENN_DIR.exists():
+        return []
+    allowed = set(mu.IMAGE_EXT) | set(mu.VIDEO_EXT)
+    return sorted(
+        p for p in NYPENN_DIR.iterdir()
+        if p.is_file() and p.suffix.lower() in allowed
+    )
+
+
+def _compute_dest_corner(pos_in: list[float], size_in: list[float], zone_dims: list[float]) -> str:
+    """Human-readable room corner/wall label inside `[L, W, H]` destination room."""
+    L = max(1.0, float(zone_dims[0]))
+    W = max(1.0, float(zone_dims[1]))
+    cx = (float(pos_in[0]) + 0.5 * float(size_in[0])) / L  # 0 = back wall, 1 = front doorway wall
+    cy = (float(pos_in[1]) + 0.5 * float(size_in[1])) / W  # 0 = left wall, 1 = right wall
+
+    depth_lbl = "Back" if cx < 0.36 else ("Front" if cx > 0.66 else "Mid")
+    side_lbl = "Left" if cy < 0.36 else ("Right" if cy > 0.64 else "Center")
+
+    if depth_lbl == "Mid" and side_lbl == "Center":
+        return "Center Floor"
+    if depth_lbl == "Mid":
+        return f"{side_lbl} Wall"
+    if side_lbl == "Center":
+        return "Back Wall" if depth_lbl == "Back" else "Front Entrance"
+    return f"{depth_lbl}-{side_lbl} Corner"
 
 
 def _load_inventory_for_run(run_id: str | None) -> tuple[str, dict[str, Any]]:
@@ -50,6 +84,184 @@ def _load_inventory_for_run(run_id: str | None) -> tuple[str, dict[str, Any]]:
     if inv is None:
         raise HTTPException(409, "inventory not ready yet; poll GET /runs/{run_id}")
     return rid, inv
+
+
+def _enrich_media_and_corners(rid: str, inv: dict[str, Any], plan: dict[str, Any]) -> None:
+    """Attach source video evidence, room stills, truck source->dest links, and room corners."""
+    manifest_by_name: dict[str, dict[str, Any]] = {}
+    if rid not in ("inline", "sample_venue", "mock-demo"):
+        try:
+            rd = run_dir(rid)
+            manifest = read_json(rd / "manifest.json") or {}
+            for f in manifest.get("files", []):
+                if f.get("name"):
+                    manifest_by_name[f["name"]] = f
+        except Exception:
+            pass
+
+    # Map file name -> sha256/kind from either manifest or item evidence
+    file_meta: dict[str, dict[str, Any]] = {}
+    for name, mf in manifest_by_name.items():
+        file_meta[name] = {"sha256": mf.get("sha256"), "kind": mf.get("kind")}
+
+    for rb in inv.get("rooms", []):
+        for it in rb.get("items", []):
+            ev = it.get("evidence") or {}
+            src = ev.get("source")
+            if src and ev.get("sha256") and src not in file_meta:
+                file_meta[src] = {"sha256": ev.get("sha256"), "kind": ev.get("kind")}
+
+    def _norm_ev(ev: dict[str, Any] | None, fallback_files: list[str]) -> dict[str, Any] | None:
+        if not ev and not fallback_files:
+            return None
+        out = dict(ev or {})
+        src = out.get("source") or (fallback_files[0] if fallback_files else None)
+        if not src:
+            return None
+        out["source"] = src
+        fm = file_meta.get(src) or {}
+        if not out.get("sha256") and fm.get("sha256"):
+            out["sha256"] = fm["sha256"]
+        if not out.get("kind"):
+            ext = Path(src).suffix.lower()
+            out["kind"] = fm.get("kind") or ("video" if ext in mu.VIDEO_EXT else "image")
+        if out["kind"] == "video" and out.get("timestamp_s") is None:
+            out["timestamp_s"] = 2.5
+        return out
+
+    source_ev_by_id: dict[str, dict[str, Any]] = {}
+    room_stills: list[dict[str, Any]] = []
+
+    for r_idx, rb in enumerate(inv.get("rooms", []), start=1):
+        r_meta = rb.get("room") or {}
+        room_id = r_meta.get("id") or f"room_{r_idx}"
+        room_name = r_meta.get("name") or room_id
+        r_files = list(rb.get("files") or [])
+
+        best_room_ev: dict[str, Any] | None = None
+        sample_boxes: list[dict[str, Any]] = []
+
+        for it in rb.get("items", []):
+            nev = _norm_ev(it.get("evidence"), r_files)
+            if nev:
+                source_ev_by_id[it["id"]] = nev
+                if best_room_ev is None or (nev.get("kind") == "video" and best_room_ev.get("kind") != "video"):
+                    best_room_ev = nev
+                if nev.get("box_2d") and len(sample_boxes) < 4:
+                    sample_boxes.append({"label": it.get("label", ""), "box_2d": nev["box_2d"]})
+
+        for c in rb.get("containers", []):
+            cid = c.get("id")
+            nev = _norm_ev(c.get("evidence"), c.get("seen_in") or r_files)
+            if cid and nev:
+                source_ev_by_id[cid] = nev
+
+        if best_room_ev is None and r_files:
+            best_room_ev = _norm_ev({"source": r_files[0]}, r_files)
+
+        room_stills.append({
+            "room_id": room_id,
+            "room_name": room_name,
+            "files": r_files,
+            "evidence": best_room_ev,
+            "sample_detections": sample_boxes,
+        })
+
+    room_still_by_id = {rs["room_id"]: rs for rs in room_stills}
+
+    # Check if real Penn Station destination media exists in data/NYPenn/
+    nypenn_files = _list_nypenn_files()
+
+    # Map piece_id -> destination corner from zones[]
+    piece_corner_map: dict[str, str] = {}
+    for z_idx, z in enumerate(plan.get("zones", [])):
+        z_dims = z.get("dims_in") or [180.0, 120.0, 96.0]
+        if nypenn_files:
+            chosen_file = nypenn_files[z_idx % len(nypenn_files)]
+            is_vid = chosen_file.suffix.lower() in mu.VIDEO_EXT
+            t_sec = round(1.0 + (z_idx * 1.7) % 6.0, 1) if is_vid else None
+            q = f"?t={t_sec}&size=640" if t_sec is not None else "?size=640"
+            z["dest_still"] = {
+                "url": f"/destination-media/{z_idx % len(nypenn_files)}/still{q}",
+                "source": chosen_file.name,
+                "kind": "video" if is_vid else "image",
+                "timestamp_s": t_sec,
+            }
+        else:
+            z["dest_still"] = None
+
+        corner_counts: dict[str, int] = {}
+        src_rooms_in_zone: dict[str, int] = {}
+        for zit in z.get("items", []):
+            corner = _compute_dest_corner(zit.get("pos_in") or [0, 0, 0], zit.get("size_in") or [18, 18, 16], z_dims)
+            zit["dest_corner"] = corner
+            piece_corner_map[zit.get("piece_id", zit["id"])] = corner
+            corner_counts[corner] = corner_counts.get(corner, 0) + 1
+            rid_it = zit.get("room_id") or "room_1"
+            src_rooms_in_zone[rid_it] = src_rooms_in_zone.get(rid_it, 0) + 1
+            ev = source_ev_by_id.get(zit.get("source_id", ""))
+            if ev:
+                zit["evidence"] = ev
+
+        z["corners_summary"] = [
+            {"corner": k, "count": n}
+            for k, n in sorted(corner_counts.items(), key=lambda kv: -kv[1])
+        ]
+        z["sourced_from_rooms"] = [
+            {
+                "room_id": rk,
+                "room_name": (room_still_by_id.get(rk) or {}).get("room_name", rk),
+                "count": rn,
+                "evidence": (room_still_by_id.get(rk) or {}).get("evidence"),
+            }
+            for rk, rn in sorted(src_rooms_in_zone.items(), key=lambda kv: -kv[1])
+        ]
+
+    zone_by_id = {z["zone_id"]: z for z in plan.get("zones", [])}
+
+    # Enrich trucks[].items[] and build per-truck source_rooms & dest_zones summaries
+    for t in plan.get("trucks", []):
+        src_tally: dict[str, dict[str, Any]] = {}
+        dst_tally: dict[str, dict[str, Any]] = {}
+        for it in t.get("items", []):
+            ev = source_ev_by_id.get(it.get("source_id", ""))
+            if ev:
+                it["evidence"] = ev
+            corner = piece_corner_map.get(it.get("piece_id", it["id"])) or "Center Floor"
+            it["dest_corner"] = corner
+
+            rm_id = it.get("room_id") or "room_1"
+            rm_entry = src_tally.setdefault(rm_id, {
+                "room_id": rm_id,
+                "room_name": it.get("room_name") or rm_id,
+                "item_count": 0,
+                "box_count": 0,
+                "weight_lb": 0.0,
+                "evidence": (room_still_by_id.get(rm_id) or {}).get("evidence") or ev,
+                "sample_detections": (room_still_by_id.get(rm_id) or {}).get("sample_detections") or [],
+            })
+            rm_entry["item_count"] += 1
+            if it.get("is_box"):
+                rm_entry["box_count"] += 1
+            rm_entry["weight_lb"] = round(rm_entry["weight_lb"] + float(it.get("weight_lb") or 0), 1)
+
+            zid = it.get("dest_zone") or "penn_concourse"
+            z_obj = zone_by_id.get(zid) or {}
+            dz_entry = dst_tally.setdefault(zid, {
+                "zone_id": zid,
+                "name": it.get("dest_zone_name") or z_obj.get("name") or zid,
+                "dock_stop": it.get("dock_stop") or z_obj.get("dock_stop") or 6,
+                "item_count": 0,
+                "corners": {},
+                "dest_still": z_obj.get("dest_still"),
+            })
+            dz_entry["item_count"] += 1
+            dz_entry["corners"][corner] = dz_entry["corners"].get(corner, 0) + 1
+
+        t["source_rooms"] = sorted(src_tally.values(), key=lambda x: -x["item_count"])
+        t["dest_zones"] = sorted(dst_tally.values(), key=lambda x: x["dock_stop"])
+
+    plan["room_stills"] = room_stills
 
 
 def _inject_extra_items(inv: dict[str, Any], extra_items: list[dict[str, Any]]) -> dict[str, Any]:
@@ -114,6 +326,95 @@ def _inject_extra_items(inv: dict[str, Any], extra_items: list[dict[str, Any]]) 
     return cloned
 
 
+_ORIOR_CURATED_CIDS = {
+    "sofa_3seat", "sofa_loveseat", "sofa_sectional_piece", "armchair", "recliner",
+    "coffee_table", "end_table", "sideboard", "console_table", "counter_table",
+    "ottoman", "bookshelf_tall", "bookshelf_short", "area_rug_rolled",
+    "table_lamp", "floor_lamp", "framed_art", "mirror_floor",
+    "orior_travertine_table", "orior_boucle_chair",
+}
+_ORIOR_KEYWORDS = ("orior", "travertine", "marble", "stone", "boucle", "bouclé", "mohair", "velvet", "credenza", "sideboard")
+
+
+def _apply_orior_venue_policy(inv: dict[str, Any], strategy: dict[str, Any]) -> dict[str, Any] | None:
+    """Apply Orior White-Glove Care (`orior_white_glove`) or in-situ hold (`orior_curated_stays`).
+
+    In real life, The Malin's bespoke Orior pieces (Newry, Ireland) are custom-curated per club
+    and never move between locations. For our proof-of-concept simulation of a curated venue move,
+    `orior_white_glove` keeps every piece in the move while enforcing Orior-grade white-glove rules:
+    zero top-stacking (`stackable='no'`), upright two-person handling, and +2" pad/crate clearance.
+    """
+    white_glove = bool(strategy.get("orior_white_glove"))
+    curated_stays = bool(strategy.get("orior_curated_stays"))
+    if not white_glove and not curated_stays:
+        return None
+
+    affected_units = 0
+    affected_cuft = 0.0
+    sample_labels: list[str] = []
+
+    for rb in inv.get("rooms", []):
+        for it in rb.get("items", []):
+            disp = str(it.get("disposition") or "undecided").lower()
+            if disp not in ("keep", "undecided"):
+                continue
+            cid = str(it.get("catalog_id") or "").lower()
+            lbl = str(it.get("label") or "").lower()
+            mat = str((it.get("size") or {}).get("material") or "").lower()
+            is_orior = (
+                cid in _ORIOR_CURATED_CIDS
+                or mat in ("stone", "upholstered")
+                or any(k in lbl for k in _ORIOR_KEYWORDS)
+            )
+            if not is_orior or str(it.get("id") or "").startswith("judge_"):
+                continue
+
+            qty = max(1, int(it.get("quantity") or 1))
+            sz = it.setdefault("size", {})
+            vol = float(sz.get("volume_cuft_total") or 0.0)
+            affected_units += qty
+            affected_cuft += vol
+            sample_labels.append(str(it.get("label") or cid))
+
+            if curated_stays and not white_glove:
+                it["disposition"] = "stays"
+            else:
+                # Orior White-Glove Care: keep in simulation, forbid stacking anything on top,
+                # require upright 2-person handling, and add 2" breathable pad/crate clearance.
+                it["stackable"] = "no"
+                it["fragile"] = True
+                it["must_stay_upright"] = True
+                it["two_person"] = True
+                dims = sz.get("dims_in")
+                if isinstance(dims, list) and len(dims) == 3:
+                    padded = [round(float(dims[0]) + 2.0, 1), round(float(dims[1]) + 2.0, 1), round(float(dims[2]) + 1.0, 1)]
+                    sz["dims_in"] = padded
+                    v_each = catalog.volume_cuft(padded[0], padded[1], padded[2])
+                    sz["volume_cuft_each"] = v_each
+                    sz["volume_cuft_total"] = round(v_each * qty, 2)
+
+    if curated_stays and not white_glove:
+        return {
+            "policy": "malin_orior_curated_stays",
+            "kept_in_venue_units": affected_units,
+            "kept_in_venue_cuft": round(affected_cuft, 1),
+            "sample_items": list(dict.fromkeys(sample_labels))[:5],
+            "note": "In-situ mode: bespoke curated pieces remain in place while packing event gear only.",
+        }
+
+    return {
+        "policy": "orior_white_glove",
+        "white_glove_units": affected_units,
+        "white_glove_cuft": round(affected_cuft, 1),
+        "sample_items": list(dict.fromkeys(sample_labels))[:5],
+        "note": (
+            "Proof-of-concept tribute to Orior (Newry, Ireland) & The Malin: while these custom pieces "
+            "never move between clubs in real life, our simulation packs all of them to Orior white-glove "
+            "standards—zero top-stacking, upright 2-person lifts, +2\" pad clearance & breathable cotton covers."
+        ),
+    }
+
+
 @router.get("/trucks")
 def get_trucks_and_zones() -> dict[str, Any]:
     return {
@@ -122,19 +423,64 @@ def get_trucks_and_zones() -> dict[str, Any]:
     }
 
 
-def _inventory_from_body(payload: dict[str, Any]) -> tuple[str, dict[str, Any], list[dict[str, Any]]]:
-    """-> (run id, inventory with any what-if items added, the what-if items)."""
+@router.get("/destination-media")
+def list_destination_media() -> dict[str, Any]:
+    files = _list_nypenn_files()
+    return {
+        "count": len(files),
+        "files": [
+            {
+                "slot": idx,
+                "name": p.name,
+                "kind": "video" if p.suffix.lower() in mu.VIDEO_EXT else "image",
+                "still_url": f"/destination-media/{idx}/still",
+            }
+            for idx, p in enumerate(files)
+        ],
+    }
+
+
+@router.get("/destination-media/{slot}/still")
+def get_destination_still(
+    slot: int,
+    t: float | None = Query(1.5, ge=0),
+    size: int = Query(640, ge=64, le=1920),
+) -> Response:
+    files = _list_nypenn_files()
+    if not files:
+        raise HTTPException(404, "no media files in data/NYPenn")
+    chosen = files[slot % len(files)]
+    kind = "video" if chosen.suffix.lower() in mu.VIDEO_EXT else "image"
+    jpg = mu.crop_jpeg(chosen, kind, None, t if kind == "video" else None, max_side=size)
+    return Response(jpg, media_type="image/jpeg", headers={"Cache-Control": "max-age=3600"})
+
+
+def _inventory_from_body(
+    payload: dict[str, Any],
+    strategy: dict[str, Any] | None = None,
+) -> tuple[str, dict[str, Any], list[dict[str, Any]], dict[str, Any] | None]:
+    """-> (run id, inventory with what-if items + Orior policy applied, what-if items, venue_policy)."""
     extra_items = list(payload.get("extra_items") or [])
     if isinstance(payload.get("inventory"), dict):
         inv = payload["inventory"]
         rid = str(payload.get("run_id") or inv.get("run_id") or "inline")
     else:
         rid, inv = _load_inventory_for_run(payload.get("run_id"))
-    return rid, _inject_extra_items(inv, extra_items), extra_items
+    inv_to_solve = _inject_extra_items(inv, extra_items)
+    venue_policy = _apply_orior_venue_policy(inv_to_solve, strategy or {})
+    return rid, inv_to_solve, extra_items, venue_policy
 
 
-def _finish_plan(plan: dict[str, Any], rid: str, inv_to_solve: dict[str, Any], extra_items: list) -> dict[str, Any]:
-    """Add run id and rooms, and save placement.json for a real run (not for a what-if)."""
+def _finish_plan(
+    plan: dict[str, Any],
+    rid: str,
+    inv_to_solve: dict[str, Any],
+    extra_items: list,
+    venue_policy: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Add run id, rooms, venue_policy, and video-still corners, and save placement.json for a real run."""
+    if venue_policy:
+        plan["venue_policy"] = venue_policy
     plan["run_id"] = rid
     plan["rooms"] = [
         {
@@ -143,6 +489,7 @@ def _finish_plan(plan: dict[str, Any], rid: str, inv_to_solve: dict[str, Any], e
         }
         for i, r in enumerate(inv_to_solve.get("rooms", []))
     ]
+    _enrich_media_and_corners(rid, inv_to_solve, plan)
 
     # Persist placement.json for real runs when not running a transient what-if injection.
     if not extra_items and rid not in ("inline", "sample_venue", "mock-demo"):
@@ -160,25 +507,20 @@ def _finish_plan(plan: dict[str, Any], rid: str, inv_to_solve: dict[str, Any], e
 def post_solve(body: dict[str, Any] | None = None) -> dict[str, Any]:
     payload = body or {}
     strategy = dict(payload.get("strategy") or {})
-    rid, inv_to_solve, extra_items = _inventory_from_body(payload)
+    rid, inv_to_solve, extra_items, venue_policy = _inventory_from_body(payload, strategy)
     try:
         plan = solver.solve(inv_to_solve, strategy=strategy)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    return _finish_plan(plan, rid, inv_to_solve, extra_items)
+    return _finish_plan(plan, rid, inv_to_solve, extra_items, venue_policy)
 
 
 @router.post("/plan")
 def post_plan(body: dict[str, Any] | None = None) -> dict[str, Any]:
-    """The planner loop (B6): solve, let the `plan` model change the settings, solve again, keep the best.
-
-    Same body as /solve, plus optional `max_rounds` (default 3 solver runs). The reply is the winning
-    plan in /solve's shape with one more key, `planner`: the rounds, which one won, the model, and a
-    note if the model could not be reached (the plan is then the plain solve).
-    """
+    """The planner loop (B6): solve, let the `plan` model change the settings, solve again, keep the best."""
     payload = body or {}
     strategy = dict(payload.get("strategy") or {})
-    rid, inv_to_solve, extra_items = _inventory_from_body(payload)
+    rid, inv_to_solve, extra_items, venue_policy = _inventory_from_body(payload, strategy)
 
     rd = None
     if rid not in ("inline", "sample_venue", "mock-demo"):
@@ -198,7 +540,7 @@ def post_plan(body: dict[str, Any] | None = None) -> dict[str, Any]:
 
     plan = out.pop("plan")
     plan["planner"] = out
-    plan = _finish_plan(plan, rid, inv_to_solve, extra_items)
+    plan = _finish_plan(plan, rid, inv_to_solve, extra_items, venue_policy)
     if rd is not None and not extra_items:
         try:
             write_json(rd / "planner.json", {"run_id": rid, **out})

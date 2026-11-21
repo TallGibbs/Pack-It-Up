@@ -105,7 +105,11 @@ class GeminiProvider:
     def _config(self, settings: dict, **extra) -> types.GenerateContentConfig:
         cfg: dict = dict(extra)
         if settings.get("thinking"):
-            cfg["thinking_config"] = types.ThinkingConfig(thinking_level=_THINKING[settings["thinking"]])
+            lvl = settings["thinking"]
+            # Builder Guide rule: Gemini 4 Neon and Hydrogen reject `minimal` thinking level.
+            if lvl == "minimal" and any(m in self.model for m in ("gemini-4-neon", "gemini-4-hydrogen")):
+                lvl = "low"
+            cfg["thinking_config"] = types.ThinkingConfig(thinking_level=_THINKING[lvl])
         if settings.get("media_resolution"):
             cfg["media_resolution"] = _RES[settings["media_resolution"]]
         if settings.get("temperature") is not None:
@@ -174,6 +178,125 @@ class GeminiProvider:
                 "rationale": "Decisions API calibrated probabilities: " +
                              json.dumps({k: round(v, 3) for k, v in (ans.probabilities or {}).items()}),
                 "probabilities": dict(ans.probabilities or {})}, usage
+
+    def decide_batch(
+        self, input_text: str, media: list[Media], questions: dict[str, dict], settings: dict
+    ) -> tuple[dict, Usage]:
+        """Native Decisions API batch call: evaluates noul, choice, and score questions in one pass."""
+        inputs: list[dict] = []
+        for m in media:
+            if m.caption:
+                inputs.append({"type": "text", "text": m.caption})
+            if m.kind == "image":
+                inputs.append({
+                    "type": "image",
+                    "mime_type": m.mime,
+                    "data": base64.b64encode(Path(m.path).read_bytes()).decode(),
+                })
+            elif m.kind == "audio":
+                inputs.append({
+                    "type": "audio",
+                    "mime_type": m.mime,
+                    "data": base64.b64encode(Path(m.path).read_bytes()).decode(),
+                })
+            else:
+                f = self.upload_video(m)
+                inputs.append({"type": "video", "mime_type": f.mime_type or m.mime, "uri": f.uri})
+        if input_text:
+            inputs.append({"type": "text", "text": input_text})
+        if not inputs:
+            inputs.append({"type": "text", "text": "(no input)"})
+
+        api_questions: dict[str, dict] = {}
+        for qid, q in questions.items():
+            qtype = q["type"]
+            if qtype == "noul":
+                entry: dict = {"type": "noul", "instructions": q["instructions"]}
+                if q.get("criteria"):
+                    entry["criteria"] = dict(q["criteria"])
+                api_questions[qid] = entry
+            elif qtype == "choice":
+                api_questions[qid] = {
+                    "type": "choice",
+                    "instructions": q["instructions"],
+                    "criteria": dict(q["criteria"]),
+                }
+            elif qtype == "score":
+                api_questions[qid] = {
+                    "type": "score",
+                    "instructions": q["instructions"],
+                    "criteria": list(q["criteria"]),
+                }
+            else:
+                raise ValueError(f"unsupported decision question type {qtype!r} for {qid!r}")
+
+        model = self.model if self.model.startswith("models/") else f"models/{self.model}"
+        extra = {"api_version": settings["api_version"]} if settings.get("api_version") else {}
+        try:
+            resp = _get_client().decisions.create(
+                model=model,
+                input=inputs,
+                questions=api_questions,
+                timeout=settings.get("timeout_s", 90),
+                **extra,
+            )
+        except Exception as e:
+            raise ProviderError(f"Decisions API {type(e).__name__}: {e}") from e
+
+        raw_answers = resp.answers or {}
+        parsed: dict[str, dict] = {}
+        for qid, q in questions.items():
+            ans = raw_answers.get(qid)
+            if ans is None:
+                raise ProviderError(f"Decisions API returned no answer for {qid!r}: {resp!r}"[:500])
+            qtype = q["type"]
+            if qtype == "noul":
+                noul_val = getattr(ans, "noul", None)
+                if noul_val is None:
+                    raise ProviderError(f"Decisions API missing noul value for {qid!r}: {ans!r}"[:500])
+                p_yes = float(noul_val)
+                parsed[qid] = {
+                    "type": "noul",
+                    "noul": round(p_yes, 4),
+                    "answer": p_yes >= 0.5,
+                    "confidence": round(float(ans.confidence), 4),
+                }
+            elif qtype == "choice":
+                choice_val = getattr(ans, "choice", None)
+                if choice_val is None:
+                    raise ProviderError(f"Decisions API missing choice value for {qid!r}: {ans!r}"[:500])
+                parsed[qid] = {
+                    "type": "choice",
+                    "choice": str(choice_val),
+                    "probabilities": {str(k): round(float(v), 4) for k, v in (ans.probabilities or {}).items()},
+                    "confidence": round(float(ans.confidence), 4),
+                }
+            elif qtype == "score":
+                score_val = getattr(ans, "score", None)
+                if score_val is None:
+                    raise ProviderError(f"Decisions API missing score value for {qid!r}: {ans!r}"[:500])
+                crit = list(q["criteria"])
+                max_lvl = max(1, len(crit) - 1)
+                sc = float(score_val)
+                raw_legend = getattr(ans, "legend", None) or {str(i): c for i, c in enumerate(crit)}
+                parsed[qid] = {
+                    "type": "score",
+                    "score": round(sc, 4),
+                    "max_score": max_lvl,
+                    "normalized": round(sc / max_lvl, 4),
+                    "probabilities": {str(k): round(float(v), 4) for k, v in (ans.probabilities or {}).items()},
+                    "legend": {str(k): str(v) for k, v in raw_legend.items()},
+                    "confidence": round(float(ans.confidence), 4),
+                }
+
+        usage = Usage()
+        u = getattr(resp, "usage", None)
+        if u is not None:
+            usage = Usage(
+                tokens_in=getattr(u, "total_input_tokens", None),
+                tokens_out=getattr(u, "total_output_tokens", None),
+            )
+        return {"answers": parsed}, usage
 
     def generate_image(self, prompt: str, refs: list[Media], settings: dict) -> tuple[bytes, Usage]:
         resp = self._generate(prompt, refs, settings, response_modalities=["IMAGE", "TEXT"])

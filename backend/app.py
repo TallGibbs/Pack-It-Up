@@ -11,14 +11,22 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.analysis.api import router as analysis_router
+from backend.arena_api import router as arena_router
+from backend.commerce_api import router as commerce_router
 from backend.ingest.api import router as ingest_router
+from backend.judge_api import router as judge_router
 from backend.pack_api import router as pack_router
+from backend.route_api import router as route_router
 
 app = FastAPI(title="Pack It Up")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(ingest_router)
 app.include_router(analysis_router)  # which model did which job: frontend/models.html
 app.include_router(pack_router)
+app.include_router(arena_router)
+app.include_router(commerce_router)
+app.include_router(route_router)
+app.include_router(judge_router)
 
 
 @app.get("/health")

@@ -176,6 +176,7 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Moving into one giant open hall is trivial; filling constrained storefronts with doorway limits and LIFO dock-stop ordering creates real packing and routing trade-offs that showcase Gemini 4 planning and verification.
 - **By:** George.
 - **Replaces:** The "placing items inside Penn Station is out of scope" clause of `2026-11-21 ~09:45 · Demo: move this hackathon to Penn Station`.
+
 ## 2026-11-21 12:00 · Fixed demo address on Chris's domain
 - **Decision:** The demo runs at https://packitup.temperedanalytics.com/, a named Cloudflare tunnel (`pack-it-up`) on Chris's `temperedanalytics.com` to the API on the demo laptop. The temporary trycloudflare.com tunnel stays as a fallback.
 - **Why:** The Hackathon wifi blocks phone-to-laptop traffic, and a quick tunnel's address changes whenever it restarts, which would break the QR codes on the slides and cards. A fixed name survives restarts.
@@ -227,3 +228,35 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Limits:** Built from Chris's session in George's files (`pack_api.py`, `index.html`); George has not reviewed it. The gain comes mostly from `allow_all_rotations`. See FAILURES.md 14:10 rows.
 - **By:** Chris (go-ahead to merge and restart).
 - **See:** commits f250ff9 to f7d50d9, open-questions.md "After the planner loop"
+
+## 2026-11-21 12:08 · Include Shopify `shop.dev` Commerce Bonus Track in Track B output
+- **Decision:** Track B's output must include the Shopify Commerce Bonus Track (`shop.dev` / `https://mcp.shop.com` UCP MCP): automatically compute the Move Supply Kit (exact moving box counts by size plus tape, bubble wrap, moving blankets, stretch wrap, mattress bags, and lifting straps from physics flags), discover & verify real Shopify merchant offers with `gemini-decision-1` + `gemini-4-neon`, consolidate into live multi-item Shopify carts & Shop Pay checkouts (`continue_url`), surface Haul-vs-Replace / Sell comps, and embed an interactive Shopping Agent.
+- **Why:** Turns the computed packing plan into an immediately actionable move purchase and enters the open Shopify Build with Commerce bonus prize track.
+- **By:** George.
+- **Replaces:** `plan/EVENT_DAY_PLAN.md` "Optional: Shopify bonus track — Only if we are ahead at 3:00 PM".
+- **See:** `backend/commerce.py`, `backend/commerce_api.py`, `frontend/ui/commerce.js`, `frontend/shop.html`, `frontend/index.html`
+
+## 2026-11-21 13:04 · Live Point A→B truck route tips, city parking, and calm end-to-end unpack support
+- **Decision:** The Track B output app (`frontend/index.html`) includes Point A to Point B route intelligence informed by real-time street routing, weather/wind, truck height/restriction data, and traffic speeds plus Gemini 4 synthesis: tolls, roads/parkways that prohibit trucks, a reminder to switch to commercial truck mode on the user's phone maps app, and city parking/curb tips. It also supports the user calmly through the entire move until unpacking the very last item, without being pushy or overbearing.
+- **Why:** Moving doesn't end when the 3D load plan is computed—renters get stuck on no-truck parkways, surprise tolls, city curb rules, and finding/unpacking boxes at destination.
+- **By:** George.
+- **Replaces:** `memory/open-questions.md` undecided stretch notes on "Truck-mode reminder" and "Route warnings".
+- **See:** `data/trucks.csv`, `backend/route_guide.py`, `backend/route_api.py`, `frontend/ui/journey.js`, `frontend/index.html`
+
+## 2026-11-21 12:16 · Two separate final judge steps (Move Plan Judge, then Hackathon Rubric Judge)
+- **Decision:** Add two distinct judge steps at the end of the pipeline rather than combining them: (1) `backend/judge_plan.py` evaluates the solved truck load, Penn Station store LIFO routing, verifier checks, and arrival render via multi-question Decisions API (`noul` + `choice` + `score`) with Gemini 4 escalation on low confidence; (2) `backend/judge_rubric.py` separately audits the run, model logs, baselines, and compliance gates against the four Cerebral Valley judging criteria (Round 1 35/25/20/20 and Round 2 25/25/25/25). Extend `backend/llm/` with `decide_batch()` to keep all SDK calls inside `backend/llm/`.
+- **Why:** Keeps product-facing move readiness separate from hackathon submission self-scoring while showcasing `gemini-decision-1`'s single-pass `noul`, `choice`, and `score` capabilities from the official Builder Guide.
+- **By:** George.
+
+## 2026-11-21 13:58 · Integrate on-site Malin × Orior (Ireland) & Cinema Rental (Adorama / ARRI) domain rules into product and pitch
+- **Decision:** Add real-world venue & production domain rules gathered from in-person conversations at the hackathon into the catalog, solver API, `shop.dev` commerce kit, What-If UI, and pitch cards: (1) **Malin × Orior rule (`orior_curated_stays`)** reflecting that The Malin's parent company **Orior** (bespoke Irish design house, Newry, est. 1979) curates custom travertine/bouclé/mohair pieces per club and never moves furniture between locations (plus breathable cotton covers & stone corner guards in `commerce.py` when commissioning a new space); (2) **Cinema Production Rig (`pelican_1650`, `pelican_1510`, `c_stand_cart`, `magliner_camera_cart`)** reflecting **Adorama Rental / ARRI Rental** camera-truck rules (1650 floor base, unstacked 1510 lens cases, upright locked carts, outward QR return labels, and E-track straps/case foam via `mcp.shop.com`).
+- **Why:** Grounds both the engineering and the 3-minute live demo in real domain constraints discovered directly from the venue team and event film crew in the room.
+- **By:** George.
+- **See:** `data/item_catalog.csv`, `data/penn_zones.csv`, `backend/pack_api.py`, `backend/commerce.py`, `frontend/ui/commerce.js`, `plan/PITCH_NOTES.md`, `frontend/pitch.html`
+
+## 2026-11-21 14:16 · Reframe Orior mode as White-Glove Care tribute (keep all pieces in the move simulation)
+- **Decision:** Default the venue Orior feature to **✨ Orior White-Glove Care (`orior_white_glove=True`)** rather than excluding Orior furniture from the move: keep every piece in the simulation as a respectful proof of concept for venues/homes that *do* move, clearly note that The Malin's bespoke Orior pieces (Newry, Ireland) would never leave the club in real life, and pay tribute to Orior's standards by forbidding any stacking on stone/upholstery (`stackable="no"`), adding +2" breathable pad/crate clearance, requiring upright 2-person handling, and including cotton covers & stone corner guards in the `shop.dev` kit.
+- **Why:** Keeps the full-room move simulation intact while warmly honoring The Malin and Orior's craftsmanship without implying their curated pieces would ever be moved out.
+- **By:** George.
+- **Replaces:** The `orior_curated_stays` UI default in `2026-11-21 13:58 · Integrate on-site Malin × Orior (Ireland) & Cinema Rental (Adorama / ARRI) domain rules`.
+- **See:** `backend/pack_api.py`, `frontend/ui/commerce.js`, `plan/PITCH_NOTES.md`, `frontend/pitch.html`
