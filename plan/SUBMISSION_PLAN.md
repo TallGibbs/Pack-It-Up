@@ -9,7 +9,7 @@ Draft written at 14:05 on Nov 21 for Chris and George to agree. Nothing here is 
 | Phone capture page: photos and clips per room, progress per file | Competing agents (B7) |
 | Inventory from Gemini 4 Hydrogen, with sizes, weights and box estimates | Penn Station arrival render (B9) |
 | Gap questions answered by the Decisions API, and by the person on the phone | QR box labels print page (B10) |
-| Review page: quantity, Move / Stays / Sell / Toss, add an item | Baselines and `eval/RESULTS.md` |
+| Review page: quantity, Move / Stays / Sell / Toss, add an item | A single-model-call packing baseline |
 | 3D truck view from the Python solver, with the verifier's violation count and a what-if re-solve | |
 | Model-use page: which model did which call | |
 | "Plan with Neon" (since 14:14): Gemini 4 Neon reads the checker's result and changes the solver settings | |
@@ -82,7 +82,7 @@ If the tunnel or wifi fails, open a move from earlier today on the laptop and sa
 
 ## Before we submit, in order of points at stake
 
-1. **Results table (proof, 25%).** `eval/RESULTS.md` does not exist. Smallest version: the Malin hand count, the Decisions API grading (4 of 4 applied answers right), the verifier result for every move in `runs/`, and the bedroom-count truck size as the baseline. A single-model-call packing plan through the verifier is the second baseline if there is time.
+1. **Results table (proof, 25%).** Done at 14:50: [eval/RESULTS.md](../eval/RESULTS.md), built by `python eval/results_table.py` from the 24 moves on the demo laptop (14 different sets of footage). One per set: the stock `py3dbp` packer's plan broke no rule on 3 of 14, ours on 13 of 14; U-Haul's bedroom rule picked too small a truck on 7 of 14; Neon raised the score on 9 of 14. Venue lounge against the in-person count: recall 67% to 75%. Not built: a single-model-call baseline. Run the script again before submitting if new moves should count.
 2. **A model in Track B (model use, 20%).** Done at 14:14: "Plan with Neon" is live (decisions.md 14:14). On move 133201 it goes from two 26 ft trucks (91.5) to one (95.2).
 3. **README.** Status still says Track B is being built. Add what the app does now, the results table, and whether `data/trucks.csv`, `penn_zones.csv` and `sample_venue.json` were brought in.
 4. **Tunnel restart** in `run_demo.ps1`.

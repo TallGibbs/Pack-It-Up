@@ -6,7 +6,7 @@ Built at the Cerebral Valley × Google DeepMind **Gemini 4 NYC hackathon** (Nov 
 
 ## Status
 
-In progress. Track A (ingestion: photos and clips to a resolved inventory with sizes, weights and questions) runs end to end; see [backend/ingest/README.md](backend/ingest/README.md). Track B (solver, verifier, 3D view) is being built.
+In progress. Track A (ingestion: photos and clips to a resolved inventory with sizes, weights and questions) runs end to end; see [backend/ingest/README.md](backend/ingest/README.md). Track B (solver, checker, 3D view, the Gemini 4 Neon planner loop) was joined into `main` at 13:55 and runs from the same inventory. What we measured is in [eval/RESULTS.md](eval/RESULTS.md).
 
 ## What was built at the event
 
@@ -16,6 +16,7 @@ In progress. Track A (ingestion: photos and clips to a resolved inventory with s
   - Penn Station reference photos and clips (`data/NYPenn/`), taken by the team before kickoff. Used as the move destination; not committed.
   - `data/item_catalog.csv`: starting item sizes and handling flags, drafted in the planning repo before kickoff and brought in at the event.
   - Python libraries (see `requirements.txt`): `google-genai` (Apache-2.0), `fastapi` (MIT), `uvicorn` (BSD-3-Clause), `python-multipart` (Apache-2.0), `jsonschema` (MIT), `Pillow` (MIT-CMU), `pillow-heif` (BSD-3-Clause), `imageio-ffmpeg` (BSD-2-Clause; ships an ffmpeg binary under its own licence), `python-dotenv` (BSD-3-Clause), `databricks-sql-connector` (Apache-2.0; only for the optional Databricks copy of the model-use history, which stores data and runs no model), `py3dbp` (MIT; bin and item modelling and the baseline packer in `backend/solver.py`). The 3D page loads `three.js` 0.160 (MIT) from the jsDelivr CDN.
+  - U-Haul's truck guidance (the home size each truck is for, and its cargo volume), read from uhaul.com/Truck-Rentals on Nov 21. Used only as the rule-of-thumb baseline in `eval/results_table.py`.
 
 ## Layout
 

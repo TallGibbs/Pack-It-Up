@@ -1,0 +1,1264 @@
+{
+ "114124-A": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 92.9,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 46.0
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_20",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_20"
+     ],
+     "allow_all_rotations": [
+      false,
+      true
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "Switched to uhaul_20 with allow_all_rotations enabled because the uhaul_26 was only 46% full and a smaller truck will reduce fleet size and boost the fill score.",
+    "score": 94.7,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "2 × uhaul_20",
+    "fill_pct": 38.3,
+    "model_latency_s": 10.95
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_20",
+      "uhaul_26"
+     ],
+     "order_mode": [
+      "lifo_heavy_first",
+      "zone_strict_lifo"
+     ]
+    },
+    "reason": "Returned to uhaul_26 with zone_strict_lifo and allow_all_rotations because uhaul_20 needed two trucks, and strict LIFO ordering should raise the single-truck LIFO score above 5.9.",
+    "score": 91.4,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "1 × uhaul_26 + 1 × uhaul_10",
+    "fill_pct": 37.8,
+    "model_latency_s": 13.69
+   }
+  ],
+  "best_round": 2,
+  "first_score": 92.9,
+  "best_score": 94.7,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "110908-B": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 84.0,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "2 × uhaul_26",
+    "fill_pct": 18.4
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "allow_all_rotations": [
+      false,
+      true
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "Enabled allow_all_rotations and downsize_last_truck because only one non-upright table spilled into the second uhaul_26, so tipping pieces should fit the entire load into one truck.",
+    "score": 87.7,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 36.9,
+    "model_latency_s": 13.55
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "order_mode": [
+      "lifo_heavy_first",
+      "zone_strict_lifo"
+     ]
+    },
+    "reason": "Switched order_mode to zone_strict_lifo while keeping allow_all_rotations and downsize_last_truck true because Round 2 fit in one uhaul_26 with a low 4.1 LIFO score.",
+    "score": 87.9,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "1 × uhaul_26 + 1 × uhaul_10",
+    "fill_pct": 30.3,
+    "model_latency_s": 9.11
+   }
+  ],
+  "best_round": 3,
+  "first_score": 84.0,
+  "best_score": 87.9,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "111600-C": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 83.1,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 23.9
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_15",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_15"
+     ],
+     "allow_all_rotations": [
+      false,
+      true
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "Switched to uhaul_15 with all rotations enabled because the uhaul_26 was only 23.9% full and the load can fit in a smaller truck.",
+    "score": 91.1,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "1 × uhaul_15 + 1 × uhaul_10",
+    "fill_pct": 35.1,
+    "model_latency_s": 12.2
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_20",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_15",
+      "uhaul_20"
+     ]
+    },
+    "reason": "Switched to uhaul_20 with all rotations enabled because uhaul_15 left only two pieces for a second truck, so everything should fit in a single uhaul_20.",
+    "score": 89.0,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_20",
+    "fill_pct": 39.7,
+    "model_latency_s": 8.16
+   }
+  ],
+  "best_round": 2,
+  "first_score": 83.1,
+  "best_score": 91.1,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "144416-D": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 74.6,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 4.8
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_10"
+     ],
+     "order_mode": [
+      "lifo_heavy_first",
+      "zone_strict_lifo"
+     ]
+    },
+    "reason": "Switched to uhaul_10 and zone_strict_lifo because the load only filled 4.8% of uhaul_26 and scored 5.0/10 on LIFO.",
+    "score": 71.7,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 22.2,
+    "model_latency_s": 7.92
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {
+     "order_mode": [
+      "zone_strict_lifo",
+      "lifo_heavy_first"
+     ]
+    },
+    "reason": "Switched order_mode back to lifo_heavy_first on uhaul_10 because zone_strict_lifo dropped the LIFO score from 5.0 to 0.0.",
+    "score": 71.7,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 22.2,
+    "model_latency_s": 8.31
+   }
+  ],
+  "best_round": 1,
+  "first_score": 74.6,
+  "best_score": 74.6,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "120009-E": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 82.3,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 14.3
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_10"
+     ],
+     "allow_all_rotations": [
+      false,
+      true
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "Switched to uhaul_10 with all rotations enabled because the 251.6 cuft load only filled 14.3% of the uhaul_26 and should fit a much smaller truck.",
+    "score": 88.4,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "2 × uhaul_10",
+    "fill_pct": 32.9,
+    "model_latency_s": 7.33
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_15",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_10",
+      "uhaul_15"
+     ]
+    },
+    "reason": "Switched to uhaul_15 because the load spilled into two uhaul_10 trucks, and a single uhaul_15 has enough floor area to fit everything in one smaller truck.",
+    "score": 89.4,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_15",
+    "fill_pct": 30.9,
+    "model_latency_s": 13.12
+   }
+  ],
+  "best_round": 3,
+  "first_score": 82.3,
+  "best_score": 89.4,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "120427-F": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 83.0,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 2.6
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_10"
+     ]
+    },
+    "reason": "Switched truck_id from uhaul_26 to uhaul_10 because the 7 pieces filled only 2.6% of the 26-foot truck and easily fit in the smallest truck.",
+    "score": 82.7,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 11.9,
+    "model_latency_s": 5.46
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {
+     "order_mode": [
+      "lifo_heavy_first",
+      "zone_strict_lifo"
+     ]
+    },
+    "reason": "Changed order_mode to zone_strict_lifo on uhaul_10 to keep the 10.0 LIFO score while trying to improve left-right balance from 50.6% closer to 50.0%.",
+    "score": 82.9,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 11.9,
+    "model_latency_s": 8.65
+   }
+  ],
+  "best_round": 1,
+  "first_score": 83.0,
+  "best_score": 83.0,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "124056-G": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 67.7,
+    "valid": false,
+    "violation_count": 1,
+    "violations_by_rule": {
+     "zone_distribution": 1
+    },
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 3.3
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_10"
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "Switched to uhaul_10 with downsize_last_truck enabled because the 57.8 cuft load filled only 3.3% of the uhaul_26.",
+    "score": 67.2,
+    "valid": false,
+    "violation_count": 1,
+    "violations_by_rule": {
+     "zone_distribution": 1
+    },
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 15.1,
+    "model_latency_s": 7.51
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": false,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "order_mode": [
+      "lifo_heavy_first",
+      "zone_strict_lifo"
+     ]
+    },
+    "reason": "Switched order_mode to zone_strict_lifo on uhaul_10 to improve left-right balance from 50.9% while keeping the smallest truck and full LIFO score.",
+    "score": 67.2,
+    "valid": false,
+    "violation_count": 1,
+    "violations_by_rule": {
+     "zone_distribution": 1
+    },
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 15.1,
+    "model_latency_s": 9.38
+   }
+  ],
+  "best_round": 1,
+  "first_score": 67.7,
+  "best_score": 67.7,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "130657-H": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 84.3,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 2.6
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_10"
+     ]
+    },
+    "reason": "Switched to uhaul_10 because the 45 cuft load only filled 2.6% of the uhaul_26, so a much smaller truck will fit and improve the fill score.",
+    "score": 83.5,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 11.8,
+    "model_latency_s": 5.87
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {
+     "order_mode": [
+      "lifo_heavy_first",
+      "zone_strict_lifo"
+     ]
+    },
+    "reason": "Switched order_mode to zone_strict_lifo on uhaul_10 because round 2 lost 0.2 points on LIFO and slightly on balance, which strict dock-stop ordering may improve.",
+    "score": 84.0,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 11.8,
+    "model_latency_s": 6.06
+   }
+  ],
+  "best_round": 1,
+  "first_score": 84.3,
+  "best_score": 84.3,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "144333-I": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 83.9,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 25.2
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_15",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_15"
+     ],
+     "allow_all_rotations": [
+      false,
+      true
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "Switched to uhaul_15 with all rotations allowed because the uhaul_26 was only 25.2% full, so a much smaller single truck should fit the load and boost the score.",
+    "score": 91.2,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "1 × uhaul_15 + 1 × uhaul_10",
+    "fill_pct": 37.1,
+    "model_latency_s": 8.73
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_20",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_15",
+      "uhaul_20"
+     ]
+    },
+    "reason": "Switched to uhaul_20 with all rotations allowed because uhaul_15 left only three pieces for a second truck, so one uhaul_20 should fit everything.",
+    "score": 88.5,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "1 × uhaul_20 + 1 × uhaul_10",
+    "fill_pct": 30.8,
+    "model_latency_s": 8.47
+   }
+  ],
+  "best_round": 2,
+  "first_score": 83.9,
+  "best_score": 91.2,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "132950-J": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 87.2,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 31.3
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_15",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_15"
+     ],
+     "allow_all_rotations": [
+      false,
+      true
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "The uhaul_26 was only 31.3% full, so I switched to a uhaul_15 with allow_all_rotations enabled to fit the load in a smaller truck.",
+    "score": 95.7,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "1 × uhaul_15 + 1 × uhaul_10",
+    "fill_pct": 46.0,
+    "model_latency_s": 10.07
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_20",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_15",
+      "uhaul_20"
+     ]
+    },
+    "reason": "Only three armchairs spilled out of the uhaul_15 into a second truck, so I switched to a single uhaul_20 to fit the entire load in one smaller truck.",
+    "score": 92.4,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "1 × uhaul_20 + 1 × uhaul_10",
+    "fill_pct": 38.2,
+    "model_latency_s": 8.33
+   }
+  ],
+  "best_round": 2,
+  "first_score": 87.2,
+  "best_score": 95.7,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "133201-K": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 91.5,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "2 × uhaul_26",
+    "fill_pct": 24.5
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "allow_all_rotations": [
+      false,
+      true
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "Enabled allow_all_rotations and downsize_last_truck because only 3 pieces spilled into the second truck, so tipping eligible pieces should free floor space to fit into one uhaul_26.",
+    "score": 95.2,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 49.0,
+    "model_latency_s": 10.57
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "order_mode": [
+      "lifo_heavy_first",
+      "zone_strict_lifo"
+     ]
+    },
+    "reason": "Switched order_mode to zone_strict_lifo because round 2 fit into one uhaul_26 with zero violations but only scored 6.6 of 10 on LIFO.",
+    "score": 92.3,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "1 × uhaul_26 + 1 × uhaul_10",
+    "fill_pct": 40.3,
+    "model_latency_s": 11.61
+   }
+  ],
+  "best_round": 2,
+  "first_score": 91.5,
+  "best_score": 95.2,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "134559-L": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 77.5,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 0.9
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_10"
+     ]
+    },
+    "reason": "Switched truck_id to uhaul_10 because the 5 boxes only filled 0.9% of the uhaul_26, so the smallest truck will fit them with better fill.",
+    "score": 75.3,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 3.9,
+    "model_latency_s": 5.33
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {
+     "order_mode": [
+      "lifo_heavy_first",
+      "heavy_first"
+     ]
+    },
+    "reason": "Changed order_mode to heavy_first on uhaul_10 to try improving the 45.3% left-right balance while keeping the smallest truck and zero violations.",
+    "score": 75.3,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 3.9,
+    "model_latency_s": 8.66
+   }
+  ],
+  "best_round": 1,
+  "first_score": 77.5,
+  "best_score": 77.5,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "134605-M": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 90.0,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 40.2
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_20",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_20"
+     ],
+     "allow_all_rotations": [
+      false,
+      true
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "The 26-foot truck was only 40.2% full, so I switched to a 20-foot truck with rotations and downsizing enabled to use a smaller truck and raise fill.",
+    "score": 89.3,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 2,
+    "fleet": "1 × uhaul_20 + 1 × uhaul_15",
+    "fill_pct": 37.8,
+    "model_latency_s": 11.06
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_20",
+      "uhaul_26"
+     ],
+     "order_mode": [
+      "lifo_heavy_first",
+      "zone_strict_lifo"
+     ]
+    },
+    "reason": "Round 2 overflowed the 20-foot truck into two trucks, so I returned to uhaul_26 and switched to zone_strict_lifo with rotations to improve the 5.5 LIFO score.",
+    "score": 90.3,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 40.2,
+    "model_latency_s": 16.18
+   }
+  ],
+  "best_round": 3,
+  "first_score": 90.0,
+  "best_score": 90.3,
+  "model": "gemini-4-neon",
+  "note": null
+ },
+ "140739-N": {
+  "rounds": [
+   {
+    "round": 1,
+    "source": "start",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_26",
+     "truck_sequence": [],
+     "order_mode": "lifo_heavy_first",
+     "allow_all_rotations": false,
+     "downsize_last_truck": false
+    },
+    "changed": {},
+    "reason": "Starting settings.",
+    "score": 76.7,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_26",
+    "fill_pct": 5.3
+   },
+   {
+    "round": 2,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": false,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "truck_id": [
+      "uhaul_26",
+      "uhaul_10"
+     ],
+     "order_mode": [
+      "lifo_heavy_first",
+      "zone_strict_lifo"
+     ],
+     "downsize_last_truck": [
+      false,
+      true
+     ]
+    },
+    "reason": "Switched to uhaul_10 and zone_strict_lifo because the uhaul_26 was only 5.3% full and the LIFO score was low at 5.1.",
+    "score": 84.0,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 24.4,
+    "model_latency_s": 8.48
+   },
+   {
+    "round": 3,
+    "source": "model",
+    "settings": {
+     "packer_engine": "constrained",
+     "truck_id": "uhaul_10",
+     "truck_sequence": [],
+     "order_mode": "zone_strict_lifo",
+     "allow_all_rotations": true,
+     "downsize_last_truck": true
+    },
+    "changed": {
+     "allow_all_rotations": [
+      false,
+      true
+     ]
+    },
+    "reason": "Enabled allow_all_rotations on uhaul_10 with zone_strict_lifo to try improving the 41.3% left-right balance while keeping the 10.0 LIFO score and zero violations.",
+    "score": 83.2,
+    "valid": true,
+    "violation_count": 0,
+    "violations_by_rule": {},
+    "truck_count": 1,
+    "fleet": "1 × uhaul_10",
+    "fill_pct": 24.4,
+    "model_latency_s": 8.13
+   }
+  ],
+  "best_round": 2,
+  "first_score": 76.7,
+  "best_score": 84.0,
+  "model": "gemini-4-neon",
+  "note": null
+ }
+}
