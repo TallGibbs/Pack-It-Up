@@ -225,6 +225,33 @@ def test_self_healing_cart_recovery_swaps_failed_merchant() -> None:
     assert "gpack-usa.myshopify.com" in domains
 
 
+def test_consolidate_stores_trades_item_cost_for_fewer_shipments() -> None:
+    def offer(shop: str, cents: int) -> dict[str, Any]:
+        return {"seller_domain": shop, "line_total_cents": cents, "title": f"{shop} {cents}"}
+
+    # Cheapest per line would use 3 stores (A boxes, B wrap, C tape).
+    cands = {
+        "boxes": [offer("a", 2025), offer("b", 2400)],
+        "wrap": [offer("b", 999), offer("a", 1150)],
+        "tape": [offer("c", 580), offer("a", 700), offer("b", 650)],
+    }
+    trace: list[dict[str, Any]] = []
+    commerce.consolidate_stores(cands, trace, ship_cents=1500)
+    # Moving tape (+$1.20 at A) then wrap (+$1.51 at A) beats paying two more shipping fees.
+    assert {c[0]["seller_domain"] for c in cands.values()} == {"a"}
+    assert [t["dropped_shop"] for t in trace] == ["c", "b"]
+    # Every original offer is still in the list, just reordered.
+    assert len(cands["tape"]) == 3
+
+    # A store is kept when moving its lines costs more than the shipping it saves.
+    cands2 = {
+        "boxes": [offer("a", 2025)],
+        "blankets": [offer("b", 3000), offer("a", 6000)],
+    }
+    commerce.consolidate_stores(cands2, ship_cents=1500)
+    assert cands2["blankets"][0]["seller_domain"] == "b"
+
+
 def test_shopping_agent_and_fastapi_routes(monkeypatch) -> None:
     # Ensure deterministic heuristic path runs fast without burning live API calls in unit tests
     commerce._load_env()

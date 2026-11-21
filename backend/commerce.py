@@ -1037,6 +1037,73 @@ def _verify_offer_with_decisions_api(
         return 0, None
 
 
+# Shopify carts are one per store, and each store charges its own shipping. Real fees are only
+# known at checkout (one store charged $25 on a $5.80 tape order), so use a flat estimate per store.
+EST_SHIPPING_PER_STORE_CENTS = 1500
+
+
+def consolidate_stores(
+    candidates_by_need: dict[str, list[dict[str, Any]]],
+    agent_trace: list[dict[str, Any]] | None = None,
+    ship_cents: int = EST_SHIPPING_PER_STORE_CENTS,
+) -> None:
+    """Reorder each need's candidates in place so the kit uses as few stores as is worth it.
+
+    Starts from each need's top candidate. Repeatedly drops the store whose lines can move to
+    other stores already in the kit for the smallest extra item cost, as long as that extra
+    cost is below one estimated shipping fee. Only candidates already in each need's list
+    (which passed the size and pack-count checks) are used.
+    """
+    pick = {nid: 0 for nid, cands in candidates_by_need.items() if cands}
+
+    def _store(nid: str) -> str:
+        return candidates_by_need[nid][pick[nid]]["seller_domain"]
+
+    while True:
+        stores = {_store(nid) for nid in pick}
+        if len(stores) < 2:
+            break
+        best: tuple[int, str, dict[str, int]] | None = None
+        for drop in stores:
+            others = stores - {drop}
+            extra = 0
+            moves: dict[str, int] = {}
+            for nid in pick:
+                if _store(nid) != drop:
+                    continue
+                cur = candidates_by_need[nid][pick[nid]]
+                options = [
+                    (c["line_total_cents"] - cur["line_total_cents"], i)
+                    for i, c in enumerate(candidates_by_need[nid])
+                    if c["seller_domain"] in others
+                ]
+                if not options:
+                    moves = {}
+                    break
+                delta, idx = min(options)
+                extra += delta
+                moves[nid] = idx
+            if moves and extra < ship_cents and (best is None or extra < best[0]):
+                best = (extra, drop, moves)
+        if best is None:
+            break
+        extra, drop, moves = best
+        pick.update(moves)
+        if agent_trace is not None:
+            agent_trace.append({
+                "step": "store_consolidation",
+                "dropped_shop": drop,
+                "moved_lines": sorted(moves),
+                "extra_item_cents": extra,
+                "est_shipping_saved_cents": ship_cents,
+            })
+
+    for nid, idx in pick.items():
+        if idx:
+            cands = candidates_by_need[nid]
+            cands.insert(0, cands.pop(idx))
+
+
 def build_move_kit(
     inventory: dict[str, Any],
     plan: dict[str, Any] | None = None,
@@ -1136,18 +1203,30 @@ def build_move_kit(
 
     anchor_domains = [d for d, cnt in sorted(domain_freq.items(), key=lambda kv: -kv[1]) if cnt >= 1][:2]
     if anchor_domains and live_hits > 0:
-        anchor = anchor_domains[0]
-        missing_needs = [
-            n for n in needs
+        # Ask each anchor store directly for every line it isn't already offering, so the
+        # store-consolidation step (5) has same-store options to move lines onto.
+        lookups = [
+            (anchor, n)
+            for anchor in anchor_domains
+            for n in needs
             if not any(c["seller_domain"] == anchor for c in candidates_by_need.get(n["need_id"], []))
-        ][:3]
-        for mn in missing_needs:
+        ]
+
+        def _search_at(anchor: str, mn: dict[str, Any]) -> tuple[str, dict[str, Any], list[dict[str, Any]]]:
             try:
                 res_shop = mcp.search_catalog(mn["query"], destination=dest, shops=[anchor], limit=3)
-                extra_cands = _normalize_catalog_offers(res_shop.get("products") or [], mn)
+            except ShopMCPError:
+                return anchor, mn, []
+            return anchor, mn, _normalize_catalog_offers(res_shop.get("products") or [], mn)
+
+        if lookups:
+            with ThreadPoolExecutor(max_workers=min(6, len(lookups))) as pool:
+                found = list(pool.map(lambda a: _search_at(*a), lookups))
+            for anchor, mn, extra_cands in found:
+                # Keep only that store's own offers; a shops filter can still return others.
+                extra_cands = [c for c in extra_cands if c["seller_domain"] == anchor]
                 if extra_cands:
-                    merged = extra_cands + candidates_by_need.get(mn["need_id"], [])
-                    candidates_by_need[mn["need_id"]] = merged
+                    candidates_by_need[mn["need_id"]] = extra_cands + candidates_by_need.get(mn["need_id"], [])
                     agent_trace.append({
                         "step": "merchant_consolidation",
                         "tool": "mcp.shop.com/search_catalog",
@@ -1155,8 +1234,6 @@ def build_move_kit(
                         "shop": anchor,
                         "matched": len(extra_cands),
                     })
-            except ShopMCPError:
-                pass
 
         # Apply consolidation score boost (+14 pts) for anchor merchants so ties & near-ties bundle cleanly.
         for nid, cands in candidates_by_need.items():
@@ -1208,7 +1285,11 @@ def build_move_kit(
                 "target_budget_usd": round(max_budget_cents / 100.0, 2),
             })
 
-    # 5. Assemble line Selections & create live Self-Healing Shopify Carts + Shop Pay Checkouts!
+    # 5. Fewer stores: each store is its own cart and its own shipping fee, so move lines onto
+    #    stores already in the kit when that costs less than one more shipment.
+    consolidate_stores(candidates_by_need, agent_trace)
+
+    # 6. Assemble line Selections & create live Self-Healing Shopify Carts + Shop Pay Checkouts!
     selected_lines: list[dict[str, Any]] = []
     for n in needs:
         cands = candidates_by_need.get(n["need_id"], [])

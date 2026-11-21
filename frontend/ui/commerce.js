@@ -226,6 +226,39 @@
       })
     );
 
+    // Fewer stores: each store is its own cart and shipping fee (same rule as consolidate_stores
+    // in backend/commerce.py). Drop a store when moving its lines to stores already in the kit
+    // costs less than an estimated shipping fee.
+    const EST_SHIP_CENTS = 1500;
+    for (;;) {
+      const stores = new Set(itemsOut.map((x) => x.offer.seller_domain));
+      if (stores.size < 2) break;
+      let best = null;
+      for (const drop of stores) {
+        let extra = 0;
+        const moves = [];
+        let ok = true;
+        for (const it of itemsOut) {
+          if (it.offer.seller_domain !== drop) continue;
+          const opts = it.alternatives
+            .map((a, i) => ({ i, d: a.line_total_cents - it.offer.line_total_cents, dom: a.seller_domain }))
+            .filter((o) => o.dom !== drop && stores.has(o.dom))
+            .sort((p, q) => p.d - q.d);
+          if (!opts.length) { ok = false; break; }
+          extra += opts[0].d;
+          moves.push([it, opts[0].i]);
+        }
+        if (ok && moves.length && extra < EST_SHIP_CENTS && (!best || extra < best.extra)) best = { drop, extra, moves };
+      }
+      if (!best) break;
+      for (const [it, i] of best.moves) {
+        const alt = it.alternatives[i];
+        it.alternatives[i] = it.offer;
+        it.offer = alt;
+      }
+      trace.push({ step: "store_consolidation", dropped_shop: best.drop, extra_item_cents: best.extra });
+    }
+
     // Group by seller_domain and call create_cart live over CORS!
     const byShop = {};
     for (const it of itemsOut) {
