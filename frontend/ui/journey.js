@@ -107,16 +107,37 @@
     const st = document.createElement("style");
     st.id = "piu-journey-styles";
     st.textContent = `
-      /* Keep right-hand tab bar flexible when 4-5 tabs are present */
+      /* Single-row 6-tab bar (Unload · Stores · QR · Crew · Route · Shop) */
       .tab-bar[role="tablist"] {
-        display: flex !important;
-        flex-wrap: wrap;
-        gap: 4px;
+        display: grid !important;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 3px;
       }
       .tab-bar[role="tablist"] > button {
-        flex: 1 1 auto;
-        min-width: fit-content;
-        padding: 7px 8px;
+        min-width: 0;
+        padding: 6px 3px;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: center;
+      }
+      @media (max-width: 380px) {
+        .tab-bar[role="tablist"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      }
+
+      .rt-acc {
+        border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+        margin-bottom: 8px; font-size: 12.5px; line-height: 1.42; overflow: hidden;
+      }
+      .rt-acc > summary {
+        list-style: none; cursor: pointer; padding: 8px 11px;
+        display: flex; align-items: center; justify-content: space-between; gap: 6px;
+        font-size: 12.8px; font-weight: 750;
+      }
+      .rt-acc > summary::-webkit-details-marker { display: none; }
+      .rt-acc > .rt-acc-body {
+        padding: 0 11px 10px; border-top: 1px solid var(--line); padding-top: 8px;
       }
 
       .route-pill-btn {
@@ -322,7 +343,7 @@
       }
 
       @media print {
-        .companion-strip, .route-pill-btn { display: none !important; }
+        .companion-strip, .route-pill-btn, #tab-journey { display: none !important; }
       }
     `;
     document.head.appendChild(st);
@@ -584,10 +605,88 @@
     };
   }
 
+  function ensureUnifiedTabs() {
+    const ORDER = ["unload", "stores", "labels", "crew", "journey", "shop"];
+    const SHORT_NAMES = {
+      unload: ["Unload", "LIFO Truck Unload Order"],
+      stores: ["Stores", "Penn Station Storefronts"],
+      labels: ["QR", "Printable Offline QR Box Labels"],
+    };
+    if (!window.PIU_ACTIVATE_TAB) {
+      window.PIU_ACTIVATE_TAB = function (tabKey, extra) {
+        const tabBar = document.querySelector(".tab-bar[role='tablist']");
+        if (!tabBar) return;
+        tabBar.querySelectorAll("[role='tab']").forEach((btn) => {
+          btn.setAttribute("aria-selected", String(btn.dataset.tab === tabKey));
+        });
+        ORDER.forEach((k) => {
+          const pane = document.getElementById("tab-" + k);
+          if (pane) pane.classList.toggle("hidden", k !== tabKey);
+        });
+        window.dispatchEvent(new CustomEvent("piu:tabchange", { detail: { tab: tabKey, ...(extra || {}) } }));
+      };
+    }
+    if (!window.PIU_REGISTER_TAB) {
+      window.PIU_REGISTER_TAB = function (tabKey, label, title) {
+        const tabBar = document.querySelector(".tab-bar[role='tablist']");
+        const hostCard = tabBar && tabBar.parentNode;
+        if (!tabBar || !hostCard) return null;
+
+        Object.entries(SHORT_NAMES).forEach(([k, [txt, ttl]]) => {
+          const b = tabBar.querySelector(`[data-tab='${k}']`);
+          if (b) {
+            b.textContent = txt;
+            if (!b.title) b.title = ttl;
+          }
+        });
+
+        let btn = tabBar.querySelector(`[data-tab='${tabKey}']`);
+        if (!btn) {
+          btn = document.createElement("button");
+          btn.type = "button";
+          btn.setAttribute("role", "tab");
+          btn.dataset.tab = tabKey;
+          btn.setAttribute("aria-selected", "false");
+          tabBar.appendChild(btn);
+        }
+        btn.textContent = label;
+        if (title) btn.title = title;
+
+        const buttons = Array.from(tabBar.querySelectorAll("[role='tab']"));
+        buttons
+          .sort((a, b) => {
+            const ia = ORDER.indexOf(a.dataset.tab);
+            const ib = ORDER.indexOf(b.dataset.tab);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+          })
+          .forEach((b) => tabBar.appendChild(b));
+
+        let pane = document.getElementById("tab-" + tabKey);
+        if (!pane) {
+          pane = document.createElement("div");
+          pane.id = "tab-" + tabKey;
+          pane.className = "hidden";
+          hostCard.appendChild(pane);
+        }
+
+        if (!tabBar.dataset.piuUnified) {
+          tabBar.dataset.piuUnified = "1";
+          tabBar.addEventListener("click", (e) => {
+            const clicked = e.target.closest("[role='tab']");
+            if (!clicked || !clicked.dataset.tab) return;
+            window.PIU_ACTIVATE_TAB(clicked.dataset.tab);
+          });
+        }
+        return { btn, pane };
+      };
+    }
+  }
+
   // ---------- Main Auto-Mount on index.html ----------
   function mountMoveJourney() {
     if (!document.body || !document.body.classList.contains("pack-page")) return;
     if (document.getElementById("piu-companion-strip")) return;
+    ensureUnifiedTabs();
     injectStyles();
 
     const piu = window.PIU || {
@@ -609,7 +708,7 @@
       destination: saved.destination || DEFAULT_DEST,
       navApp: saved.navApp || "google_maps",
       stage: saved.stage || "drive", // pack | load | drive | park_unload | unpack
-      quiet: Boolean(saved.quiet),
+      quiet: saved.quiet !== undefined ? Boolean(saved.quiet) : true,
       subTab: saved.subTab || "route", // route | unpack
       unpackedIds: new Set(Array.isArray(saved.unpackedIds) ? saved.unpackedIds : []),
       essentialsDone: Boolean(saved.essentialsDone),
@@ -653,7 +752,7 @@
       return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
     }
 
-    // 1. Insert Calm Companion Strip right below #verdict-banner
+    // 1. Insert slim Calm Companion Strip right below #verdict-banner (quiet 1-row by default)
     const verdictEl = document.getElementById("verdict-banner");
     const companionEl = document.createElement("section");
     companionEl.id = "piu-companion-strip";
@@ -663,89 +762,26 @@
       verdictEl.insertAdjacentElement("afterend", companionEl);
     }
 
-    // 2. Add quick topbar button "🛣️ Route & Unpack"
-    const navActions = document.querySelector(".nav-actions");
-    let topJumpBtn = null;
-    if (navActions) {
-      topJumpBtn = document.createElement("button");
-      topJumpBtn.type = "button";
-      topJumpBtn.id = "btn-jump-journey";
-      topJumpBtn.className = "route-pill-btn";
-      topJumpBtn.innerHTML = "🛣️ Route &amp; Unpack";
-      navActions.prepend(topJumpBtn);
-    }
-
-    // 3. Add `🛣️ Route & Unpack` tab to right-hand `.tab-bar`
-    const tabBar = document.querySelector(".tab-bar[role='tablist']");
-    const labelsPane = document.getElementById("tab-labels");
-    if (!tabBar || !labelsPane) return;
-
-    const journeyTabBtn = document.createElement("button");
-    journeyTabBtn.type = "button";
-    journeyTabBtn.setAttribute("role", "tab");
-    journeyTabBtn.dataset.tab = "journey";
-    journeyTabBtn.setAttribute("aria-selected", "false");
-    journeyTabBtn.textContent = "🛣️ Route & Unpack";
-
-    // Place right before Buy Boxes if present, else at end
-    const shopTab = tabBar.querySelector("[data-tab='shop']");
-    if (shopTab) {
-      tabBar.insertBefore(journeyTabBtn, shopTab);
-    } else {
-      tabBar.appendChild(journeyTabBtn);
-    }
-
-    const journeyPane = document.createElement("div");
-    journeyPane.id = "tab-journey";
-    journeyPane.className = "hidden";
-    labelsPane.insertAdjacentElement("afterend", journeyPane);
+    // 2. Register clean "Route" tab in unified right-hand `.tab-bar`
+    const reg = window.PIU_REGISTER_TAB && window.PIU_REGISTER_TAB("journey", "Route", "Live A→B Truck Route, Parking & Unpack Checklist");
+    if (!reg) return;
+    const journeyTabBtn = reg.btn;
+    const journeyPane = reg.pane;
 
     function activateJourneyTab(subMode) {
       if (subMode) {
         state.subTab = subMode;
         persist();
       }
-      tabBar.querySelectorAll("[role='tab']").forEach((btn) => {
-        btn.setAttribute("aria-selected", String(btn === journeyTabBtn));
-      });
-      ["tab-unload", "tab-stores", "tab-labels", "tab-shop"].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add("hidden");
-      });
-      journeyPane.classList.remove("hidden");
+      window.PIU_ACTIVATE_TAB("journey");
       renderJourneyPane();
     }
 
-    // Event delegation + MutationObserver on tabBar so ALL tabs (including #btn-jump-shop) cooperate cleanly
-    tabBar.addEventListener("click", (e) => {
-      const clicked = e.target.closest("[role='tab']");
-      if (!clicked) return;
-      if (clicked === journeyTabBtn) {
-        e.stopPropagation();
-        activateJourneyTab();
-      } else {
-        journeyPane.classList.add("hidden");
-        journeyTabBtn.setAttribute("aria-selected", "false");
-      }
-    }, true);
-
-    const tabObserver = new MutationObserver(() => {
-      const otherSelected = Array.from(tabBar.querySelectorAll("[role='tab']")).some(
-        (t) => t !== journeyTabBtn && t.getAttribute("aria-selected") === "true"
-      );
-      if (otherSelected && !journeyPane.classList.contains("hidden")) {
-        journeyPane.classList.add("hidden");
-        journeyTabBtn.setAttribute("aria-selected", "false");
+    window.addEventListener("piu:tabchange", (ev) => {
+      if (ev.detail && ev.detail.tab === "journey") {
+        renderJourneyPane();
       }
     });
-    tabObserver.observe(tabBar, { attributes: true, subtree: true, attributeFilter: ["aria-selected"] });
-
-    if (topJumpBtn) {
-      topJumpBtn.addEventListener("click", () => {
-        activateJourneyTab();
-        journeyPane.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      });
-    }
 
     // Enhance the small static `.nav-tip` inside `#tab-unload` with a live summary + 1-click open
     function updateUnloadFooterTip() {
@@ -756,7 +792,7 @@
       navTip.innerHTML = `
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px">
           <span>🚛 <b>Live Route (${esc(dr.distance_miles)} mi · ~${esc(dr.truck_eta_min)} min):</b> Set phone GPS to <b>Commercial Truck Mode (${esc(fl.recommended_nav_height_label)})</b> · avoid parkways · reserve ~${esc(fl.curb_space_needed_ft)} ft at curb.</span>
-          <button type="button" class="comp-cta" id="btn-from-unload-route"> Tolls, Roads &amp; Unpack →</button>
+          <button type="button" class="comp-cta" id="btn-from-unload-route">Route &amp; Tolls →</button>
         </div>`;
       const btn = document.getElementById("btn-from-unload-route");
       if (btn) btn.addEventListener("click", () => activateJourneyTab("route"));
@@ -776,11 +812,11 @@
       };
 
       const stageDefs = [
-        { id: "pack", label: "1 · Pack", cta: "QR Labels", act: () => document.querySelector("[data-tab='labels']")?.click() },
-        { id: "load", label: "2 · Load", cta: "3D Load Order", act: () => document.getElementById("dir-load")?.click() },
-        { id: "drive", label: "3 · Drive A→B", cta: "Live Route & Tolls", act: () => activateJourneyTab("route") },
-        { id: "park_unload", label: "4 · Curb & Unload", cta: "Parking & LIFO", act: () => { document.getElementById("dir-unload")?.click(); activateJourneyTab("route"); } },
-        { id: "unpack", label: total ? `5 · Unpack (${done}/${total})` : "5 · Unpack", done: total > 0 && done === total, cta: "Unpack Checklist", act: () => activateJourneyTab("unpack") },
+        { id: "pack", label: "1·Pack", cta: "QR Labels", act: () => window.PIU_ACTIVATE_TAB("labels") },
+        { id: "load", label: "2·Load", cta: "3D Load", act: () => document.getElementById("dir-load")?.click() },
+        { id: "drive", label: "3·Drive", cta: "Route & Tolls", act: () => activateJourneyTab("route") },
+        { id: "park_unload", label: "4·Unload", cta: "Curb & LIFO", act: () => { document.getElementById("dir-unload")?.click(); activateJourneyTab("route"); } },
+        { id: "unpack", label: total && done > 0 ? `5·Unpack (${done}/${total})` : "5·Unpack", done: total > 0 && done === total, cta: "Checklist", act: () => activateJourneyTab("unpack") },
       ];
 
       const activeDef = stageDefs.find((s) => s.id === state.stage) || stageDefs[2];
@@ -789,17 +825,10 @@
           ? "🎉 Every single item is unpacked! Do a quick final sweep of the truck bed & fuel gauge before returning keys."
           : nudges[activeDef.id] || "";
 
-      if (topJumpBtn) {
-        topJumpBtn.innerHTML =
-          total > 0 && done > 0
-            ? `🛣️ Route · Unpack (${done}/${total})`
-            : "🛣️ Route &amp; Unpack";
-      }
-
       companionEl.innerHTML = `
         <div class="comp-top">
           <div class="comp-stages" role="group" aria-label="Move-day progress chapters">
-            <span style="font-size:12px;font-weight:750;margin-right:4px">🧭 Move Co-Pilot:</span>
+            <span style="font-size:12px;font-weight:750;margin-right:2px">🧭 Co-Pilot:</span>
             ${stageDefs
               .map(
                 (s) => `
@@ -810,11 +839,11 @@
               .join("")}
           </div>
           <button type="button" class="comp-quiet-btn" id="btn-comp-quiet" title="Hide or show guidance tips">
-            ${state.quiet ? "Show tips ▾" : "Quiet mode ▴"}
+            ${state.quiet ? "Tips ▾" : "Hide tip ▴"}
           </button>
         </div>
         <div class="comp-nudge-row">
-          <div class="comp-nudge-text"><b>Supportive tip:</b> ${esc(nudgeText)}</div>
+          <div class="comp-nudge-text"><b>Tip:</b> ${esc(nudgeText)}</div>
           <button type="button" class="comp-cta" id="btn-comp-cta">${esc(activeDef.cta)} →</button>
         </div>
       `;
@@ -822,10 +851,15 @@
       companionEl.querySelectorAll("[data-stage-pick]").forEach((btn) => {
         btn.addEventListener("click", () => {
           state.stage = btn.dataset.stagePick;
-          state.quiet = false;
           persist();
           renderCompanionStrip();
+          if (state.stage === "pack") window.PIU_ACTIVATE_TAB("labels");
+          if (state.stage === "load") document.getElementById("dir-load")?.click();
           if (state.stage === "drive") activateJourneyTab("route");
+          if (state.stage === "park_unload") {
+            document.getElementById("dir-unload")?.click();
+            window.PIU_ACTIVATE_TAB("unload");
+          }
           if (state.stage === "unpack") activateJourneyTab("unpack");
         });
       });
@@ -847,10 +881,10 @@
       const subBarHtml = `
         <div class="j-subbar" role="group" aria-label="Route Guide vs Unpack Tracker">
           <button type="button" class="j-subbtn" data-j-sub="route" aria-pressed="${String(state.subTab === "route")}">
-            🛣️ Live A→B Route &amp; Parking
+            🛣️ Truck Route &amp; Curbs
           </button>
           <button type="button" class="j-subbtn" data-j-sub="unpack" aria-pressed="${String(state.subTab === "unpack")}">
-            📦 Unpack to Last Item (${done}/${total})
+            📦 Unpack (${done}/${total})
           </button>
         </div>
       `;
@@ -868,31 +902,10 @@
         const parking = b?.parking || {};
         const wxD = b?.weather?.destination || {};
         const tfc = b?.traffic || {};
+        const shortA = state.origin.split(",")[0].slice(0, 22);
+        const shortB = state.destination.split(",")[0].slice(0, 22);
 
         bodyHtml = `
-          <form class="addr-box" id="piu-route-form">
-            <div class="addr-row">
-              <span class="addr-dot a" title="Point A (Origin)">A</span>
-              <input type="text" class="addr-input" id="inp-route-a" value="${esc(state.origin)}" placeholder="Point A origin street address, city, ZIP" aria-label="Origin address Point A">
-            </div>
-            <div class="addr-row">
-              <span class="addr-dot b" title="Point B (Destination)">B</span>
-              <input type="text" class="addr-input" id="inp-route-b" value="${esc(state.destination)}" placeholder="Point B destination street address, city, ZIP" aria-label="Destination address Point B">
-            </div>
-            <div class="addr-actions">
-              <div style="display:flex;gap:6px;flex-wrap:wrap">
-                <button type="button" class="btn sm" id="btn-route-swap" title="Swap Point A and Point B">⇅ Swap</button>
-                <button type="button" class="btn sm" id="btn-route-refresh" title="Pull fresh real-time weather, traffic & routing">${state.loadingBrief ? "Updating…" : "↻ Live Refresh"}</button>
-              </div>
-              <button type="submit" class="btn sm primary" ${state.loadingBrief ? "disabled" : ""}>${state.loadingBrief ? "Pulling Live Data…" : "Check Truck Route"}</button>
-            </div>
-            <div class="preset-chips">
-              ${QUICK_PRESETS.map(
-                (p, idx) => `<button type="button" class="preset-chip" data-preset-idx="${idx}">${esc(p.label)}</button>`
-              ).join("")}
-            </div>
-          </form>
-
           ${
             !b
               ? `<div class="live-banner">Pulling real-time routing, bridge clearances, tolls, weather &amp; traffic for your truck…</div>`
@@ -906,22 +919,54 @@
               ${dr.weather_alert ? `<div class="warn-callout">🌬️ ${esc(dr.weather_alert)}</div>` : ""}
               <div class="live-chips">
                 <span class="live-chip ok">● Live ${esc((b.fetched_at || "").split("T").pop())}</span>
-                ${wxD.temp_f != null ? `<span class="live-chip">🌡️ Dest ${esc(wxD.temp_f)}°F · ${esc(wxD.condition)} · Gusts ${esc(wxD.gusts_mph)} mph</span>` : ""}
-                ${tfc.avg_mph != null ? `<span class="live-chip">🚦 NYC DOT Sensors: ${esc(tfc.avg_mph)} mph</span>` : ""}
+                ${wxD.temp_f != null ? `<span class="live-chip">🌡️ ${esc(wxD.temp_f)}°F · ${esc(wxD.condition)} · Gusts ${esc(wxD.gusts_mph)} mph</span>` : ""}
+                ${tfc.avg_mph != null ? `<span class="live-chip">🚦 NYC DOT: ${esc(tfc.avg_mph)} mph</span>` : ""}
                 ${b.decision?.choice ? `<span class="live-chip ${b.decision.choice.includes("reroute") ? "warn" : "ok"}">🎯 ${esc(b.decision.choice.replace(/_/g, " "))}${b.decision.confidence ? ` (${Math.round(b.decision.confidence * 100)}%)` : ""}</span>` : ""}
               </div>
-              <div class="small muted" style="margin-top:5px;font-size:10.5px">
-                Sources: ${esc((b.live_sources || []).join(" · "))}
-              </div>
-            </div>
+            </div>`
+          }
 
-            <!-- 1. Commercial Truck Mode Phone Reminder -->
+          <details class="rt-acc">
+            <summary>
+              <span>📍 ${esc(shortA)} → ${esc(shortB)}</span>
+              <span class="live-chip">Edit A→B ▾</span>
+            </summary>
+            <div class="rt-acc-body">
+              <form id="piu-route-form">
+                <div class="addr-row">
+                  <span class="addr-dot a" title="Point A (Origin)">A</span>
+                  <input type="text" class="addr-input" id="inp-route-a" value="${esc(state.origin)}" placeholder="Point A origin street address, city, ZIP" aria-label="Origin address Point A">
+                </div>
+                <div class="addr-row">
+                  <span class="addr-dot b" title="Point B (Destination)">B</span>
+                  <input type="text" class="addr-input" id="inp-route-b" value="${esc(state.destination)}" placeholder="Point B destination street address, city, ZIP" aria-label="Destination address Point B">
+                </div>
+                <div class="addr-actions">
+                  <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button type="button" class="btn sm" id="btn-route-swap" title="Swap Point A and Point B">⇅ Swap</button>
+                    <button type="button" class="btn sm" id="btn-route-refresh" title="Pull fresh real-time weather, traffic & routing">${state.loadingBrief ? "Updating…" : "↻ Refresh"}</button>
+                  </div>
+                  <button type="submit" class="btn sm primary" ${state.loadingBrief ? "disabled" : ""}>${state.loadingBrief ? "Updating…" : "Check Route"}</button>
+                </div>
+                <div class="preset-chips">
+                  ${QUICK_PRESETS.map(
+                    (p, idx) => `<button type="button" class="preset-chip" data-preset-idx="${idx}">${esc(p.label)}</button>`
+                  ).join("")}
+                </div>
+              </form>
+            </div>
+          </details>
+
+          ${
+            !b
+              ? ""
+              : `
+            <!-- 1. Commercial Truck Mode Phone Reminder (open by default) -->
             <div class="rt-card">
               <h3>
-                <span>📱 1. Switch Phone Maps to Commercial Truck Mode</span>
+                <span>📱 1. Phone Commercial Truck Mode</span>
                 <span class="live-chip ${selApp.has_native_truck_mode ? "ok" : "warn"}">${esc(selApp.badge || "")}</span>
               </h3>
-              <div class="small muted">Tap the maps app on your phone:</div>
               <div class="nav-app-grid">
                 ${(nav.available_apps || [])
                   .map(
@@ -940,77 +985,83 @@
                 ${selApp.has_native_truck_mode ? "✅ " : "⚠️ "}<b>${esc(selApp.name)}:</b> ${esc(nav.tip || "")}
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:7px">
-                <a class="btn sm" target="_blank" rel="noopener" href="${safeHref(links.google_maps)}">Open Google Maps</a>
-                <a class="btn sm" target="_blank" rel="noopener" href="${safeHref(links.google_maps_no_tolls)}">Avoid Tolls Link</a>
+                <a class="btn sm" target="_blank" rel="noopener" href="${safeHref(links.google_maps)}">Google Maps</a>
+                <a class="btn sm" target="_blank" rel="noopener" href="${safeHref(links.google_maps_no_tolls)}">No-Tolls</a>
                 <a class="btn sm" target="_blank" rel="noopener" href="${safeHref(links.apple_maps)}">Apple Maps</a>
                 <a class="btn sm" target="_blank" rel="noopener" href="${safeHref(links.waze)}">Waze</a>
               </div>
             </div>
 
             <!-- 2. Roads That Can't Have Trucks & Low Clearances -->
-            <div class="rt-card">
-              <h3>
-                <span>🚫 2. No-Truck Roads &amp; Roof Clearances</span>
-                <span class="live-chip">${esc(fl.ext_height_label || "12' 0\"")} Roof</span>
-              </h3>
-              ${noTruck
-                .map(
-                  (w) => `
-                <div class="no-truck-item ${w.severity === "critical" ? "critical" : "watch"}">
-                  <div style="display:flex;justify-content:space-between;gap:6px;font-weight:700">
-                    <span>${w.severity === "critical" ? "🛑 " : "⚠️ "}${esc(w.road)}</span>
-                    <span class="small muted">${esc(w.detected_on)}</span>
-                  </div>
-                  <div style="margin-top:2px;color:var(--muted)">${esc(w.reason)}</div>
-                  <div style="margin-top:3px"><b>Safe Truck Route:</b> ${esc(w.safe_alternative)}</div>
-                </div>`
-                )
-                .join("")}
-              ${
-                noTruckAi.length
-                  ? `<ul class="rt-list">${noTruckAi.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`
-                  : ""
-              }
-            </div>
+            <details class="rt-acc" open>
+              <summary>
+                <span>🚫 2. No-Truck Roads &amp; Clearances</span>
+                <span class="live-chip ${noTruck.length ? "warn" : "ok"}">${noTruck.length ? `${noTruck.length} alert${noTruck.length === 1 ? "" : "s"}` : "Clear"} · ${esc(fl.ext_height_label || "12' 0\"")}</span>
+              </summary>
+              <div class="rt-acc-body">
+                ${noTruck
+                  .map(
+                    (w) => `
+                  <div class="no-truck-item ${w.severity === "critical" ? "critical" : "watch"}">
+                    <div style="display:flex;justify-content:space-between;gap:6px;font-weight:700">
+                      <span>${w.severity === "critical" ? "🛑 " : "⚠️ "}${esc(w.road)}</span>
+                      <span class="small muted">${esc(w.detected_on)}</span>
+                    </div>
+                    <div style="margin-top:2px;color:var(--muted)">${esc(w.reason)}</div>
+                    <div style="margin-top:3px"><b>Safe Truck Route:</b> ${esc(w.safe_alternative)}</div>
+                  </div>`
+                  )
+                  .join("")}
+                ${
+                  noTruckAi.length
+                    ? `<ul class="rt-list">${noTruckAi.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`
+                    : ""
+                }
+              </div>
+            </details>
 
             <!-- 3. Tolls & Congestion Zone -->
-            <div class="rt-card">
-              <h3>
+            <details class="rt-acc">
+              <summary>
                 <span>💳 3. Tolls &amp; Axle Class</span>
-                <span class="live-chip">${esc(tolls.toll_class || "")}</span>
-              </h3>
-              ${(tolls.items || [])
-                .map(
-                  (t) => `
-                <div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px dashed var(--line)">
-                  <div style="display:flex;justify-content:space-between;gap:6px;font-weight:700">
-                    <span>${esc(t.name)}</span>
-                    <span style="color:var(--accent)">${esc(t.estimate)}</span>
-                  </div>
-                  <div class="small muted">${esc(t.note)}</div>
-                </div>`
-                )
-                .join("")}
-              ${
-                (tolls.ai_bullets || []).length
-                  ? `<ul class="rt-list">${tolls.ai_bullets.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`
-                  : ""
-              }
-              <div class="small muted" style="margin-top:4px">💡 ${esc(tolls.rental_plate_tip || "")}</div>
-            </div>
+                <span class="live-chip">${esc(tolls.toll_class || "E-ZPass")} ▾</span>
+              </summary>
+              <div class="rt-acc-body">
+                ${(tolls.items || [])
+                  .map(
+                    (t) => `
+                  <div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px dashed var(--line)">
+                    <div style="display:flex;justify-content:space-between;gap:6px;font-weight:700">
+                      <span>${esc(t.name)}</span>
+                      <span style="color:var(--accent)">${esc(t.estimate)}</span>
+                    </div>
+                    <div class="small muted">${esc(t.note)}</div>
+                  </div>`
+                  )
+                  .join("")}
+                ${
+                  (tolls.ai_bullets || []).length
+                    ? `<ul class="rt-list">${tolls.ai_bullets.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`
+                    : ""
+                }
+                <div class="small muted" style="margin-top:4px">💡 ${esc(tolls.rental_plate_tip || "")}</div>
+              </div>
+            </details>
 
             <!-- 4. City Parking & Curb Survival Tips -->
-            <div class="rt-card">
-              <h3>
-                <span>🅿️ 4. Parking &amp; Unloading at Point B</span>
-                <span class="live-chip">${esc(parking.context_badge || "")}</span>
-              </h3>
-              <ul class="rt-list">
-                ${((parking.ai_bullets && parking.ai_bullets.length ? parking.ai_bullets : parking.tips) || [])
-                  .map((tip) => `<li>${esc(tip)}</li>`)
-                  .join("")}
-              </ul>
-            </div>
+            <details class="rt-acc">
+              <summary>
+                <span>🅿️ 4. Curb Parking &amp; Dock Rules</span>
+                <span class="live-chip">${esc(parking.context_badge || `~${fl.curb_space_needed_ft || 46} ft curb`)} ▾</span>
+              </summary>
+              <div class="rt-acc-body">
+                <ul class="rt-list" style="margin-top:0">
+                  ${((parking.ai_bullets && parking.ai_bullets.length ? parking.ai_bullets : parking.tips) || [])
+                    .map((tip) => `<li>${esc(tip)}</li>`)
+                    .join("")}
+                </ul>
+              </div>
+            </details>
           `
           }
         `;
@@ -1248,8 +1299,11 @@
 
     function syncJourneyTabLabel() {
       const { done, total } = unpackCounts();
-      journeyTabBtn.textContent =
-        total > 0 && done > 0 ? `🛣️ Route · Unpack (${done}/${total})` : "🛣️ Route & Unpack";
+      journeyTabBtn.textContent = "Route";
+      journeyTabBtn.title =
+        total > 0 && done > 0
+          ? `Live Truck Route & Unpack (${done}/${total} unpacked)`
+          : "Live A→B Truck Route, Parking & Unpack Checklist";
     }
 
     // ---------- Fetch Live Route Brief (FastAPI -> Browser Live Fallback) ----------

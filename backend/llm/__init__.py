@@ -475,13 +475,106 @@ class Job:
                             self.provider.speak(p, self.settings)), label=label)
         return base64.b64decode(b64)
 
-    def generate_video(self, prompt: str, label: str | None = None) -> bytes:
-        """Generated video (MP4 bytes) for `prompt`, with the job's duration, resolution and aspect ratio."""
+    def generate_speech(
+        self,
+        turns: list[dict],
+        speakers: list[dict] | None = None,
+        prompt_version: str = "tts_v1",
+        label: str | None = None,
+    ) -> bytes:
         import base64
-        b64 = self._run("video", prompt, [], "",
-                        lambda p, m: (lambda r: (base64.b64encode(r[0]).decode(), r[1]))(
-                            self.provider.generate_video(p, self.settings)), label=label)
+        spk = speakers or [{"speaker": "Vinny", "voice": "Puck"}]
+        prompt_repr = json.dumps({"turns": turns, "speakers": spk}, ensure_ascii=False)
+        b64 = self._run(
+            "speech",
+            prompt_repr,
+            [],
+            prompt_version,
+            lambda _p, _m: (lambda r: (base64.b64encode(r[0]).decode(), r[1]))(
+                self.provider.generate_speech(turns, spk, self.settings)
+            ),
+            extra_key=spk,
+            label=label or "foreman_tts",
+        )
         return base64.b64decode(b64)
+
+    def generate_video(
+        self,
+        prompt: str,
+        first_frame: Media | None = None,
+        last_frame: Media | None = None,
+        refs: list[Media] | None = None,
+        duration: str | None = None,
+        aspect_ratio: str | None = None,
+        resolution: str | None = None,
+        prompt_version: str = "omni_v1",
+        label: str | None = None,
+    ) -> bytes:
+        """Generated video (MP4 bytes) supporting both plain text-to-video (`video_open`) and frame transitions (`video`)."""
+        if first_frame is None and last_frame is None and not refs and duration is None and aspect_ratio is None and resolution is None:
+            import base64
+            b64 = self._run("video", prompt, [], "",
+                            lambda p, m: (lambda r: (base64.b64encode(r[0]).decode(), r[1]))(
+                                self.provider.generate_video(p, self.settings)), label=label)
+            return base64.b64decode(b64)
+
+        eff_duration = duration or (f"{int(self.settings['duration_s'])}s" if self.settings.get("duration_s") else "6s")
+        eff_aspect = aspect_ratio or str(self.settings.get("aspect_ratio", "16:9"))
+        eff_res = resolution or str(self.settings.get("resolution", "720p"))
+        all_media = [m for m in [first_frame, last_frame, *(refs or [])] if m is not None]
+        vid_settings = {
+            **self.settings,
+            "duration": eff_duration,
+            "aspect_ratio": eff_aspect,
+            "resolution": eff_res,
+        }
+        key = self._key(
+            "video",
+            prompt,
+            all_media,
+            prompt_version,
+            extra={"duration": eff_duration, "aspect_ratio": eff_aspect, "resolution": eff_res},
+        )
+        vid_cache_dir = CACHE_DIR / "videos"
+        vid_path = vid_cache_dir / f"{key}.mp4"
+        files = label or ",".join(m.path.name for m in all_media) or "video"
+        if vid_path.exists() and vid_path.stat().st_size > 0:
+            self._log(kind="video", prompt_version=prompt_version, file=files, cache="hit", valid=True, latency_s=0.0)
+            return vid_path.read_bytes()
+
+        t0 = time.time()
+        try:
+            mp4_bytes, usage = self.provider.generate_video(
+                prompt, vid_settings, first_frame=first_frame, last_frame=last_frame, refs=list(refs or [])
+            )
+            vid_cache_dir.mkdir(parents=True, exist_ok=True)
+            tmp = vid_cache_dir / f"{key}.{threading.get_ident()}.tmp"
+            tmp.write_bytes(mp4_bytes)
+            os.replace(tmp, vid_path)
+            self._log(
+                kind="video",
+                prompt_version=prompt_version,
+                file=files,
+                cache="miss",
+                valid=True,
+                latency_s=round(time.time() - t0, 2),
+                tokens_in=usage.tokens_in,
+                tokens_out=usage.tokens_out,
+            )
+            return mp4_bytes
+        except ProviderError as e:
+            self._log(
+                kind="video",
+                prompt_version=prompt_version,
+                file=files,
+                cache="miss",
+                valid=False,
+                latency_s=round(time.time() - t0, 2),
+                error=str(e)[:300],
+            )
+            if "is not set; add it to .env" not in str(e):
+                _append_failure(f"{self.name} ({self.spec}) failed: {e}", files)
+            raise LLMError(f"{self.name} failed on {files}: {e}") from e
 
 
 def media_from_path(path: Path | str, sha256: str | None = None, start_s=None, end_s=None) -> Media:

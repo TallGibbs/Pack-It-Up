@@ -12,11 +12,14 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.analysis.api import router as analysis_router
 from backend.arena_api import router as arena_router
+from backend.co_move_api import router as co_move_router
 from backend.commerce_api import router as commerce_router
+from backend.eval_api import router as eval_router
 from backend.ingest.api import router as ingest_router
 from backend.judge_api import router as judge_router
 from backend.labels_api import router as labels_router
 from backend.pack_api import router as pack_router
+from backend.render_api import router as render_router
 from backend.route_api import router as route_router
 
 app = FastAPI(title="Pack It Up")
@@ -25,10 +28,13 @@ app.include_router(ingest_router)
 app.include_router(analysis_router)  # which model did which job: frontend/models.html
 app.include_router(pack_router)
 app.include_router(arena_router)
+app.include_router(co_move_router)
 app.include_router(commerce_router)
 app.include_router(route_router)
 app.include_router(judge_router)
 app.include_router(labels_router)
+app.include_router(render_router)
+app.include_router(eval_router)
 
 
 @app.get("/health")

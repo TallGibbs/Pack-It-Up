@@ -71,12 +71,23 @@
   function injectStyles() {
     const style = document.createElement("style");
     style.textContent = `
-      .arena-actions { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-      .arena-actions .btn { flex: 1; justify-content: center; font-size: 12.5px; padding: 8px 10px; }
-      .arena-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
+      .arena-docked {
+        margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line);
+      }
+      .arena-bar {
+        display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;
+      }
+      .arena-label {
+        font-size: 12px; font-weight: 700; color: var(--muted); display: inline-flex; align-items: center; gap: 6px;
+      }
+      .arena-label small { font-weight: 500; font-size: 11px; }
+      .arena-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+      .arena-actions .btn { min-height: 32px; justify-content: center; font-size: 12px; padding: 5px 10px; border-radius: 8px; }
+      .arena-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+      .arena-list.hidden { display: none; }
       .arena-row {
-        padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line);
-        background: var(--bg); font-size: 12.5px; transition: border-color 0.2s, background 0.2s;
+        padding: 7px 9px; border-radius: 9px; border: 1px solid var(--line);
+        background: var(--bg); font-size: 12px; transition: border-color 0.2s, background 0.2s;
       }
       .arena-row.winner {
         border-color: var(--ok, #2da44e);
@@ -86,33 +97,39 @@
       .arena-score { font-variant-numeric: tabular-nums; font-weight: 700; }
       .arena-score.ok { color: var(--ok, #2da44e); }
       .arena-score.bad { color: var(--bad, #cf222e); }
-      .arena-sub { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+      .arena-sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+      @media print { #arena-panel { display: none !important; } }
     `;
     document.head.appendChild(style);
   }
 
   function mountPanel() {
+    const whatif = document.getElementById("whatif-panel");
     const verifier = document.getElementById("verifier-panel");
-    if (!verifier || document.getElementById("arena-panel")) return;
+    if ((!whatif && !verifier) || document.getElementById("arena-panel")) return;
     injectStyles();
 
-    const card = document.createElement("section");
-    card.className = "panel-card";
+    const card = document.createElement("div");
+    card.className = whatif ? "arena-docked" : "panel-card";
     card.id = "arena-panel";
     card.innerHTML = `
-      <h2>
-        <span>AI Strategy Arena</span>
-        <span class="small muted" id="arena-status">Gemini 4 Neon + Agents</span>
-      </h2>
-      <div class="arena-actions">
-        <button type="button" class="btn primary" id="btn-run-agents">⚡ Compete (4 Agents)</button>
-        <button type="button" class="btn" id="btn-run-neon">🧠 Neon Loop (3 Rounds)</button>
+      <div class="arena-bar">
+        <span class="arena-label">
+          <span>AI Arena</span>
+          <small id="arena-status">Agents + Neon</small>
+        </span>
+        <div class="arena-actions">
+          <button type="button" class="btn primary" id="btn-run-agents" title="Run 4 competing Managed Agents in parallel">⚡ 4 Agents</button>
+          <button type="button" class="btn" id="btn-run-neon" title="Run 3-round Gemini 4 Neon critique loop">🧠 Neon Loop</button>
+        </div>
       </div>
-      <ul class="arena-list" id="arena-list">
-        <li class="arena-sub">Launch 4 parallel Managed Agents or run the 3-round Gemini 4 Neon critique loop to watch the verifier score climb.</li>
-      </ul>
+      <ul class="arena-list hidden" id="arena-list"></ul>
     `;
-    verifier.parentNode.insertBefore(card, verifier);
+    if (whatif) {
+      whatif.appendChild(card);
+    } else {
+      verifier.parentNode.insertBefore(card, verifier);
+    }
 
     document.getElementById("btn-run-agents").addEventListener("click", runAgentRace);
     document.getElementById("btn-run-neon").addEventListener("click", runNeonLoop);
@@ -123,6 +140,7 @@
     const listEl = document.getElementById("arena-list");
     if (statusEl && statusText) statusEl.textContent = statusText;
     if (!listEl) return;
+    listEl.classList.remove("hidden");
 
     listEl.innerHTML = agents.map((a) => {
       const done = a.status === "completed";
@@ -150,6 +168,7 @@
     const listEl = document.getElementById("arena-list");
     if (statusEl) statusEl.textContent = modelName || "Neon 3-round climb";
     if (!listEl) return;
+    listEl.classList.remove("hidden");
 
     const maxScore = Math.max(...rounds.map((r) => (r.score && r.score.valid ? r.score.total : -1)));
     listEl.innerHTML = rounds.map((r) => {

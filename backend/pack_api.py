@@ -21,7 +21,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 
 from backend import catalog, planner, solver
-from backend.ingest.common import read_json, run_dir, write_json
+from backend.ingest.common import RUNS_DIR, read_json, run_dir, write_json
 from backend.llm import media as mu
 
 router = APIRouter(tags=["pack"])
@@ -87,29 +87,42 @@ def _load_inventory_for_run(run_id: str | None) -> tuple[str, dict[str, Any]]:
 
 
 def _enrich_media_and_corners(rid: str, inv: dict[str, Any], plan: dict[str, Any]) -> None:
-    """Attach source video evidence, room stills, truck source->dest links, and room corners."""
+    """Attach real source video evidence, room stills, truck source->dest links, and room corners."""
     manifest_by_name: dict[str, dict[str, Any]] = {}
+    rd_path: Path | None = None
     if rid not in ("inline", "sample_venue", "mock-demo"):
         try:
-            rd = run_dir(rid)
-            manifest = read_json(rd / "manifest.json") or {}
+            rd_path = run_dir(rid)
+            manifest = read_json(rd_path / "manifest.json") or {}
             for f in manifest.get("files", []):
                 if f.get("name"):
                     manifest_by_name[f["name"]] = f
         except Exception:
-            pass
+            rd_path = None
 
-    # Map file name -> sha256/kind from either manifest or item evidence
+    # Map file name -> sha256/kind/duration/real_media from manifest or item evidence
     file_meta: dict[str, dict[str, Any]] = {}
     for name, mf in manifest_by_name.items():
-        file_meta[name] = {"sha256": mf.get("sha256"), "kind": mf.get("kind")}
+        rel_p = mf.get("path")
+        exists_on_disk = bool(rd_path and rel_p and (rd_path / rel_p).exists())
+        file_meta[name] = {
+            "sha256": mf.get("sha256"),
+            "kind": mf.get("kind"),
+            "duration_s": mf.get("duration_s"),
+            "real_media": exists_on_disk and bool(mf.get("sha256")),
+        }
 
     for rb in inv.get("rooms", []):
         for it in rb.get("items", []):
             ev = it.get("evidence") or {}
             src = ev.get("source")
             if src and ev.get("sha256") and src not in file_meta:
-                file_meta[src] = {"sha256": ev.get("sha256"), "kind": ev.get("kind")}
+                file_meta[src] = {
+                    "sha256": ev.get("sha256"),
+                    "kind": ev.get("kind"),
+                    "duration_s": None,
+                    "real_media": False,
+                }
 
     def _norm_ev(ev: dict[str, Any] | None, fallback_files: list[str]) -> dict[str, Any] | None:
         if not ev and not fallback_files:
@@ -127,6 +140,7 @@ def _enrich_media_and_corners(rid: str, inv: dict[str, Any], plan: dict[str, Any
             out["kind"] = fm.get("kind") or ("video" if ext in mu.VIDEO_EXT else "image")
         if out["kind"] == "video" and out.get("timestamp_s") is None:
             out["timestamp_s"] = 2.5
+        out["real_media"] = bool(fm.get("real_media"))
         return out
 
     source_ev_by_id: dict[str, dict[str, Any]] = {}
@@ -140,15 +154,25 @@ def _enrich_media_and_corners(rid: str, inv: dict[str, Any], plan: dict[str, Any
 
         best_room_ev: dict[str, Any] | None = None
         sample_boxes: list[dict[str, Any]] = []
+        seen_ts: list[tuple[str, str, float | None, str | None]] = []
 
         for it in rb.get("items", []):
             nev = _norm_ev(it.get("evidence"), r_files)
             if nev:
                 source_ev_by_id[it["id"]] = nev
-                if best_room_ev is None or (nev.get("kind") == "video" and best_room_ev.get("kind") != "video"):
+                if best_room_ev is None or (
+                    nev.get("real_media") and not best_room_ev.get("real_media")
+                ) or (nev.get("kind") == "video" and best_room_ev.get("kind") != "video"):
                     best_room_ev = nev
                 if nev.get("box_2d") and len(sample_boxes) < 4:
                     sample_boxes.append({"label": it.get("label", ""), "box_2d": nev["box_2d"]})
+                if nev.get("real_media") and nev.get("sha256"):
+                    seen_ts.append((
+                        str(nev["source"]),
+                        str(nev["sha256"]),
+                        float(nev["timestamp_s"]) if nev.get("timestamp_s") is not None else None,
+                        it.get("label"),
+                    ))
 
         for c in rb.get("containers", []):
             cid = c.get("id")
@@ -159,10 +183,41 @@ def _enrich_media_and_corners(rid: str, inv: dict[str, Any], plan: dict[str, Any
         if best_room_ev is None and r_files:
             best_room_ev = _norm_ev({"source": r_files[0]}, r_files)
 
+        # Build real extracted video/photo keyframe URLs when real uploaded files exist on disk
+        keyframes: list[dict[str, Any]] = []
+        for fname in r_files:
+            fm = file_meta.get(fname) or {}
+            if not fm.get("real_media") or not fm.get("sha256"):
+                continue
+            sha16 = str(fm["sha256"])[:16]
+            kind = fm.get("kind") or "video"
+            if kind == "video":
+                # Pick distinct detected item timestamps first, otherwise spread across clip duration
+                file_ts = sorted({round(t, 1) for (s, _, t, _) in seen_ts if s == fname and t is not None})
+                if not file_ts:
+                    dur = float(fm.get("duration_s") or 6.0)
+                    file_ts = sorted({round(max(0.5, dur * frac), 1) for frac in (0.2, 0.5, 0.8)})
+                for t_val in file_ts[:3]:
+                    keyframes.append({
+                        "url": f"/media/{rid}/{sha16}/crop?t={t_val}&size=640",
+                        "source": fname,
+                        "kind": "video",
+                        "timestamp_s": t_val,
+                    })
+            else:
+                keyframes.append({
+                    "url": f"/media/{rid}/{sha16}/crop?size=640",
+                    "source": fname,
+                    "kind": "image",
+                    "timestamp_s": None,
+                })
+
         room_stills.append({
             "room_id": room_id,
             "room_name": room_name,
             "files": r_files,
+            "has_real_media": bool(keyframes),
+            "keyframes": keyframes[:4],
             "evidence": best_room_ev,
             "sample_detections": sample_boxes,
         })
@@ -231,14 +286,17 @@ def _enrich_media_and_corners(rid: str, inv: dict[str, Any], plan: dict[str, Any
             it["dest_corner"] = corner
 
             rm_id = it.get("room_id") or "room_1"
+            rs_obj = room_still_by_id.get(rm_id) or {}
             rm_entry = src_tally.setdefault(rm_id, {
                 "room_id": rm_id,
                 "room_name": it.get("room_name") or rm_id,
                 "item_count": 0,
                 "box_count": 0,
                 "weight_lb": 0.0,
-                "evidence": (room_still_by_id.get(rm_id) or {}).get("evidence") or ev,
-                "sample_detections": (room_still_by_id.get(rm_id) or {}).get("sample_detections") or [],
+                "has_real_media": bool(rs_obj.get("has_real_media")),
+                "keyframes": rs_obj.get("keyframes") or [],
+                "evidence": rs_obj.get("evidence") or ev,
+                "sample_detections": rs_obj.get("sample_detections") or [],
             })
             rm_entry["item_count"] += 1
             if it.get("is_box"):
@@ -262,6 +320,8 @@ def _enrich_media_and_corners(rid: str, inv: dict[str, Any], plan: dict[str, Any
         t["dest_zones"] = sorted(dst_tally.values(), key=lambda x: x["dock_stop"])
 
     plan["room_stills"] = room_stills
+    plan["has_real_source_media"] = any(bool(rs.get("has_real_media")) for rs in room_stills)
+    plan["has_real_dest_media"] = bool(nypenn_files)
 
 
 def _inject_extra_items(inv: dict[str, Any], extra_items: list[dict[str, Any]]) -> dict[str, Any]:
@@ -420,6 +480,53 @@ def get_trucks_and_zones() -> dict[str, Any]:
     return {
         "trucks": catalog.list_trucks(),
         "zones": catalog.list_penn_zones(),
+    }
+
+
+@router.get("/runs-available")
+def list_runs_available() -> dict[str, Any]:
+    """List real uploaded video/photo runs in `runs/` (newest first) for auto-selection & switching."""
+    entries: list[dict[str, Any]] = []
+    if RUNS_DIR.exists():
+        dirs = sorted(
+            (p for p in RUNS_DIR.iterdir() if p.is_dir() and not p.name.startswith(".")),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for rd in dirs:
+            manifest = read_json(rd / "manifest.json") or {}
+            inv = read_json(rd / "inventory.json")
+            m_files = manifest.get("files") or []
+            has_real_media = any(
+                bool(f.get("path") and (rd / f["path"]).exists())
+                for f in m_files
+            )
+            rooms = (
+                [(r.get("room") or {}).get("name") or "Room" for r in (inv.get("rooms") or [])]
+                if isinstance(inv, dict)
+                else list(dict.fromkeys(f.get("room") or "Room" for f in m_files))
+            )
+            item_count = (
+                sum(len(r.get("items") or []) for r in (inv.get("rooms") or []))
+                if isinstance(inv, dict)
+                else 0
+            )
+            entries.append({
+                "run_id": rd.name,
+                "ready": isinstance(inv, dict),
+                "has_real_media": has_real_media,
+                "file_count": len(m_files),
+                "rooms": rooms,
+                "item_count": item_count,
+            })
+
+    latest_real = next(
+        (e["run_id"] for e in entries if e["ready"] and e["has_real_media"]),
+        next((e["run_id"] for e in entries if e["ready"]), None),
+    )
+    return {
+        "runs": entries,
+        "latest_real_run_id": latest_real,
     }
 
 

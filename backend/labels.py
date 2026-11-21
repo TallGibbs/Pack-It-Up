@@ -770,6 +770,65 @@ def identify_box_from_photo(
     }
 
 
+def render_qr_png(text: str, scale: int = 8, border: int = 4) -> bytes:
+    """Alias for `qr_png_bytes` matching top-flap helper signature."""
+    return qr_png_bytes(text, scale=scale, border=border)
+
+
+def render_qr_svg(text: str, border: int = 4) -> str:
+    """Alias for `qr_svg` matching top-flap helper signature."""
+    return qr_svg(text, border=border)
+
+
+def build_qr_payload(box_item: dict[str, Any]) -> str:
+    """Self-contained multi-line text payload encoded directly into the box's top-flap QR label."""
+    short_name = str(box_item.get("box_short_name") or box_item.get("id") or "BOX")
+    room = str(box_item.get("room_name") or "")
+    stop = box_item.get("dock_stop") or "-"
+    dest = str(box_item.get("dest_zone_name") or "Penn Station")
+    corner = str(box_item.get("dest_corner") or "").strip()
+    dest_full = f"Stop {stop} {dest}" + (f" ({corner})" if corner else "")
+    truck_num = int(box_item.get("truck_index") or 0) + 1
+    load_seq = box_item.get("load_seq") or "-"
+    unload_seq = box_item.get("unload_seq") or "-"
+    handling = "FRAGILE-UPRIGHT" if box_item.get("fragile") else "STD"
+    contents = str(box_item.get("contents") or box_item.get("label") or "")[:90]
+    return "\n".join([
+        f"PACK-IT-UP | BOX:{short_name}",
+        f"DEST:{dest_full}",
+        f"TRUCK:T{truck_num} Load#{load_seq} Unload#{unload_seq}",
+        f"ROOM:{room} | HANDLING:{handling} | MOUNT:TOP-FLAPS",
+        f"IN:{contents}",
+    ])
+
+
+def extract_box_labels(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return all box label descriptors (with scannable SVG QR + payload) across the solved fleet."""
+    out: list[dict[str, Any]] = []
+    for t in plan.get("trucks") or []:
+        for it in t.get("items") or []:
+            if not it.get("is_box"):
+                continue
+            payload = build_qr_payload(it)
+            out.append({
+                "id": it.get("id"),
+                "box_short_name": it.get("box_short_name") or it.get("id"),
+                "placement_surface": "top",
+                "room_name": it.get("room_name"),
+                "dock_stop": it.get("dock_stop"),
+                "dest_zone_name": it.get("dest_zone_name"),
+                "dest_corner": it.get("dest_corner") or "Stock",
+                "truck_index": it.get("truck_index", 0),
+                "load_seq": it.get("load_seq"),
+                "unload_seq": it.get("unload_seq"),
+                "fragile": bool(it.get("fragile")),
+                "weight_lb": it.get("weight_lb"),
+                "qr_payload": payload,
+                "qr_svg": render_qr_svg(payload),
+            })
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Stage B10: generate offline scannable QR box labels.")
     ap.add_argument("inventory", nargs="?", type=Path, default=None, help="Optional inventory_v2 JSON")

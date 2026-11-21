@@ -56,7 +56,7 @@ def _usage(resp) -> Usage:
 
 class GeminiProvider:
     name = "gemini"
-    capabilities = {"image_in", "video_in", "audio_in", "json_schema", "decide_native", "image_out"}
+    capabilities = {"image_in", "video_in", "audio_in", "json_schema", "decide_native", "image_out", "audio_out", "video_out"}
 
     def __init__(self, model: str):
         self.model = model
@@ -114,8 +114,13 @@ class GeminiProvider:
             cfg["media_resolution"] = _RES[settings["media_resolution"]]
         if settings.get("temperature") is not None:
             cfg["temperature"] = settings["temperature"]
+        http_opts: dict = {}
         if settings.get("timeout_s"):
-            cfg["http_options"] = types.HttpOptions(timeout=int(settings["timeout_s"] * 1000))
+            http_opts["timeout"] = int(settings["timeout_s"] * 1000)
+        if settings.get("api_version"):
+            http_opts["api_version"] = settings["api_version"]
+        if http_opts:
+            cfg["http_options"] = types.HttpOptions(**http_opts)
         return types.GenerateContentConfig(**cfg)
 
     def _generate(self, prompt, media, settings, **cfg):
@@ -299,14 +304,56 @@ class GeminiProvider:
         return {"answers": parsed}, usage
 
     def generate_image(self, prompt: str, refs: list[Media], settings: dict) -> tuple[bytes, Usage]:
+        """Generate an image via Interactions API (Nano Banana 2.1) with generate_content fallback."""
+        client = _get_client()
+        inputs: list[dict] = []
+        for m in refs[:14]:
+            if m.caption:
+                inputs.append({"type": "text", "text": m.caption})
+            if m.kind == "image":
+                inputs.append({
+                    "type": "image",
+                    "mime_type": m.mime,
+                    "data": base64.b64encode(Path(m.path).read_bytes()).decode(),
+                })
+            elif m.kind == "video":
+                f = self.upload_video(m)
+                inputs.append({"type": "video", "mime_type": f.mime_type or m.mime, "uri": f.uri})
+        inputs.append({"type": "text", "text": prompt})
+
+        try:
+            interaction = client.interactions.create(
+                model=self.model,
+                input=inputs if len(inputs) > 1 else prompt,
+            )
+            out_img = getattr(interaction, "output_image", None)
+            if out_img and getattr(out_img, "data", None):
+                raw = out_img.data
+                img_bytes = base64.b64decode(raw) if isinstance(raw, str) else bytes(raw)
+                u = getattr(interaction, "usage", None)
+                usage = Usage(
+                    tokens_in=getattr(u, "total_input_tokens", None) if u else None,
+                    tokens_out=getattr(u, "total_output_tokens", None) if u else None,
+                )
+                return img_bytes, usage
+            for step in getattr(interaction, "steps", None) or []:
+                if getattr(step, "type", None) == "model_output":
+                    for c in getattr(step, "content", None) or []:
+                        if getattr(c, "type", None) == "image" and getattr(c, "data", None):
+                            raw = c.data
+                            return (base64.b64decode(raw) if isinstance(raw, str) else bytes(raw)), Usage()
+        except Exception:
+            pass
+
         resp = self._generate(prompt, refs, settings, response_modalities=["IMAGE", "TEXT"])
         for cand in resp.candidates or []:
             for part in (cand.content.parts if cand.content else []) or []:
                 if part.inline_data and part.inline_data.data:
-                    return part.inline_data.data, _usage(resp)
+                    raw = part.inline_data.data
+                    return (base64.b64decode(raw) if isinstance(raw, str) else bytes(raw)), _usage(resp)
         raise ProviderError("no image in response")
 
-    # ---------- speech and video (submission video build, plan/VIDEO_SCRIPT.md) ----------
+    # ---------- speech and video (submission video build + Vinny/ARIA crew radio + Omni arrival clip) ----------
     def _client_for(self, settings: dict) -> genai.Client:
         """A client on the job's api_version (TTS and video use the Interactions API on v1beta)."""
         if not settings.get("api_version"):
@@ -335,25 +382,172 @@ class GeminiProvider:
         data = audio.data if isinstance(audio.data, bytes) else base64.b64decode(audio.data)
         return data, Usage()
 
-    def generate_video(self, prompt: str, settings: dict) -> tuple[bytes, Usage]:
-        """Text to video (Gemini Omni Flash): returns MP4 bytes."""
-        fmt = {"type": "video", "delivery": "uri", "aspect_ratio": settings.get("aspect_ratio", "16:9")}
-        if settings.get("duration_s"):
-            fmt["duration"] = f"{int(settings['duration_s'])}s"
-        if settings.get("resolution"):
-            fmt["resolution"] = settings["resolution"]
-        client = self._client_for(settings)
+    def generate_speech(
+        self, turns: list[dict], speakers: list[dict], settings: dict
+    ) -> tuple[bytes, Usage]:
+        """Synthesize single- or multi-speaker 24kHz WAV via Gemini 3.8 TTS Interactions API."""
+        var = key_var()
+        if not os.environ.get(var):
+            raise ProviderError(f"{var} is not set; add it to .env")
+        api_ver = settings.get("api_version", "v1beta")
+        timeout_ms = int(settings.get("timeout_s", 45)) * 1000
+        tts_client = genai.Client(
+            api_key=os.environ[var],
+            http_options=types.HttpOptions(api_version=api_ver, timeout=timeout_ms),
+        )
+        content: list[dict] = []
+        multi = len(speakers) > 1
+        for t in turns:
+            ann: dict[str, str] = {"type": "speech_metadata"}
+            if multi and t.get("speaker"):
+                ann["speaker"] = str(t["speaker"])
+            if t.get("style"):
+                ann["style"] = str(t["style"])
+            content.append({
+                "type": "text",
+                "text": str(t["text"]),
+                "annotations": [ann],
+            })
+
+        if multi:
+            speech_cfg: dict | list = {
+                "speakers": [{"speaker": s["speaker"], "voice": s["voice"]} for s in speakers]
+            }
+        else:
+            voice = speakers[0]["voice"] if speakers else "Puck"
+            speech_cfg = [{"voice": voice}]
+
+        models_to_try = [self.model]
+        if self.model == "gemini-3.8-flash-tts":
+            models_to_try.append("gemini-3.8-flash-lite-tts")
+
+        last_err: Exception | None = None
+        for mdl in models_to_try:
+            try:
+                interaction = tts_client.interactions.create(
+                    model=mdl,
+                    input=[{"type": "user_input", "content": content}],
+                    response_format={"type": "audio"},
+                    generation_config={"speech_config": speech_cfg},
+                )
+                out_aud = getattr(interaction, "output_audio", None)
+                if out_aud and getattr(out_aud, "data", None):
+                    raw = out_aud.data
+                    wav_bytes = base64.b64decode(raw) if isinstance(raw, str) else bytes(raw)
+                    u = getattr(interaction, "usage", None)
+                    usage = Usage(
+                        tokens_in=getattr(u, "total_input_tokens", None) if u else None,
+                        tokens_out=getattr(u, "total_output_tokens", None) if u else None,
+                    )
+                    return wav_bytes, usage
+                for step in getattr(interaction, "steps", None) or []:
+                    if getattr(step, "type", None) == "model_output":
+                        for c in getattr(step, "content", None) or []:
+                            if getattr(c, "type", None) == "audio" and getattr(c, "data", None):
+                                raw = c.data
+                                return (base64.b64decode(raw) if isinstance(raw, str) else bytes(raw)), Usage()
+                raise ProviderError(f"TTS model {mdl} returned no audio block")
+            except Exception as e:
+                last_err = e
+                continue
+        raise ProviderError(f"TTS {type(last_err).__name__}: {last_err}") from last_err
+
+    def generate_video(
+        self,
+        prompt: str,
+        settings: dict,
+        first_frame: Media | None = None,
+        last_frame: Media | None = None,
+        refs: list[Media] | None = None,
+    ) -> tuple[bytes, Usage]:
+        """Generate MP4 video (text-to-video or first+last frame transitions) via Gemini Omni 1.2 Flash."""
+        vid_client = self._client_for({**settings, "api_version": settings.get("api_version", "v1beta"), "timeout_s": settings.get("timeout_s", 300)})
+
+        def _norm_uri(uri: str) -> str:
+            import re as _re
+            m_id = _re.search(r"files/([a-zA-Z0-9\-_]+)", uri or "")
+            if m_id:
+                return f"https://generativelanguage.googleapis.com/files/{m_id.group(1)}"
+            return uri
+
+        input_parts: list[dict] = []
+        f1_uri: str | None = None
+        f1_mime: str | None = None
+        if first_frame is not None:
+            f1 = self.upload_video(first_frame)
+            f1_uri = _norm_uri(f1.uri)
+            f1_mime = f1.mime_type or first_frame.mime
+            input_parts.append({"type": "image", "uri": f1_uri, "mime_type": f1_mime})
+
+        if last_frame is not None:
+            if first_frame is not None and last_frame.sha256 == first_frame.sha256 and f1_uri:
+                input_parts.append({"type": "image", "uri": f1_uri, "mime_type": f1_mime})
+            else:
+                f2 = self.upload_video(last_frame)
+                input_parts.append({
+                    "type": "image",
+                    "uri": _norm_uri(f2.uri),
+                    "mime_type": f2.mime_type or last_frame.mime,
+                })
+
+        for r in (refs or [])[:6]:
+            rf = self.upload_video(r)
+            input_parts.append({
+                "type": "image" if r.kind == "image" else "video",
+                "uri": _norm_uri(rf.uri),
+                "mime_type": rf.mime_type or r.mime,
+            })
+
+        prompt_text = (prompt or "").strip()
+        low = prompt_text.lower()
+        if first_frame is not None and last_frame is not None:
+            if "starting frame" not in low and "first frame" not in low:
+                sep = "" if prompt_text.endswith((".", "!", "?")) else "."
+                prompt_text = f"{prompt_text}{sep} Use the first image as the starting frame and the second image as the final frame."
+        elif first_frame is not None:
+            if "starting frame" not in low and "first frame" not in low:
+                sep = "" if prompt_text.endswith((".", "!", "?")) else "."
+                prompt_text = f"{prompt_text}{sep} Use this image as the starting frame."
+
+        input_parts.append({"type": "text", "text": prompt_text})
+
+        raw_dur = settings.get("duration") or (f"{int(settings['duration_s'])}s" if settings.get("duration_s") else "6s")
+        duration = str(raw_dur)
+        if not duration.endswith("s"):
+            duration = f"{int(float(duration))}s"
+        video_cfg: dict[str, str] = {
+            "type": "video",
+            "delivery": "uri",
+            "aspect_ratio": str(settings.get("aspect_ratio", "16:9")),
+            "duration": duration,
+            "resolution": str(settings.get("resolution", "720p")),
+        }
+
         try:
-            r = client.interactions.create(model=self.model, input=[{"type": "text", "text": prompt}],
-                                           response_format=fmt)
-            out = getattr(r, "output_video", None)
-            if not out or not getattr(out, "uri", None):
-                raise ProviderError(f"generate_video: no video in response (status {getattr(r, 'status', '?')})")
-            data = client.files.download(file=out.uri)
+            interaction = vid_client.interactions.create(
+                model=self.model,
+                input=input_parts,
+                response_format=video_cfg,
+            )
+            out_vid = getattr(interaction, "output_video", None)
+            vid_uri = getattr(out_vid, "uri", None) if out_vid else None
+            if not vid_uri:
+                for step in getattr(interaction, "steps", None) or []:
+                    if getattr(step, "type", None) == "model_output":
+                        for c in getattr(step, "content", None) or []:
+                            if getattr(c, "type", None) == "video" and getattr(c, "uri", None):
+                                vid_uri = c.uri
+                                break
+            if not vid_uri:
+                raise ProviderError(f"generate_video: no video in response (status {getattr(interaction, 'status', '?')})")
+            video_bytes = vid_client.files.download(file=vid_uri)
+            u = getattr(interaction, "usage", None)
+            usage = Usage(
+                tokens_in=getattr(u, "total_input_tokens", None) if u else None,
+                tokens_out=getattr(u, "total_output_tokens", None) if u else None,
+            )
+            return bytes(video_bytes), usage
         except ProviderError:
             raise
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise ProviderError(f"generate_video: {e}") from e
-        u = getattr(r, "usage", None)
-        return data, Usage(tokens_in=getattr(u, "total_input_tokens", None),
-                           tokens_out=getattr(u, "total_output_tokens", None))

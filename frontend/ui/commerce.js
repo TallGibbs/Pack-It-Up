@@ -413,8 +413,97 @@
       }
       .shop-comp-card img { width: 48px; height: 48px; border-radius: 7px; object-fit: cover; background: var(--card); }
       .shop-trace { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); max-height: 150px; overflow-y: auto; margin-top: 6px; }
+      .shop-drawer {
+        margin-top: 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overflow: hidden;
+      }
+      .shop-drawer > summary {
+        list-style: none; cursor: pointer; padding: 8px 11px; font-size: 12.5px; font-weight: 700;
+        display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      }
+      .shop-drawer > summary::-webkit-details-marker { display: none; }
+      .shop-drawer > .shop-drawer-body {
+        padding: 8px 10px 10px; border-top: 1px solid var(--line);
+      }
+      @media print { #tab-shop, #btn-jump-shop { display: none !important; } }
     `;
     document.head.appendChild(st);
+  }
+
+  function ensureUnifiedTabs() {
+    const ORDER = ["unload", "stores", "labels", "crew", "journey", "shop"];
+    const SHORT_NAMES = {
+      unload: ["Unload", "LIFO Truck Unload Order"],
+      stores: ["Stores", "Penn Station Storefronts"],
+      labels: ["QR", "Printable Offline QR Box Labels"],
+    };
+    if (!window.PIU_ACTIVATE_TAB) {
+      window.PIU_ACTIVATE_TAB = function (tabKey, extra) {
+        const tabBar = document.querySelector(".tab-bar[role='tablist']");
+        if (!tabBar) return;
+        tabBar.querySelectorAll("[role='tab']").forEach((btn) => {
+          btn.setAttribute("aria-selected", String(btn.dataset.tab === tabKey));
+        });
+        ORDER.forEach((k) => {
+          const pane = document.getElementById("tab-" + k);
+          if (pane) pane.classList.toggle("hidden", k !== tabKey);
+        });
+        window.dispatchEvent(new CustomEvent("piu:tabchange", { detail: { tab: tabKey, ...(extra || {}) } }));
+      };
+    }
+    if (!window.PIU_REGISTER_TAB) {
+      window.PIU_REGISTER_TAB = function (tabKey, label, title) {
+        const tabBar = document.querySelector(".tab-bar[role='tablist']");
+        const hostCard = tabBar && tabBar.parentNode;
+        if (!tabBar || !hostCard) return null;
+
+        Object.entries(SHORT_NAMES).forEach(([k, [txt, ttl]]) => {
+          const b = tabBar.querySelector(`[data-tab='${k}']`);
+          if (b) {
+            b.textContent = txt;
+            if (!b.title) b.title = ttl;
+          }
+        });
+
+        let btn = tabBar.querySelector(`[data-tab='${tabKey}']`);
+        if (!btn) {
+          btn = document.createElement("button");
+          btn.type = "button";
+          btn.setAttribute("role", "tab");
+          btn.dataset.tab = tabKey;
+          btn.setAttribute("aria-selected", "false");
+          tabBar.appendChild(btn);
+        }
+        btn.textContent = label;
+        if (title) btn.title = title;
+
+        const buttons = Array.from(tabBar.querySelectorAll("[role='tab']"));
+        buttons
+          .sort((a, b) => {
+            const ia = ORDER.indexOf(a.dataset.tab);
+            const ib = ORDER.indexOf(b.dataset.tab);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+          })
+          .forEach((b) => tabBar.appendChild(b));
+
+        let pane = document.getElementById("tab-" + tabKey);
+        if (!pane) {
+          pane = document.createElement("div");
+          pane.id = "tab-" + tabKey;
+          pane.className = "hidden";
+          hostCard.appendChild(pane);
+        }
+
+        if (!tabBar.dataset.piuUnified) {
+          tabBar.dataset.piuUnified = "1";
+          tabBar.addEventListener("click", (e) => {
+            const clicked = e.target.closest("[role='tab']");
+            if (!clicked || !clicked.dataset.tab) return;
+            window.PIU_ACTIVATE_TAB(clicked.dataset.tab);
+          });
+        }
+        return { btn, pane };
+      };
+    }
   }
 
   // ---------- Controller Factory ----------
@@ -439,6 +528,7 @@
       lastReply: "",
       lastModel: "",
       expandedAlts: new Set(),
+      supplyOpen: false,
     };
 
     async function fetchKit(tierOverride) {
@@ -587,20 +677,106 @@
 
       const fullPageLink = opts.fullPage
         ? ""
-        : `<a class="btn sm" style="min-height:30px;padding:4px 9px;font-size:12px" href="${esc(link("shop.html", { run_id: state.runId }))}">Full Shop View ↗</a>`;
+        : `<a class="btn sm" style="min-height:28px;padding:3px 8px;font-size:11.5px" href="${esc(link("shop.html", { run_id: state.runId }))}">Full Shop ↗</a>`;
+
+      const supplyLinesHtml = `
+        <div class="shop-supply-list">
+          ${(kit?.items || []).map((it) => {
+            const o = it.offer;
+            const img = o.image_url ? safeUrl(o.image_url) : placeholder(it.short_title);
+            const showAlts = state.expandedAlts.has(it.need_id);
+            return `
+              <div class="shop-line">
+                <img src="${esc(img)}" alt="${esc(it.short_title)}" loading="lazy">
+                <div>
+                  <div class="shop-line-title">
+                    <a href="${esc(safeUrl(o.product_url))}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">${esc(o.title)}</a>
+                  </div>
+                  <div class="shop-line-sub">
+                    <b>Need ${it.qty_needed}</b> → buying <b>${o.packs_to_order}× ${esc(o.variant_title)}</b> (${o.units_supplied} units) · ${esc(o.seller_name)}
+                  </div>
+                  <span class="shop-line-reason">${esc(it.reason)}</span>
+                  ${(it.alternatives || []).length ? `
+                    <button type="button" class="btn link" data-toggle-alt="${esc(it.need_id)}" style="font-size:11.5px;margin-left:6px">
+                      ${showAlts ? "Hide options ▲" : `Compare ${it.alternatives.length} more ▾`}
+                    </button>
+                  ` : ""}
+                </div>
+                <div class="shop-price-col">
+                  <b>${fmtUsd(o.line_total_cents)}</b>
+                  <span class="small muted">${fmtUsd(o.price_cents)} ea</span>
+                </div>
+                ${showAlts ? `
+                  <div class="shop-alts">
+                    ${it.alternatives.map((alt, aIdx) => `
+                      <div class="shop-alt-row">
+                        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                          <b>${esc(alt.seller_name)}</b> · ${esc(alt.title.slice(0, 48))} (${alt.packs_to_order}× ${fmtUsd(alt.price_cents)})
+                        </span>
+                        <button type="button" class="shop-tier-btn" data-swap-need="${esc(it.need_id)}" data-swap-idx="${aIdx}">
+                          Use (${fmtUsd(alt.line_total_cents)})
+                        </button>
+                      </div>
+                    `).join("")}
+                  </div>
+                ` : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+
+      const agentHtml = `
+        <div class="shop-agent-box" style="${opts.fullPage ? "" : "margin-top:0;margin-bottom:9px"}">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+            <b style="font-size:12.5px">🤖 Shopping Agent</b>
+            <span class="small muted">${esc(state.lastModel || "Gemini 4 + mcp.shop.com")}</span>
+          </div>
+          <div class="shop-chips">
+            <button type="button" class="shop-chip" data-prompt="Upgrade to heavy-duty double-wall boxes and pro pads">📦 Heavy-duty</button>
+            <button type="button" class="shop-chip" data-prompt="Add breathable cotton covers and stone corner guards for Orior bespoke furniture">🇮🇪 Orior care kit</button>
+            <button type="button" class="shop-chip" data-prompt="Add E-track ratchet straps and Pelican pick-and-pluck case foam for cinema camera gear">🎬 ARRI/Adorama kit</button>
+            ${opts.fullPage ? `
+              <button type="button" class="shop-chip" data-prompt="Swap plastic bubble wrap for eco-friendly honeycomb kraft paper">🌿 Eco kraft paper</button>
+              <button type="button" class="shop-chip" data-prompt="Ask the store what their return policy is on unused moving boxes">💬 Return policy</button>
+            ` : ""}
+          </div>
+          <form class="shop-chat-row" id="shop-agent-form">
+            <input type="text" id="shop-agent-input" placeholder="Ask agent: 'Keep under $120', 'Add 2 mattress bags'…" aria-label="Ask Shopping Agent">
+            <button type="submit" class="btn sm primary" ${state.loading ? "disabled" : ""}>Ask</button>
+          </form>
+          ${state.lastReply ? `<div class="shop-agent-reply">${esc(state.lastReply)}</div>` : ""}
+        </div>
+      `;
+
+      const compsCardsHtml = comps.map((c) => `
+        <div class="shop-comp-card">
+          <img src="${esc(c.comp.image_url ? safeUrl(c.comp.image_url) : placeholder(c.item_label))}" alt="${esc(c.item_label)}" loading="lazy">
+          <div>
+            <div style="font-size:12.5px;font-weight:700">${esc(c.quantity)}× ${esc(c.item_label)} <span class="small muted">(${esc(c.room_name)})</span></div>
+            <div class="small" style="color:var(--accent);font-weight:600">${esc(c.verdict)}</div>
+            <div class="small muted">Comp: ${esc((c.comp.title || "").slice(0, 52))} · ${esc(c.comp.seller_name)}</div>
+          </div>
+          <a class="shop-tier-btn" style="text-decoration:none;white-space:nowrap" href="${esc(safeUrl(c.comp.product_url))}" target="_blank" rel="noopener noreferrer">
+            ${fmtUsd(c.comp.price_usd, false)} ↗
+          </a>
+        </div>
+      `).join("");
+
+      const lineCount = (kit?.items || []).length;
 
       container.innerHTML = `
         <div class="${opts.fullPage ? "shop-page-full" : ""}">
           <div class="shop-hero-bar">
             <div>
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                <span class="shop-badge-pill">🛍️ Shop.dev MCP</span>
-                <b style="font-size:14.5px">${state.loading ? "Building Move Supply Kit…" : `${fmtUsd(totals.subtotal_cents)} Move Supply Kit`}</b>
-                ${isLive ? `<span class="badge" style="color:var(--ok);border-color:var(--ok)">● Live Shopify Catalog</span>` : ""}
-                ${decCount ? `<span class="badge" title="Verified by Gemini Decision 1">✓ Decisions API (${decCount})</span>` : ""}
+                <span class="shop-badge-pill">🛍️ Shop.dev</span>
+                <b style="font-size:14px">${state.loading ? "Building Kit…" : `${fmtUsd(totals.subtotal_cents)} Supply Kit`}</b>
+                ${isLive ? `<span class="badge" style="color:var(--ok);border-color:var(--ok)">● Live</span>` : ""}
+                ${decCount ? `<span class="badge" title="Verified by Gemini Decision 1">✓ Decisions (${decCount})</span>` : ""}
               </div>
               <div class="small muted" style="margin-top:2px">
-                ${kit ? `${kit.bom_summary.buffered_boxes} boxes + ${Math.max(0, totals.line_count - Object.keys(kit.items.filter(i => i.category === "boxes")).length)} protection supplies · ${totals.merchant_count} merchant cart(s)${totals.shipments_saved > 0 ? ` (${totals.shipments_saved} shipments consolidated)` : ""}` : "Exact boxes, tape, bubble wrap & blankets computed from your 3D load"}
+                ${kit ? `${kit.bom_summary.buffered_boxes} boxes + ${Math.max(0, totals.line_count - kit.items.filter((i) => i.category === "boxes").length)} supplies · ${totals.merchant_count} cart(s)` : "Exact boxes, tape, wrap & blankets from your 3D load"}
               </div>
             </div>
             ${fullPageLink}
@@ -608,11 +784,11 @@
 
           <div class="shop-tier-row">
             <button type="button" class="shop-tier-btn" data-tier="essential" aria-pressed="${state.tier === "essential"}">Essential</button>
-            <button type="button" class="shop-tier-btn" data-tier="standard" aria-pressed="${state.tier === "standard"}">Standard (+10%)</button>
-            <button type="button" class="shop-tier-btn" data-tier="pro_heavy_duty" aria-pressed="${state.tier === "pro_heavy_duty"}">Heavy-Duty Pro</button>
+            <button type="button" class="shop-tier-btn" data-tier="standard" aria-pressed="${state.tier === "standard"}">Standard</button>
+            <button type="button" class="shop-tier-btn" data-tier="pro_heavy_duty" aria-pressed="${state.tier === "pro_heavy_duty"}">Pro</button>
             <span style="margin-left:auto;display:inline-flex;align-items:center;gap:4px" class="small muted">
               ZIP <input type="text" class="shop-zip-input" id="shop-zip" value="${esc(state.postalCode)}" maxlength="10" aria-label="Delivery ZIP code">
-              <button type="button" class="shop-tier-btn" id="shop-zip-go">Update</button>
+              <button type="button" class="shop-tier-btn" id="shop-zip-go">Go</button>
             </span>
           </div>
 
@@ -621,17 +797,17 @@
               ${kit.merchant_carts.map((c) => `
                 <div class="shop-cart-card">
                   <div>
-                    <div style="font-weight:700;font-size:13.5px">
+                    <div style="font-weight:700;font-size:13px">
                       ${esc(c.seller_name)}
                       <span class="small muted" style="font-weight:500">· ${c.line_count} item${c.line_count === 1 ? "" : "s"} · ${fmtUsd(c.subtotal_cents)}</span>
                     </div>
-                    <div class="small muted">${esc(c.items.map((i) => `${i.quantity}× ${i.title.slice(0, 32)}`).join(" + ").slice(0, 95))}</div>
+                    <div class="small muted">${esc(c.items.map((i) => `${i.quantity}× ${i.title.slice(0, 28)}`).join(" + ").slice(0, 82))}</div>
                     ${(c.warnings || []).map((w) => `<div class="warn" style="font-size:11px">${esc(w)}</div>`).join("")}
                   </div>
                   <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                     ${c.shop_pay_url ? `<a class="shop-pay-btn" href="${esc(safeUrl(c.shop_pay_url))}" target="_blank" rel="noopener noreferrer">Shop Pay ↗</a>` : ""}
                     <a class="${c.shop_pay_url ? "shop-pay-btn alt" : "shop-pay-btn"}" href="${esc(safeUrl(c.cart_url || c.continue_url))}" target="_blank" rel="noopener noreferrer">
-                      Open Pre-Filled Cart (${fmtUsd(c.subtotal_cents)}) ↗
+                      Open Cart (${fmtUsd(c.subtotal_cents)}) ↗
                     </a>
                   </div>
                 </div>
@@ -639,94 +815,45 @@
             </div>
           ` : ""}
 
-          <div class="shop-supply-list">
-            ${(kit?.items || []).map((it) => {
-              const o = it.offer;
-              const img = o.image_url ? safeUrl(o.image_url) : placeholder(it.short_title);
-              const showAlts = state.expandedAlts.has(it.need_id);
-              return `
-                <div class="shop-line">
-                  <img src="${esc(img)}" alt="${esc(it.short_title)}" loading="lazy">
-                  <div>
-                    <div class="shop-line-title">
-                      <a href="${esc(safeUrl(o.product_url))}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">${esc(o.title)}</a>
-                    </div>
-                    <div class="shop-line-sub">
-                      <b>Need ${it.qty_needed}</b> → buying <b>${o.packs_to_order}× ${esc(o.variant_title)}</b> (${o.units_supplied} units) · ${esc(o.seller_name)}
-                    </div>
-                    <span class="shop-line-reason">${esc(it.reason)}</span>
-                    ${(it.alternatives || []).length ? `
-                      <button type="button" class="btn link" data-toggle-alt="${esc(it.need_id)}" style="font-size:11.5px;margin-left:6px">
-                        ${showAlts ? "Hide options ▲" : `Compare ${it.alternatives.length} more ▾`}
-                      </button>
-                    ` : ""}
-                  </div>
-                  <div class="shop-price-col">
-                    <b>${fmtUsd(o.line_total_cents)}</b>
-                    <span class="small muted">${fmtUsd(o.price_cents)} ea</span>
-                  </div>
-                  ${showAlts ? `
-                    <div class="shop-alts">
-                      ${it.alternatives.map((alt, aIdx) => `
-                        <div class="shop-alt-row">
-                          <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                            <b>${esc(alt.seller_name)}</b> · ${esc(alt.title.slice(0, 48))} (${alt.packs_to_order}× ${fmtUsd(alt.price_cents)})
-                          </span>
-                          <button type="button" class="shop-tier-btn" data-swap-need="${esc(it.need_id)}" data-swap-idx="${aIdx}">
-                            Use (${fmtUsd(alt.line_total_cents)})
-                          </button>
-                        </div>
-                      `).join("")}
-                    </div>
-                  ` : ""}
+          ${opts.fullPage ? `
+            ${supplyLinesHtml}
+            ${agentHtml}
+            ${comps.length ? `
+              <div style="margin-top:12px">
+                <b style="font-size:13px">⚖️ Haul vs. Replace &amp; Resale Comps (Shop.dev Discovery)</b>
+                ${compsCardsHtml}
+              </div>
+            ` : ""}
+          ` : `
+            ${agentHtml}
+            ${lineCount ? `
+              <details class="shop-drawer" id="shop-supply-drawer" ${state.supplyOpen ? "open" : ""}>
+                <summary>
+                  <span>📦 Supply Breakdown &amp; Swaps (${lineCount} lines)</span>
+                  <span class="small muted">${state.supplyOpen ? "Hide ▴" : "View ▾"}</span>
+                </summary>
+                <div class="shop-drawer-body">
+                  ${supplyLinesHtml}
                 </div>
-              `;
-            }).join("")}
-          </div>
-
-          <!-- Conversational Gemini 4 + Shop.dev Shopping Agent -->
-          <div class="shop-agent-box">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
-              <b style="font-size:13px">🤖 Pack It Up Shopping Agent</b>
-              <span class="small muted">${esc(state.lastModel || "Gemini 4 + mcp.shop.com")}</span>
-            </div>
-            <div class="shop-chips">
-              <button type="button" class="shop-chip" data-prompt="Upgrade to heavy-duty double-wall boxes and pro pads">📦 Heavy-duty double-wall</button>
-              <button type="button" class="shop-chip" data-prompt="Add breathable cotton covers and stone corner guards for Orior bespoke furniture">🇮🇪 Orior stone &amp; mohair kit</button>
-              <button type="button" class="shop-chip" data-prompt="Add E-track ratchet straps and Pelican pick-and-pluck case foam for cinema camera gear">🎬 ARRI/Adorama camera kit</button>
-              <button type="button" class="shop-chip" data-prompt="Swap plastic bubble wrap for eco-friendly honeycomb kraft paper">🌿 Eco kraft paper</button>
-              <button type="button" class="shop-chip" data-prompt="Ask the store what their return policy is on unused moving boxes">💬 Ask store return policy</button>
-            </div>
-            <form class="shop-chat-row" id="shop-agent-form">
-              <input type="text" id="shop-agent-input" placeholder="Ask agent: e.g. 'Keep under $120', 'Add 2 mattress bags'…" aria-label="Ask Shopping Agent">
-              <button type="submit" class="btn sm primary" ${state.loading ? "disabled" : ""}>Ask</button>
-            </form>
-            ${state.lastReply ? `<div class="shop-agent-reply">${esc(state.lastReply)}</div>` : ""}
-          </div>
-
-          ${comps.length ? `
-            <div style="margin-top:12px">
-              <b style="font-size:13px">⚖️ Haul vs. Replace &amp; Resale Comps (Shop.dev Discovery)</b>
-              ${comps.map((c) => `
-                <div class="shop-comp-card">
-                  <img src="${esc(c.comp.image_url ? safeUrl(c.comp.image_url) : placeholder(c.item_label))}" alt="${esc(c.item_label)}" loading="lazy">
-                  <div>
-                    <div style="font-size:12.5px;font-weight:700">${esc(c.quantity)}× ${esc(c.item_label)} <span class="small muted">(${esc(c.room_name)})</span></div>
-                    <div class="small" style="color:var(--accent);font-weight:600">${esc(c.verdict)}</div>
-                    <div class="small muted">Comp: ${esc((c.comp.title || "").slice(0, 52))} · ${esc(c.comp.seller_name)}</div>
-                  </div>
-                  <a class="shop-tier-btn" style="text-decoration:none;white-space:nowrap" href="${esc(safeUrl(c.comp.product_url))}" target="_blank" rel="noopener noreferrer">
-                    ${fmtUsd(c.comp.price_usd, false)} ↗
-                  </a>
+              </details>
+            ` : ""}
+            ${comps.length ? `
+              <details class="shop-drawer">
+                <summary>
+                  <span>⚖️ Haul vs. Replace Comps (${comps.length})</span>
+                  <span class="small muted">View ▾</span>
+                </summary>
+                <div class="shop-drawer-body">
+                  ${compsCardsHtml}
                 </div>
-              `).join("")}
-            </div>
-          ` : ""}
+              </details>
+            ` : ""}
+          `}
 
           ${kit ? `
-            <p class="small muted" style="margin-top:10px;font-size:11.5px;line-height:1.35">${esc(kit.disclosure)}</p>
-            <details style="margin-top:6px">
-              <summary class="small muted" style="cursor:pointer;font-size:11.5px">MCP &amp; Decisions API trace (${(kit.agent_trace || []).length} calls)</summary>
+            <p class="small muted" style="margin-top:8px;font-size:11px;line-height:1.35">${esc(kit.disclosure)}</p>
+            <details style="margin-top:4px">
+              <summary class="small muted" style="cursor:pointer;font-size:11px">MCP &amp; Decisions trace (${(kit.agent_trace || []).length} calls)</summary>
               <div class="shop-trace">
                 ${(kit.agent_trace || []).map((t) => `<div>• <b>${esc(t.step)}</b> ${esc(t.need_id || t.shop || "")} ${t.chosen ? `→ ${esc(t.chosen.slice(0, 38))} (p=${t.confidence})` : ""} ${t.latency_ms ? `${t.latency_ms}ms` : ""}</div>`).join("")}
               </div>
@@ -736,6 +863,12 @@
       `;
 
       // Wire events
+      const supplyDrawer = container.querySelector("#shop-supply-drawer");
+      if (supplyDrawer) {
+        supplyDrawer.addEventListener("toggle", () => {
+          state.supplyOpen = supplyDrawer.open;
+        });
+      }
       container.querySelectorAll("[data-tier]").forEach((btn) => {
         btn.addEventListener("click", () => fetchKit(btn.dataset.tier));
       });
@@ -752,11 +885,15 @@
           const id = btn.dataset.toggleAlt;
           if (state.expandedAlts.has(id)) state.expandedAlts.delete(id);
           else state.expandedAlts.add(id);
+          state.supplyOpen = true;
           render();
         });
       });
       container.querySelectorAll("[data-swap-need]").forEach((btn) => {
-        btn.addEventListener("click", () => swapOffer(btn.dataset.swapNeed, Number(btn.dataset.swapIdx)));
+        btn.addEventListener("click", () => {
+          state.supplyOpen = true;
+          swapOffer(btn.dataset.swapNeed, Number(btn.dataset.swapIdx));
+        });
       });
       container.querySelectorAll("[data-prompt]").forEach((chip) => {
         chip.addEventListener("click", () => sendAgentPrompt(chip.dataset.prompt));
@@ -789,6 +926,7 @@
   function autoMountOnPackPage() {
     if (!document.body || !document.body.classList.contains("pack-page")) return;
     if (document.getElementById("tab-shop")) return;
+    ensureUnifiedTabs();
     injectStyles();
 
     const piu = window.PIU || {
@@ -808,7 +946,7 @@
       );
     }
 
-    // 2. Add prominent "Buy Boxes & Supplies" pill in topbar nav-actions
+    // 2. Add compact "🛍️ Kit" pill in topbar nav-actions
     const navActions = document.querySelector(".nav-actions");
     let jumpBtn = null;
     if (navActions) {
@@ -816,46 +954,21 @@
       jumpBtn.type = "button";
       jumpBtn.id = "btn-jump-shop";
       jumpBtn.className = "shop-badge-pill";
-      jumpBtn.innerHTML = "🛍️ Buy Boxes &amp; Supplies";
+      jumpBtn.title = "Open Shopify Move Supply Kit & Shopping Agent";
+      jumpBtn.innerHTML = "🛍️ Supply Kit";
       navActions.prepend(jumpBtn);
     }
 
-    // 3. Add 4th tab "🛒 Buy Boxes" to the right-side output tab-bar
-    const tabBar = document.querySelector(".tab-bar[role='tablist']");
-    const labelsPane = document.getElementById("tab-labels");
-    if (!tabBar || !labelsPane) return;
-
-    const shopTabBtn = document.createElement("button");
-    shopTabBtn.type = "button";
-    shopTabBtn.setAttribute("role", "tab");
-    shopTabBtn.dataset.tab = "shop";
-    shopTabBtn.setAttribute("aria-selected", "false");
-    shopTabBtn.textContent = "🛒 Buy Boxes";
-    tabBar.appendChild(shopTabBtn);
-
-    const shopPane = document.createElement("div");
-    shopPane.id = "tab-shop";
-    shopPane.className = "hidden";
-    labelsPane.insertAdjacentElement("afterend", shopPane);
+    // 3. Register clean "Shop" tab in unified right-side `.tab-bar`
+    const reg = window.PIU_REGISTER_TAB && window.PIU_REGISTER_TAB("shop", "Shop", "Shopify Move Supply Kit & Shopping Agent");
+    if (!reg) return;
+    const shopTabBtn = reg.btn;
+    const shopPane = reg.pane;
 
     function activateShopTab() {
-      tabBar.querySelectorAll("[role='tab']").forEach((t) => {
-        t.setAttribute("aria-selected", String(t === shopTabBtn));
-      });
-      ["tab-unload", "tab-stores", "tab-labels"].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add("hidden");
-      });
-      shopPane.classList.remove("hidden");
+      window.PIU_ACTIVATE_TAB("shop");
     }
 
-    // Ensure clicking existing tabs hides #tab-shop cleanly
-    tabBar.querySelectorAll("[role='tab']").forEach((t) => {
-      if (t !== shopTabBtn) {
-        t.addEventListener("click", () => shopPane.classList.add("hidden"));
-      }
-    });
-    shopTabBtn.addEventListener("click", activateShopTab);
     if (jumpBtn) {
       jumpBtn.addEventListener("click", () => {
         activateShopTab();
@@ -875,7 +988,7 @@
       oriorBtn.className = "chip-toggle";
       oriorBtn.setAttribute("aria-pressed", "true");
       oriorBtn.title = "Proof-of-concept tribute to Orior (Newry, Ireland) & The Malin: packs every bespoke stone & upholstery piece with zero top-stacking, +2\" pad clearance, upright team lifts & breathable cotton covers.";
-      oriorBtn.textContent = "✨ Orior White-Glove Care";
+      oriorBtn.textContent = "✨ Orior Care";
 
       const cinemaBtn = document.createElement("button");
       cinemaBtn.type = "button";
@@ -883,7 +996,7 @@
       cinemaBtn.className = "chip-toggle";
       cinemaBtn.setAttribute("aria-pressed", "false");
       cinemaBtn.title = "PVO Media / Adorama & ARRI Rental camera-truck loadout: Pelican 1650 floor bases, unstacked 1510 lens cases & upright C-stand cart.";
-      cinemaBtn.textContent = "🎬 + PVO / ARRI Cinema Rig";
+      cinemaBtn.textContent = "🎬 + Cinema Rig";
 
       whatIfToggles.appendChild(oriorBtn);
       whatIfToggles.appendChild(cinemaBtn);
@@ -891,7 +1004,7 @@
       policyBanner = document.createElement("div");
       policyBanner.id = "venue-policy-note";
       policyBanner.className = "small hidden";
-      policyBanner.style.cssText = "margin-top:8px;padding:7px 10px;border-radius:9px;background:var(--accent-soft);color:var(--ink);line-height:1.38;";
+      policyBanner.style.cssText = "margin-top:6px;padding:4px 8px;border-radius:7px;background:var(--accent-soft);color:var(--ink);font-size:11.5px;line-height:1.3;";
       whatIfToggles.insertAdjacentElement("afterend", policyBanner);
 
       const triggerResolve = () => {
@@ -922,11 +1035,12 @@
       autoFetch: piu.MOCK,
       onTotalsUpdate(totals) {
         if (jumpBtn && totals?.subtotal_cents) {
-          jumpBtn.innerHTML = `🛍️ Buy Boxes (${fmtUsd(totals.subtotal_cents)})`;
+          jumpBtn.innerHTML = `🛍️ Kit ${fmtUsd(totals.subtotal_cents)}`;
         }
-        shopTabBtn.textContent = totals?.subtotal_cents
-          ? `🛒 Buy Boxes (${fmtUsd(totals.subtotal_cents)})`
-          : "🛒 Buy Boxes";
+        shopTabBtn.textContent = "Shop";
+        if (totals?.subtotal_cents) {
+          shopTabBtn.title = `Shopify Move Supply Kit (${fmtUsd(totals.subtotal_cents)})`;
+        }
       },
     });
 
@@ -951,12 +1065,12 @@
             if (policyBanner) {
               const notes = [];
               if (planJson.venue_policy?.white_glove_units) {
-                notes.push(`<b>✨ Orior White-Glove Care (${planJson.venue_policy.white_glove_units} pieces):</b> Zero top-stacking, +2" pad clearance, upright team-lifts &amp; breathable cotton covers. <i>(Proof-of-concept simulation — in real life The Malin's bespoke Irish Orior furniture stays curated per club.)</i>`);
+                notes.push(`<span title="Proof-of-concept simulation — in real life The Malin's bespoke Irish Orior furniture stays curated per club."><b>✨ Orior Care (${planJson.venue_policy.white_glove_units} pcs):</b> Zero top-stacking, +2" pad clearance &amp; cotton covers</span>`);
               }
               if (addCinemaRig) {
-                notes.push(`<b>🎬 PVO / ARRI Cinema Rig:</b> 2× Pelican 1650 floor cases, 2× unstacked 1510 lens cases &amp; 1× locked C-stand cart routed to Penn Tech Hub w/ outward QR labels.`);
+                notes.push(`<span><b>🎬 Cinema Rig:</b> 2× Pelican 1650 base, 2× unstacked 1510 glass &amp; locked C-stand cart</span>`);
               }
-              policyBanner.innerHTML = notes.join("<br>");
+              policyBanner.innerHTML = notes.join(" · ");
               policyBanner.classList.toggle("hidden", notes.length === 0);
             }
             widget.refreshFromPlan({

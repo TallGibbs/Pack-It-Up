@@ -81,22 +81,95 @@
     background: var(--accent); color: var(--accent-ink);
   }
 
+  .stage-split {
+    display: grid; grid-template-columns: 1fr;
+  }
+  @media (min-width: 780px) {
+    .stage-split.split-open {
+      grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+    }
+    .stage-split.split-open .real-hall-pane {
+      border-left: 1px solid var(--line);
+    }
+  }
   .canvas-wrap {
     position: relative; width: 100%; height: min(58vh, 520px); min-height: 330px;
     background: radial-gradient(circle at 50% 35%, #232a36 0%, #141820 100%);
-    touch-action: none; user-select: none;
+    touch-action: none; user-select: none; min-width: 0;
   }
   #three-canvas { width: 100%; height: 100%; display: block; }
 
-  .canvas-hud {
-    position: absolute; left: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px;
-    pointer-events: none; z-index: 2;
+  /* Side-by-Side Real Moynihan & Penn Station Viewer (Photos + Google 360° Street View / Indoor Map) */
+  .real-hall-pane {
+    display: flex; flex-direction: column; height: min(58vh, 520px); min-height: 330px;
+    background: #0f172a; color: #f1f5f9; min-width: 0; overflow: hidden;
   }
+  .rh-head {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 6px; padding: 7px 10px; background: #111827; border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 12px;
+  }
+  .rh-tabs { display: inline-flex; gap: 4px; }
+  .rh-tabs button {
+    border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05);
+    color: #cbd5e1; border-radius: 7px; padding: 3px 8px; font: inherit; font-size: 11.5px; font-weight: 650;
+    cursor: pointer;
+  }
+  .rh-tabs button[aria-pressed="true"] { background: #1f6feb; border-color: #60a5fa; color: #fff; }
+  .rh-stage {
+    position: relative; flex: 1; min-height: 0; background: #090d16; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rh-stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .rh-stage iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .rh-caption {
+    position: absolute; left: 8px; right: 8px; bottom: 8px;
+    background: rgba(9, 13, 22, 0.84); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 9px;
+    padding: 6px 9px; font-size: 11.5px; line-height: 1.35;
+  }
+  .rh-caption b { display: block; color: #f8fafc; font-size: 12px; }
+  .rh-caption span { color: #94a3b8; font-size: 11px; }
+  .rh-strip {
+    display: flex; gap: 5px; overflow-x: auto; padding: 7px 8px;
+    background: #111827; border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .rh-pill {
+    flex: 0 0 auto; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05);
+    color: #cbd5e1; border-radius: 999px; padding: 3px 9px; font: inherit; font-size: 11px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  .rh-pill[aria-pressed="true"] { background: #00704A; border-color: #34d399; color: #fff; }
+
+  .run-picker-select {
+    min-height: 36px; max-width: 260px; padding: 5px 9px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 600;
+  }
+  .no-video-notice {
+    border: 1px dashed var(--line); border-radius: 11px; padding: 10px 12px;
+    background: var(--bg); font-size: 12.5px; color: var(--muted); margin-bottom: 8px; line-height: 1.45;
+  }
+  .no-video-notice b { color: var(--ink); }
+  .kf-strip {
+    position: absolute; top: 5px; right: 5px; display: flex; gap: 3px; z-index: 2;
+  }
+  .kf-btn {
+    border: 0; border-radius: 5px; padding: 2px 5px; font-size: 10px; font-weight: 700;
+    background: rgba(15, 23, 42, 0.82); color: #cbd5e1; cursor: pointer;
+  }
+  .kf-btn.active { background: #1f6feb; color: #fff; }
+
+  .canvas-hud {
+    position: absolute; left: 10px; right: 10px; top: 10px;
+    display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 5px;
+    pointer-events: auto; z-index: 2;
+  }
+  .canvas-hud::-webkit-scrollbar { display: none; }
   .hud-chip {
-    pointer-events: auto;
+    flex: 0 0 auto; white-space: nowrap;
     background: rgba(20, 24, 32, 0.82); backdrop-filter: blur(6px);
     color: #eef2f8; border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600;
+    border-radius: 999px; padding: 4px 10px; font-size: 11.5px; font-weight: 600;
     cursor: pointer;
   }
   .hud-chip[aria-pressed="true"] { background: #1f6feb; border-color: #6ca4ff; color: #fff; }
@@ -300,7 +373,7 @@
   }
   .qr-card canvas { width: 72px; height: 72px; border-radius: 6px; background: #fff; border: 1px solid #ddd; }
 
-  /* Source Room Video Stills -> Truck -> Destination Room/Corner Storyboard */
+  /* Left column layout & Store corner chips */
   .left-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .storyboard-card {
     background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
@@ -310,50 +383,11 @@
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
     gap: 8px; margin-bottom: 10px;
   }
-  .sb-head h2 { margin: 0; font-size: 15.5px; }
-  .sb-flow {
-    display: grid; grid-template-columns: 1fr; gap: 10px; align-items: stretch;
-  }
-  @media (min-width: 720px) {
-    .sb-flow { grid-template-columns: minmax(0, 1fr) 138px minmax(0, 1.15fr); align-items: center; }
-  }
-  .sb-col-title {
-    font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-    color: var(--muted); margin-bottom: 6px;
-  }
-  .still-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 8px; }
-  .still-card {
-    border: 1px solid var(--line); border-radius: 11px; overflow: hidden;
-    background: var(--bg); cursor: pointer; transition: border-color .15s, transform .12s;
-  }
-  .still-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-  .still-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
-  .still-frame {
-    position: relative; width: 100%; aspect-ratio: 16 / 9; background: #111827; overflow: hidden;
-  }
-  .still-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .still-tag {
-    position: absolute; left: 6px; bottom: 5px; right: 6px;
-    display: flex; justify-content: space-between; align-items: center; gap: 4px;
-    font-size: 10.5px; font-weight: 650; color: #f8fafc;
-    background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(4px);
-    padding: 2px 6px; border-radius: 6px;
-  }
-  .still-body { padding: 7px 9px; font-size: 12px; }
-  .still-body b { display: block; font-size: 12.5px; color: var(--ink); line-height: 1.25; }
   .corner-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
   .corner-chip {
     font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 5px;
     background: var(--card); border: 1px solid var(--line); color: var(--muted);
   }
-  .sb-truck-hub {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    text-align: center; padding: 12px 8px; border-radius: 12px;
-    background: var(--accent-soft); border: 1px dashed var(--accent); gap: 4px;
-  }
-  .sb-truck-hub .hub-icon { font-size: 24px; line-height: 1; }
-  .sb-truck-hub b { font-size: 13px; color: var(--accent); }
-  .sb-truck-hub span { font-size: 11.5px; color: var(--muted); }
 
   /* 2-up video stills inside 3D Inspector + Store tab thumbnails */
   .ins-stills {
@@ -376,9 +410,33 @@
     border: 1px solid var(--line); background: #111827; display: block;
   }
 
+  .verifier-details {
+    border: 1px solid var(--line); border-radius: 9px; background: var(--bg); margin: 4px 0 8px; overflow: hidden;
+  }
+  .verifier-details > summary {
+    list-style: none; cursor: pointer; padding: 6px 9px; font-size: 12.2px; font-weight: 700;
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  }
+  .verifier-details > summary::-webkit-details-marker { display: none; }
+  .verifier-details.pass > summary { color: var(--ok); }
+  .verifier-details.fail > summary { color: var(--bad); background: color-mix(in srgb, var(--bad) 8%, var(--card)); }
+  .verifier-details > .checks-grid { padding: 6px 8px 8px; margin: 0; border-top: 1px solid var(--line); }
+
+  .media-tab-bar {
+    display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--bg);
+    padding: 3px; border-radius: 10px; border: 1px solid var(--line);
+  }
+  .media-tab-bar button {
+    border: 0; background: transparent; color: var(--muted); font: inherit;
+    font-size: 12px; font-weight: 650; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+  }
+  .media-tab-bar button[aria-selected="true"] {
+    background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+
   @media print {
     body.pack-page { background: #fff; color: #000; padding: 0; }
-    .topbar, .verdict, .stage-card, .storyboard-card, #whatif-panel, #verifier-panel, .tab-bar, .footer, .mock-banner { display: none !important; }
+    .topbar, .verdict, .stage-card, .storyboard-card, #e119-card, #whatif-panel, #arena-panel, #verifier-panel, .tab-bar, .footer, .mock-banner { display: none !important; }
     .pack-grid { display: block; }
     .panel-card { border: 0; padding: 0; }
     .qr-grid { max-height: none; overflow: visible; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -397,8 +455,10 @@
       <b>3 Pack &amp; Unload</b>
     </p>
     <div class="nav-actions">
+      <select id="sel-run-picker" class="run-picker-select hidden" aria-label="Choose uploaded venue video run"></select>
       <span class="small muted" id="engine-badge">Loading solver…</span>
       <a id="btn-edit-inv" class="btn sm" href="review.html">← Edit inventory</a>
+      <a id="nav-labels" class="btn sm" href="labels.html" title="Printable offline QR box labels">QR Sheet</a>
       <a id="nav-models" class="btn sm" href="models.html" title="What this move used: models, tokens and estimated cost">Usage</a>
     </div>
   </div>
@@ -427,28 +487,49 @@
             <button type="button" id="scene-venue" aria-pressed="false">🏛️ Penn Station Venue (3D)</button>
             <button type="button" id="scene-zones" aria-pressed="false">📦 By Store / Room</button>
           </div>
-          <div class="pill-group" role="group" aria-label="Color coding">
-            <button type="button" data-color="stop" aria-pressed="true">By Penn Stop</button>
-            <button type="button" data-color="room" aria-pressed="false">By Room</button>
-            <button type="button" data-color="handling" aria-pressed="false">By Rules</button>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+            <button type="button" class="chip-toggle" id="btn-split-real" aria-pressed="false" title="Compare 3D hall side-by-side with real Moynihan & LIRR Concourse photos & Google 360° view">📷 Side-by-Side Real Hall</button>
+            <div class="pill-group" role="group" aria-label="Color coding">
+              <button type="button" data-color="stop" aria-pressed="true">By Penn Stop</button>
+              <button type="button" data-color="room" aria-pressed="false">By Room</button>
+              <button type="button" data-color="handling" aria-pressed="false">By Rules</button>
+            </div>
           </div>
         </div>
 
-        <div class="canvas-wrap" id="canvas-wrap">
-          <canvas id="three-canvas"></canvas>
-          <div class="canvas-hud" id="camera-chips"></div>
+        <div class="stage-split" id="stage-split">
+          <div class="canvas-wrap" id="canvas-wrap">
+            <canvas id="three-canvas"></canvas>
+            <div class="canvas-hud" id="camera-chips"></div>
 
-          <div class="inspector hidden" id="item-inspector">
-            <button class="close-x" type="button" id="ins-close" aria-label="Close">×</button>
-            <div class="ins-title" id="ins-title">Item</div>
-            <div class="ins-stills" id="ins-stills"></div>
-            <div class="ins-meta" id="ins-meta"></div>
-            <div class="ins-badges" id="ins-badges"></div>
+            <div class="inspector hidden" id="item-inspector">
+              <button class="close-x" type="button" id="ins-close" aria-label="Close">×</button>
+              <div class="ins-title" id="ins-title">Item</div>
+              <div class="ins-stills" id="ins-stills"></div>
+              <div class="ins-meta" id="ins-meta"></div>
+              <div class="ins-badges" id="ins-badges"></div>
+            </div>
+
+            <div class="legend-bar">
+              <div class="legend-items" id="legend-items"></div>
+            </div>
           </div>
 
-          <div class="legend-bar">
-            <div class="legend-items" id="legend-items"></div>
-          </div>
+          <!-- Side-by-Side Real Moynihan Train Hall & LIRR Concourse Reference Pane -->
+          <aside class="real-hall-pane hidden" id="real-hall-pane" aria-label="Real Moynihan and Penn Station Hall View">
+            <div class="rh-head">
+              <div class="rh-tabs" role="group" aria-label="Real hall view mode">
+                <button type="button" id="rh-tab-photos" aria-pressed="true">📷 Real Interior Photos</button>
+                <button type="button" id="rh-tab-pano" aria-pressed="false">🌐 360° Street View &amp; Map</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <a id="rh-ext-link" href="https://www.google.com/maps/place/Moynihan+Train+Hall/@40.75148,-73.99605,19z" target="_blank" rel="noopener" style="color:#93c5fd;font-size:11px;text-decoration:none;font-weight:600">↗ Open 360°</a>
+                <button type="button" id="rh-close" aria-label="Close real hall pane" style="border:0;background:none;color:#94a3b8;font-size:16px;cursor:pointer;line-height:1">×</button>
+              </div>
+            </div>
+            <div class="rh-stage" id="rh-stage"></div>
+            <div class="rh-strip" id="rh-strip"></div>
+          </aside>
         </div>
 
         <!-- Load / Unload Playback Scrubber -->
@@ -473,31 +554,20 @@
         </div>
       </section>
 
-      <!-- Video Stills Storyboard: Source Rooms -> Truck -> Destination Rooms & Corners -->
-      <section class="storyboard-card" id="storyboard-card" aria-label="Source to Truck to Destination Video Stills">
+      <!-- Arrival Time-Lapse & Baseline Proof Hub -->
+      <section class="storyboard-card" id="storyboard-card" aria-label="Arrival Time-Lapse and Baselines">
         <div class="sb-head">
-          <h2>🎥 Room-to-Truck-to-Destination Video Stills</h2>
-          <div class="pill-group" id="sb-truck-tabs" role="group" aria-label="Filter storyboard by truck"></div>
-        </div>
-        <div class="sb-flow">
-          <div>
-            <div class="sb-col-title">1. Filmed Source Rooms</div>
-            <div class="still-list" id="sb-source-stills"></div>
-          </div>
-          <div class="sb-truck-hub" id="sb-truck-hub">
-            <div class="hub-icon">🚚</div>
-            <b>Truck Fleet</b>
-            <span>Loading → Unloading</span>
-          </div>
-          <div>
-            <div class="sb-col-title">2. Destination Rooms &amp; Corners (Tap for 3D Venue)</div>
-            <div class="still-list" id="sb-dest-stills"></div>
+          <div class="media-tab-bar" role="tablist" aria-label="Media and baseline views">
+            <button type="button" data-mtab="arrival" aria-selected="true">✨ Arrival Time-Lapse</button>
+            <button type="button" data-mtab="eval" aria-selected="false">📊 Baseline Proof</button>
           </div>
         </div>
+        <div id="mpane-arrival"></div>
+        <div id="mpane-eval" class="hidden"></div>
       </section>
     </div>
 
-    <!-- RIGHT: Judge What-If Re-Solve + Verifier + Unload / Stores / QR Tabs -->
+    <!-- RIGHT: Judge What-If Re-Solve + Verifier + Unload / Stores / QR / Crew / Route / Shop Tabs -->
     <aside>
       <!-- Judge Live What-If Controls -->
       <section class="panel-card" id="whatif-panel">
@@ -526,8 +596,8 @@
           </div>
         </div>
         <div class="whatif-toggles">
-          <button type="button" class="chip-toggle" id="tog-piano" aria-pressed="false">🎹 +1 Upright Piano (500 lb)</button>
-          <button type="button" class="chip-toggle" id="tog-downsize" aria-pressed="false">📐 Downsize last truck</button>
+          <button type="button" class="chip-toggle" id="tog-piano" aria-pressed="false">🎹 +1 Piano (500 lb)</button>
+          <button type="button" class="chip-toggle" id="tog-downsize" aria-pressed="false">📐 Downsize last</button>
         </div>
         <!-- B6: POST /plan. The plan model reads the checker's result and changes the settings; best round is shown -->
         <div class="planner-box">
@@ -545,7 +615,13 @@
           <span>Physics &amp; Mover Verifier</span>
           <span class="small muted" id="verifier-summary">–</span>
         </h2>
-        <div class="checks-grid" id="checks-grid"></div>
+        <details class="verifier-details pass" id="verifier-details">
+          <summary>
+            <span id="verifier-check-headline">Checking 8 rules…</span>
+            <span class="small muted" style="font-weight:600">Rules ▾</span>
+          </summary>
+          <div class="checks-grid" id="checks-grid"></div>
+        </details>
         <div class="metrics-mini">
           <div class="box-stat"><b id="m-fill">–</b>Volume Fill</div>
           <div class="box-stat"><b id="m-bal">–</b>L/R Balance</div>
@@ -554,12 +630,12 @@
         <ul class="violation-list hidden" id="violation-list"></ul>
       </section>
 
-      <!-- Output Tabs: Unload Order (B8) | Penn Station Stores | Box QR Labels (B10 preview) -->
+      <!-- Output Tabs: Unload | Stores | QR | Crew | Route | Shop -->
       <section class="panel-card">
         <div class="tab-bar" role="tablist">
-          <button type="button" role="tab" data-tab="unload" aria-selected="true">Unload Order</button>
-          <button type="button" role="tab" data-tab="stores" aria-selected="false">Penn Stores</button>
-          <button type="button" role="tab" data-tab="labels" aria-selected="false">QR Labels</button>
+          <button type="button" role="tab" data-tab="unload" aria-selected="true">Unload</button>
+          <button type="button" role="tab" data-tab="stores" aria-selected="false">Stores</button>
+          <button type="button" role="tab" data-tab="labels" aria-selected="false">QR</button>
         </div>
 
         <div id="tab-unload">
@@ -596,6 +672,8 @@
 <script src="ui/commerce.js"></script>
 <script src="ui/journey.js"></script>
 <script src="ui/arena.js"></script>
+<script src="ui/showstopper.js"></script>
+<script src="ui/co-move.js"></script>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -603,7 +681,9 @@ import {
   buildPennVenueScene,
   annotateStagedCorners,
   captureVenueCornerStills,
-  makeSimulatedVideoStill,
+  REAL_HALL_PHOTOS,
+  REAL_HALL_MAP_VIEWS,
+  getRealPhotoForZone,
 } from "./ui/penn-venue-3d.js";
 
 const { api, link, MOCK, API_BASE, params } = window.PIU;
@@ -614,14 +694,22 @@ const fmt = (n, d = 0) => (n == null || Number.isNaN(Number(n)) ? "–" : Number
 
 if (MOCK) $("#mock-banner").classList.remove("hidden");
 
-const rawRunId = params.get("run_id") || (MOCK ? window.PIU_MOCK.DEMO_RUN : (window.PIU.lastRun() || "sample_venue"));
-if (rawRunId && rawRunId !== "sample_venue") window.PIU.rememberRun(rawRunId);
+const explicitUrlRunId = params.get("run_id");
+let rawRunId = explicitUrlRunId || (MOCK ? window.PIU_MOCK.DEMO_RUN : (window.PIU.lastRun() || "sample_venue"));
 
-// With the move's id, so step 1 opens this move (with its links on to steps 2 and 3) and not a blank one.
-$("#nav-capture").href = link("capture.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
-$("#nav-review").href = link("review.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
-$("#nav-models").href = link("models.html", { run_id: rawRunId !== "sample_venue" ? rawRunId : "all" });
-$("#btn-edit-inv").href = link("review.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
+function syncNavRunLinks() {
+  if (rawRunId && rawRunId !== "sample_venue") window.PIU.rememberRun(rawRunId);
+  const capHref = link("capture.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
+  if ($("#nav-capture")) $("#nav-capture").href = capHref;
+  if ($("#btn-upload-clips")) $("#btn-upload-clips").href = capHref;
+  const revHref = link("review.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
+  if ($("#nav-review")) $("#nav-review").href = revHref;
+  if ($("#btn-edit-inv")) $("#btn-edit-inv").href = revHref;
+  if ($("#nav-labels")) $("#nav-labels").href = link("labels.html", rawRunId !== "sample_venue" ? { id: rawRunId } : {});
+  if ($("#nav-models")) $("#nav-models").href = link("models.html", { run_id: rawRunId !== "sample_venue" ? rawRunId : "all" });
+  if ($("#nav-shop")) $("#nav-shop").href = link("shop.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
+}
+syncNavRunLinks();
 
 /* ---------- Palettes ---------- */
 const STOP_COLORS = {
@@ -1186,6 +1274,7 @@ function qrPayloadText(it) {
   return [
     `PACK-IT-UP`,
     `BOX:${it.box_short_name || it.id}`,
+    `MOUNT:TOP-FLAPS`,
     `ROOM:${it.room_name || ""}`,
     `DEST:Stop ${it.dock_stop || "-"} ${it.dest_zone_name || "Penn Station"}`,
     `TRUCK:T${(it.truck_index ?? 0) + 1} Load#${it.load_seq} Unload#${it.unload_seq || "-"}`,
@@ -1210,7 +1299,9 @@ function makeBoxFaceTexture(it, baseHex) {
   ctx.lineWidth = 4;
   ctx.strokeRect(2, 2, 124, 124);
 
-  // White shipping label with QR code on front face
+  // Kraft tape seam across top flaps + white shipping label with QR code on TOP face
+  ctx.fillStyle = "rgba(255,248,225,0.35)";
+  ctx.fillRect(0, 58, 128, 12);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(18, 16, 92, 96);
   drawQrMatrix(ctx, 32, 22, 64, qrPayloadText(it));
@@ -1301,6 +1392,12 @@ let playDir = "load";         // "load" | "unload"
 let focusBinIndex = -1;       // -1 = all bins, >=0 = specific truck or store index
 let showVenueRoof = true;     // toggle Moynihan arched glass skylight roof in "venue" mode
 let hideVenueBoxes = true;    // default unpacked coworking look (cardboard boxes tucked out of sight)
+let showVenueTenants = true;  // show real-life permanent tenants (Starbucks, Shake Shack, Irish Exit, Amtrak, etc.)
+let splitRealOpen = false;    // side-by-side real hall comparison pane
+let realHallMode = "photos";  // "photos" | "pano"
+let activeRealPhotoId = REAL_HALL_PHOTOS[0].id;
+let activeRealMapId = REAL_HALL_MAP_VIEWS[0].id;
+let roomKeyframeIdx = {};     // room_id -> selected keyframe index on real uploaded videos
 let storyboardTruckIdx = -1;  // -1 = all trucks, >=0 = specific truck in video storyboard
 let highlightRoomId = null;   // optional source room highlight from clicking a room video still
 let venueCornerStills = {};   // zone_id -> offscreen 3D corner cam dataURL
@@ -1313,56 +1410,168 @@ let downsizeLast = false;
 let roomColorMap = {};
 let violatingIds = new Set();
 let meshEntries = [];         // [{ mesh, edges, item, worldPos?, targetY, seqIndex }]
-let binTargets = [];          // [{ label, center: THREE.Vector3, camPos?, radius }]
+let binTargets = [];          // [{ label, center: THREE.Vector3, camPos?, radius, photoZone? }]
 
-function getSourceStillUrls(roomName, ev, detections = [], highlightBox = null) {
-  const accentHex = "#3b82f6";
-  const sim = makeSimulatedVideoStill({
-    roomName,
-    source: (ev && ev.source) || "room_clip.mp4",
-    timestampS: ev && ev.timestamp_s != null ? ev.timestamp_s : 3.2,
-    accentHex,
-    detections,
-    highlightBox,
-  });
-  // Use real Track A video frame / crop endpoint when a real sha256 exists on a server run
+/**
+ * Pure real-video source frame resolver — NEVER generates simulated or fake canvas mockups!
+ * Returns `hasReal: true` ONLY when real uploaded room footage exists in `runs/<run_id>/media/`.
+ */
+function getSourceStillUrls(roomName, ev, keyframes = [], highlightBox = null, selectedKfIdx = 0) {
   const isMockSha = !ev || !ev.sha256 || /^(aaaa|bbbb)0000/.test(String(ev.sha256));
-  if (!MOCK && !isMockSha && plan?.run_id && !["sample_venue", "mock-demo"].includes(plan.run_id)) {
-    const q = new URLSearchParams({ size: "480" });
-    if (ev.timestamp_s != null) q.set("t", String(ev.timestamp_s));
-    if (highlightBox && highlightBox.length === 4) q.set("box", highlightBox.join(","));
+  const realRun = !MOCK && plan?.run_id && !["sample_venue", "mock-demo", "inline"].includes(plan.run_id);
+
+  if (realRun && !highlightBox && Array.isArray(keyframes) && keyframes.length > 0) {
+    const kf = keyframes[Math.min(keyframes.length - 1, Math.max(0, selectedKfIdx))];
+    const tsFmt = kf.timestamp_s != null
+      ? ` · ${Math.floor(kf.timestamp_s / 60)}:${String(Math.round(kf.timestamp_s % 60)).padStart(2, "0")}`
+      : "";
     return {
-      src: `${API_BASE}/media/${encodeURIComponent(plan.run_id)}/${ev.sha256.slice(0, 16)}/crop?${q}`,
-      fallback: sim,
-      tag: `${ev.kind === "video" ? "🎥" : "📷"} ${ev.source}${ev.timestamp_s != null ? ` · ${Math.floor(ev.timestamp_s / 60)}:${String(Math.round(ev.timestamp_s % 60)).padStart(2, "0")}` : ""}`,
+      hasReal: true,
+      src: `${API_BASE}${kf.url}`,
+      frames: keyframes,
+      tag: `${kf.kind === "video" ? "🎥" : "📷"} ${kf.source}${tsFmt}`,
     };
   }
+
+  if (realRun && !isMockSha && ev.real_media !== false) {
+    const q = new URLSearchParams({ size: "640" });
+    if (ev.timestamp_s != null) q.set("t", String(ev.timestamp_s));
+    if (highlightBox && highlightBox.length === 4) q.set("box", highlightBox.join(","));
+    const tsFmt = ev.timestamp_s != null
+      ? ` · ${Math.floor(ev.timestamp_s / 60)}:${String(Math.round(ev.timestamp_s % 60)).padStart(2, "0")}`
+      : "";
+    return {
+      hasReal: true,
+      src: `${API_BASE}/media/${encodeURIComponent(plan.run_id)}/${ev.sha256.slice(0, 16)}/crop?${q}`,
+      frames: keyframes || [],
+      tag: `${ev.kind === "video" ? "🎥" : "📷"} ${ev.source}${tsFmt}`,
+    };
+  }
+
   return {
-    src: sim,
-    fallback: sim,
-    tag: `${ev?.kind === "video" || /\.(mp4|mov|m4v)$/i.test(ev?.source || "") ? "🎥" : "📷"} ${ev?.source || "room_scan.mp4"}${ev?.timestamp_s != null ? ` · 0:${String(Math.round(ev.timestamp_s)).padStart(2, "0")}` : ""}`,
+    hasReal: false,
+    src: null,
+    frames: [],
+    tag: "Upload room video on 1 Film",
   };
 }
 
-function getDestStillUrls(zoneId, destStillObj, zoneName = "Destination") {
-  const fallback = venueCornerStills[zoneId] || makeSimulatedVideoStill({
-    roomName: zoneName,
-    source: "nypenn_concourse.mp4",
-    timestampS: 4.5,
-    accentHex: "#10b981",
-  });
+function getDestStillUrls(zoneId, destStillObj) {
+  const realPhoto = getRealPhotoForZone(zoneId);
+  const corner3d = venueCornerStills[zoneId] || "";
   if (!MOCK && destStillObj && destStillObj.url) {
     return {
       src: `${API_BASE}${destStillObj.url}`,
-      fallback,
+      fallback: realPhoto.url || corner3d,
       tag: `${destStillObj.kind === "video" ? "🎥" : "📷"} ${destStillObj.source}${destStillObj.timestamp_s != null ? ` · 0:${String(Math.round(destStillObj.timestamp_s)).padStart(2, "0")}` : ""}`,
     };
   }
   return {
-    src: fallback,
-    fallback,
-    tag: `🏛️ 3D Corner Cam`,
+    src: realPhoto.url || corner3d,
+    fallback: corner3d,
+    tag: `📷 Real Hall Photo`,
   };
+}
+
+function renderRealHallPane() {
+  const pane = $("#real-hall-pane");
+  if (!splitRealOpen) {
+    pane.classList.add("hidden");
+    $("#stage-split").classList.remove("split-open");
+    $("#btn-split-real").setAttribute("aria-pressed", "false");
+    return;
+  }
+  pane.classList.remove("hidden");
+  $("#stage-split").classList.add("split-open");
+  $("#btn-split-real").setAttribute("aria-pressed", "true");
+  $("#rh-tab-photos").setAttribute("aria-pressed", String(realHallMode === "photos"));
+  $("#rh-tab-pano").setAttribute("aria-pressed", String(realHallMode === "pano"));
+
+  const stage = $("#rh-stage");
+  const strip = $("#rh-strip");
+  const extLink = $("#rh-ext-link");
+
+  if (realHallMode === "photos") {
+    const p = REAL_HALL_PHOTOS.find((x) => x.id === activeRealPhotoId) || REAL_HALL_PHOTOS[0];
+    extLink.href = "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=40.75148,-73.99605";
+    extLink.textContent = "↗ Google 360°";
+    stage.innerHTML = `
+      <img src="${esc(p.url)}" alt="${esc(p.title)}">
+      <div class="rh-caption">
+        <b>Stop ${esc(p.stop)} Area · ${esc(p.title)}</b>
+        <span>Real tenants here: ${esc(p.tenants)}</span>
+      </div>
+    `;
+    strip.innerHTML = REAL_HALL_PHOTOS.map((ph) => `
+      <button type="button" class="rh-pill" data-rh-photo="${esc(ph.id)}" aria-pressed="${ph.id === p.id}">
+        Stop ${esc(ph.stop)} · ${esc(ph.title.split("(")[0].split("—")[0].trim().slice(0, 26))}
+      </button>
+    `).join("");
+    $$("[data-rh-photo]", strip).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activeRealPhotoId = btn.dataset.rhPhoto;
+        const chosen = REAL_HALL_PHOTOS.find((x) => x.id === activeRealPhotoId);
+        renderRealHallPane();
+        // Sync 3D camera to the matching stop/concourse in our 1:1 3D hall!
+        if (chosen) {
+          if (sceneMode !== "venue") {
+            sceneMode = "venue";
+            syncSceneButtons();
+            rebuildScene(false);
+          }
+          const camIdx = chosen.id.startsWith("lirr_")
+            ? binTargets.findIndex((b) => b.label.includes("LIRR"))
+            : binTargets.findIndex((b) => b.label === `Stop ${chosen.stop}`);
+          if (camIdx >= 0) {
+            focusBinIndex = camIdx;
+            renderCameraChips();
+            focusCamera(camIdx, false);
+          }
+        }
+      });
+    });
+  } else {
+    const mv = REAL_HALL_MAP_VIEWS.find((x) => x.id === activeRealMapId) || REAL_HALL_MAP_VIEWS[0];
+    extLink.href = mv.externalUrl;
+    extLink.textContent = "↗ Fullscreen 360°";
+    stage.innerHTML = `
+      <iframe src="${esc(mv.iframeUrl)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen title="${esc(mv.label)}"></iframe>
+      <div class="rh-caption" style="pointer-events:none">
+        <b>${esc(mv.label)}</b>
+        <span>${esc(mv.caption)}</span>
+      </div>
+    `;
+    strip.innerHTML = REAL_HALL_MAP_VIEWS.map((v) => `
+      <button type="button" class="rh-pill" data-rh-map="${esc(v.id)}" aria-pressed="${v.id === mv.id}">${esc(v.label)}</button>
+    `).join("");
+    $$("[data-rh-map]", strip).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activeRealMapId = btn.dataset.rhMap;
+        renderRealHallPane();
+      });
+    });
+  }
+}
+
+function toggleSplitRealHall(forceState) {
+  splitRealOpen = typeof forceState === "boolean" ? forceState : !splitRealOpen;
+  if (splitRealOpen && sceneMode !== "venue") {
+    sceneMode = "venue";
+    focusBinIndex = -1;
+    syncSceneButtons();
+    rebuildScene(true);
+  }
+  renderRealHallPane();
+  requestAnimationFrame(resizeRenderer);
+}
+
+function syncRealHallToZone(zoneId) {
+  if (!zoneId) return;
+  const match = REAL_HALL_PHOTOS.find((p) => p.zone_id === zoneId);
+  if (match) {
+    activeRealPhotoId = match.id;
+    if (splitRealOpen && realHallMode === "photos") renderRealHallPane();
+  }
 }
 
 function resizeRenderer() {
@@ -1530,6 +1739,7 @@ function rebuildScene(resetCamera = false) {
       makeTextSprite,
       showRoof: showVenueRoof,
       hideUnpackedBoxes: hideVenueBoxes,
+      showExistingTenants: showVenueTenants,
       fmt,
     });
   } else {
@@ -1580,8 +1790,8 @@ function rebuildScene(resetCamera = false) {
         const qrTex = makeBoxFaceTexture(it, hex);
         const sideMat = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.65, metalness: 0.05 });
         const qrMat = new THREE.MeshStandardMaterial({ map: qrTex, roughness: 0.55, metalness: 0.04 });
-        // BoxGeometry faces: +X (rear door facing!), -X, +Y (top), -Y, +Z, -Z
-        mat = [qrMat, qrMat, sideMat, sideMat, sideMat, sideMat];
+        // BoxGeometry faces: 0:+X, 1:-X, 2:+Y (TOP face), 3:-Y (bottom), 4:+Z, 5:-Z
+        mat = [sideMat, sideMat, qrMat, sideMat, sideMat, sideMat];
       } else {
         mat = new THREE.MeshStandardMaterial({
           color: hex,
@@ -1637,6 +1847,7 @@ function renderCameraChips() {
   let html = "";
   if (sceneMode === "venue") {
     html += `<button type="button" class="hud-chip" id="tog-venue-roof" aria-pressed="${showVenueRoof}">✨ Skylight Vault</button>`;
+    html += `<button type="button" class="hud-chip" id="tog-venue-tenants" aria-pressed="${showVenueTenants}">🏪 Real Station Shops</button>`;
     html += `<button type="button" class="hud-chip" id="tog-venue-boxes" aria-pressed="${!hideVenueBoxes}">${hideVenueBoxes ? "✨ Unpacked Coworking" : "📦 Stock Boxes Shown"}</button>`;
   }
   if (binTargets.length > 1) {
@@ -1654,6 +1865,13 @@ function renderCameraChips() {
       rebuildScene(false);
     });
   }
+  const tenantsBtn = $("#tog-venue-tenants", host);
+  if (tenantsBtn) {
+    tenantsBtn.addEventListener("click", () => {
+      showVenueTenants = !showVenueTenants;
+      rebuildScene(false);
+    });
+  }
   const boxBtn = $("#tog-venue-boxes", host);
   if (boxBtn) {
     boxBtn.addEventListener("click", () => {
@@ -1665,12 +1883,12 @@ function renderCameraChips() {
     btn.addEventListener("click", () => {
       focusBinIndex = Number(btn.dataset.cam);
       renderCameraChips();
-      focusCamera(focusBinIndex);
+      focusCamera(focusBinIndex, true);
     });
   });
 }
 
-function focusCamera(idx) {
+function focusCamera(idx, syncSidePane = true) {
   if (!binTargets.length) return;
   if (idx >= 0 && idx < binTargets.length) {
     const t = binTargets[idx];
@@ -1681,6 +1899,7 @@ function focusCamera(idx) {
       const d = t.radius * 1.35;
       camera.position.set(t.center.x + d * 0.92, t.center.y + d * 0.72, t.center.z + d * 0.92);
     }
+    if (syncSidePane && t.photoZone) syncRealHallToZone(t.photoZone);
   } else if (sceneMode === "venue") {
     controls.target.set(80, 140, 0);
     camera.position.set(-1980, 1360, 2080);
@@ -1753,20 +1972,32 @@ function selectItemById(itemId, flyTo = false) {
   const it = entry.item;
   $("#ins-title").textContent = it.box_short_name ? `📦 ${it.box_short_name} · ${it.label}` : it.label;
 
-  // 2-up video stills: Source Room Video Frame -> Destination Room/Corner Still
+  // Real video stills: Source Room Video Frame (ONLY when real uploaded video exists) -> Destination Hall Photo/Clip
   const srcMedia = getSourceStillUrls(it.room_name || "Source Room", it.evidence, [], it.evidence?.box_2d || null);
   const zObj = (plan?.zones || []).find((z) => z.zone_id === it.dest_zone) || {};
-  const dstMedia = getDestStillUrls(it.dest_zone, zObj.dest_still, it.dest_zone_name);
-  $("#ins-stills").innerHTML = `
-    <div class="ins-still-box">
-      <img src="${esc(srcMedia.src)}" alt="Source room frame" onerror="this.onerror=null;this.src='${esc(srcMedia.fallback)}'">
-      <div class="ins-still-cap">From: ${esc(it.room_name)}</div>
-    </div>
-    <div class="ins-still-box">
-      <img src="${esc(dstMedia.src)}" alt="Destination corner frame" onerror="this.onerror=null;this.src='${esc(dstMedia.fallback)}'">
-      <div class="ins-still-cap">To: ${esc(it.dest_corner || "Floor")}</div>
-    </div>
-  `;
+  const dstMedia = getDestStillUrls(it.dest_zone, zObj.dest_still);
+  if (srcMedia.hasReal) {
+    $("#ins-stills").style.gridTemplateColumns = "1fr 1fr";
+    $("#ins-stills").innerHTML = `
+      <div class="ins-still-box">
+        <img src="${esc(srcMedia.src)}" alt="Source room video frame">
+        <div class="ins-still-cap">From: ${esc(it.room_name)}</div>
+      </div>
+      <div class="ins-still-box">
+        <img src="${esc(dstMedia.src)}" alt="Destination hall photo" onerror="this.onerror=null;this.src='${esc(dstMedia.fallback)}'">
+        <div class="ins-still-cap">To: ${esc(it.dest_corner || "Floor")}</div>
+      </div>
+    `;
+  } else {
+    $("#ins-stills").style.gridTemplateColumns = "1fr";
+    $("#ins-stills").innerHTML = `
+      <div class="ins-still-box">
+        <img src="${esc(dstMedia.src)}" alt="Destination hall photo" onerror="this.onerror=null;this.src='${esc(dstMedia.fallback)}'">
+        <div class="ins-still-cap">Dest Hall: Stop ${esc(it.dock_stop)} · ${esc(it.dest_corner || "Floor")} (upload room clip on 1 Film for source crop)</div>
+      </div>
+    `;
+  }
+  syncRealHallToZone(it.dest_zone);
 
   const dims = it.size_in.map((v) => fmt(v, 0)).join(" × ");
   $("#ins-meta").innerHTML = [
@@ -1818,159 +2049,6 @@ canvasEl.addEventListener("pointerup", (e) => {
   selectItemById(null);
 });
 
-/* ---------- Video Stills Storyboard: Source Rooms -> Truck -> Destination Rooms/Corners ---------- */
-function renderStoryboard() {
-  if (!plan) return;
-  const trucks = plan.trucks || [];
-  if (storyboardTruckIdx >= trucks.length) storyboardTruckIdx = -1;
-
-  // Truck filter pills
-  const tabsHost = $("#sb-truck-tabs");
-  if (trucks.length <= 1) {
-    tabsHost.innerHTML = `<button type="button" aria-pressed="true">Truck 1</button>`;
-  } else {
-    let th = `<button type="button" data-sb-t="-1" aria-pressed="${storyboardTruckIdx === -1}">All (${trucks.length})</button>`;
-    trucks.forEach((t) => {
-      th += `<button type="button" data-sb-t="${t.index}" aria-pressed="${storyboardTruckIdx === t.index}">Truck ${t.index + 1}</button>`;
-    });
-    tabsHost.innerHTML = th;
-    $$("[data-sb-t]", tabsHost).forEach((b) => {
-      b.addEventListener("click", () => {
-        storyboardTruckIdx = Number(b.dataset.sbT);
-        renderStoryboard();
-      });
-    });
-  }
-
-  const activeTrucks = storyboardTruckIdx >= 0 ? trucks.filter((t) => t.index === storyboardTruckIdx) : trucks;
-
-  // Aggregate source rooms feeding the active truck(s)
-  const srcMap = new Map();
-  const dstMap = new Map();
-  let totalItems = 0, totalWt = 0;
-
-  activeTrucks.forEach((t) => {
-    totalItems += (t.items || []).length;
-    totalWt += Number(t.weight_lb || 0);
-
-    // Build source_rooms on the fly if solveInBrowser produced the plan
-    const sRooms = t.source_rooms || (() => {
-      const m = {};
-      (t.items || []).forEach((it) => {
-        const rid = it.room_id || "room_1";
-        if (!m[rid]) m[rid] = { room_id: rid, room_name: it.room_name || rid, item_count: 0, box_count: 0, weight_lb: 0, evidence: it.evidence, sample_detections: [] };
-        m[rid].item_count++;
-        if (it.is_box) m[rid].box_count++;
-        m[rid].weight_lb += Number(it.weight_lb || 0);
-      });
-      return Object.values(m);
-    })();
-
-    sRooms.forEach((sr) => {
-      if (!srcMap.has(sr.room_id)) {
-        srcMap.set(sr.room_id, { ...sr, item_count: 0, box_count: 0, weight_lb: 0 });
-      }
-      const acc = srcMap.get(sr.room_id);
-      acc.item_count += sr.item_count;
-      acc.box_count += sr.box_count || 0;
-      acc.weight_lb += sr.weight_lb || 0;
-    });
-
-    (t.dest_zones || []).forEach((dz) => {
-      if (!dstMap.has(dz.zone_id)) {
-        dstMap.set(dz.zone_id, { ...dz, item_count: 0, corners: {} });
-      }
-      const acc = dstMap.get(dz.zone_id);
-      acc.item_count += dz.item_count;
-      Object.entries(dz.corners || {}).forEach(([ck, cv]) => {
-        acc.corners[ck] = (acc.corners[ck] || 0) + cv;
-      });
-    });
-  });
-
-  // Hub summary
-  const hubTitle = storyboardTruckIdx >= 0
-    ? `Truck ${storyboardTruckIdx + 1}`
-    : `${trucks.length} Truck${trucks.length === 1 ? "" : "s"}`;
-  const hubModel = activeTrucks[0]?.name || "U-Haul 26 ft";
-  $("#sb-truck-hub").innerHTML = `
-    <div class="hub-icon">🚚</div>
-    <b>${esc(hubTitle)}</b>
-    <span>${esc(hubModel)}</span>
-    <span><b>${fmt(totalItems)} pcs</b> · ${fmt(totalWt)} lb</span>
-    <span style="font-size:11px;color:var(--accent)">──▶ LIFO Unload</span>
-  `;
-
-  // Source room video stills
-  const srcArr = Array.from(srcMap.values()).sort((a, b) => b.item_count - a.item_count);
-  $("#sb-source-stills").innerHTML = srcArr.map((sr) => {
-    const media = getSourceStillUrls(sr.room_name, sr.evidence, sr.sample_detections || []);
-    const isAct = highlightRoomId === sr.room_id;
-    return `<div class="still-card${isAct ? " active" : ""}" data-src-room="${esc(sr.room_id)}">
-      <div class="still-frame">
-        <img src="${esc(media.src)}" loading="lazy" alt="${esc(sr.room_name)}" onerror="this.onerror=null;this.src='${esc(media.fallback)}'">
-        <div class="still-tag"><span>${esc(media.tag)}</span><span>${fmt(sr.item_count)} pcs</span></div>
-      </div>
-      <div class="still-body">
-        <b>${esc(sr.room_name)}</b>
-        <span class="muted">${fmt(sr.weight_lb)} lb${sr.box_count ? ` · ${sr.box_count} boxes` : ""} · Tap to highlight</span>
-      </div>
-    </div>`;
-  }).join("") || `<p class="small muted">No source rooms.</p>`;
-
-  $$("[data-src-room]", $("#sb-source-stills")).forEach((card) => {
-    card.addEventListener("click", () => {
-      const rid = card.dataset.srcRoom;
-      highlightRoomId = highlightRoomId === rid ? null : rid;
-      if (highlightRoomId) {
-        colorMode = "room";
-        $$("[data-color]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.color === "room")));
-      }
-      renderStoryboard();
-      rebuildScene(false);
-    });
-  });
-
-  // Destination room & corner stills
-  const dstArr = Array.from(dstMap.values()).sort((a, b) => a.dock_stop - b.dock_stop);
-  $("#sb-dest-stills").innerHTML = dstArr.map((dz) => {
-    const media = getDestStillUrls(dz.zone_id, dz.dest_still, dz.name);
-    const stopColor = STOP_COLORS[dz.dock_stop] || "#3b82f6";
-    const topCorners = Object.entries(dz.corners || {})
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([cName, cnt]) => `<span class="corner-chip">${esc(cName)} (${cnt})</span>`)
-      .join("");
-    return `<div class="still-card" data-dst-zone="${esc(dz.zone_id)}" data-dst-stop="${esc(dz.dock_stop)}">
-      <div class="still-frame">
-        <img src="${esc(media.src)}" loading="lazy" alt="${esc(dz.name)}" onerror="this.onerror=null;this.src='${esc(media.fallback)}'">
-        <div class="still-tag">
-          <span style="color:${stopColor}">● Stop ${esc(dz.dock_stop)}</span>
-          <span>${fmt(dz.item_count)} pcs</span>
-        </div>
-      </div>
-      <div class="still-body">
-        <b>${esc(dz.name)}</b>
-        <div class="corner-chips">${topCorners}</div>
-      </div>
-    </div>`;
-  }).join("") || `<p class="small muted">No destination zones.</p>`;
-
-  $$("[data-dst-zone]", $("#sb-dest-stills")).forEach((card) => {
-    card.addEventListener("click", () => {
-      const stopNum = Number(card.dataset.dstStop);
-      sceneMode = "venue";
-      syncSceneButtons();
-      rebuildScene(false);
-      // In venue mode binTargets has [Walkthrough Cam, Loading Dock, Stop 1..6]
-      const targetIdx = binTargets.findIndex((b) => b.label === `Stop ${stopNum}`);
-      focusBinIndex = targetIdx >= 0 ? targetIdx : -1;
-      renderCameraChips();
-      focusCamera(focusBinIndex);
-    });
-  });
-}
-
 /* ---------- Render Side Panels ---------- */
 function renderPanels() {
   if (!plan) return;
@@ -2011,7 +2089,17 @@ function renderPanels() {
   $("#checks-grid").innerHTML = ruleGroups.map(([name, fails]) =>
     `<span class="check-chip ${fails ? "fail" : "pass"}">${fails ? `✕ ${esc(name)} (${fails})` : `✓ ${esc(name)}`}</span>`
   ).join("");
-  $("#verifier-summary").textContent = sc.valid ? "All checks passed" : `${vCount} issue${vCount === 1 ? "" : "s"} found`;
+  $("#verifier-summary").textContent = sc.valid ? "All passed" : `${vCount} issue${vCount === 1 ? "" : "s"}`;
+  const vDetails = $("#verifier-details");
+  const vHeadline = $("#verifier-check-headline");
+  if (vDetails && vHeadline) {
+    vDetails.classList.toggle("pass", Boolean(sc.valid));
+    vDetails.classList.toggle("fail", !sc.valid);
+    vHeadline.textContent = sc.valid
+      ? `✓ All ${ruleGroups.length} physics & doorway checks passed`
+      : `✕ ${vCount} rule violation${vCount === 1 ? "" : "s"} detected`;
+    if (!sc.valid) vDetails.open = true;
+  }
 
   $("#m-fill").textContent = `${fmt(sc.fill_pct, 1)}%`;
   $("#m-bal").textContent = sc.balance_pct != null ? `${fmt(sc.balance_pct, 1)}%` : "–";
@@ -2109,15 +2197,15 @@ function renderPanels() {
     });
   });
 
-  // Tab 3: Self-Contained QR Box Labels
+  // Tab 3: Self-Contained QR Box Labels (applied on TOP flaps)
   const boxes = (plan.trucks || []).flatMap((t) => (t.items || []).filter((i) => i.is_box));
-  $("#qr-count-note").textContent = `${boxes.length} moving box${boxes.length === 1 ? "" : "es"} · scan offline with any phone`;
+  $("#qr-count-note").textContent = `${boxes.length} moving box${boxes.length === 1 ? "" : "es"} · place on TOP flaps · scan offline`;
   const qrHost = $("#qr-list");
   qrHost.innerHTML = boxes.map((b, idx) =>
     `<div class="qr-card" data-box-id="${esc(b.id)}">
       <canvas width="126" height="126" data-qr-idx="${idx}"></canvas>
       <div>
-        <div style="font-weight:700;font-size:14px">${esc(b.box_short_name || b.id)} ${b.fragile ? `<span class="lift-tag fragile">FRAGILE</span>` : ""}</div>
+        <div style="font-weight:700;font-size:14px">${esc(b.box_short_name || b.id)} <span class="lift-tag">⬆️ Top Flap</span> ${b.fragile ? `<span class="lift-tag fragile">FRAGILE</span>` : ""}</div>
         <div class="small"><b>Stop ${esc(b.dock_stop)}:</b> ${esc(b.dest_zone_name)} (${esc(b.dest_corner || "Stock")})</div>
         <div class="small muted">Truck ${(b.truck_index ?? 0) + 1} · Load #${esc(b.load_seq)} / Unload #${esc(b.unload_seq)} · ${fmt(b.weight_lb)} lb</div>
         <div class="small muted">In box: ${esc((b.contents || b.label || "").slice(0, 75))}</div>
@@ -2129,8 +2217,6 @@ function renderPanels() {
     const b = boxes[Number(cv.dataset.qrIdx)];
     if (b) drawQrMatrix(cv.getContext("2d"), 6, 6, 114, qrPayloadText(b));
   });
-
-  renderStoryboard();
 }
 
 /* ---------- Settings from the controls, and putting a solved plan on screen ---------- */
@@ -2172,6 +2258,7 @@ function showPlan(result, resetCam) {
 
   renderPanels();
   if (window.PIU_JOURNEY) window.PIU_JOURNEY.setPlan(plan);
+  if (window.PIU_COMOVE) window.PIU_COMOVE.setPlan(plan);
   rebuildScene(resetCam);
 }
 
@@ -2319,7 +2406,7 @@ async function loadAndSolve(resetCam = false) {
     }
 
     showPlan(result, resetCam);
-    if (!$("#planner-rounds").classList.contains("hidden")) {
+    if ($("#planner-rounds") && !$("#planner-rounds").classList.contains("hidden")) {
       $("#planner-status").textContent = "The view now shows your Re-solve, which keeps Neon's load order and rotation settings. The rounds below are from the last Neon run.";
     }
   } catch (e) {
@@ -2413,17 +2500,85 @@ $("#tog-downsize").addEventListener("click", () => {
   loadAndSolve(true);
 });
 
-$$("[role='tab']").forEach((tab) => {
+$$(".tab-bar [role='tab']").forEach((tab) => {
   tab.addEventListener("click", () => {
     const target = tab.dataset.tab;
-    $$("[role='tab']").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+    if (window.PIU_ACTIVATE_TAB) {
+      window.PIU_ACTIVATE_TAB(target);
+      return;
+    }
+    $$(".tab-bar [role='tab']").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
     $("#tab-unload").classList.toggle("hidden", target !== "unload");
     $("#tab-stores").classList.toggle("hidden", target !== "stores");
     $("#tab-labels").classList.toggle("hidden", target !== "labels");
   });
 });
 
+function switchMediaTab(tabKey) {
+  $$("[data-mtab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mtab === tabKey)));
+  ["arrival", "eval"].forEach((k) => {
+    const el = $(`#mpane-${k}`);
+    if (el) el.classList.toggle("hidden", k !== tabKey);
+  });
+  window.dispatchEvent(new CustomEvent("piu:mediatab", { detail: { tab: tabKey } }));
+}
+$$("[data-mtab]").forEach((btn) => {
+  btn.addEventListener("click", () => switchMediaTab(btn.dataset.mtab));
+});
+window.PIU_SWITCH_MEDIA_TAB = switchMediaTab;
+
 $("#btn-print-qr").addEventListener("click", () => window.print());
+
+$("#btn-split-real").addEventListener("click", () => toggleSplitRealHall());
+$("#rh-close").addEventListener("click", () => toggleSplitRealHall(false));
+$("#rh-tab-photos").addEventListener("click", () => {
+  realHallMode = "photos";
+  renderRealHallPane();
+});
+$("#rh-tab-pano").addEventListener("click", () => {
+  realHallMode = "pano";
+  renderRealHallPane();
+});
+
+$("#sel-run-picker").addEventListener("change", (e) => {
+  rawRunId = e.target.value;
+  roomKeyframeIdx = {};
+  highlightRoomId = null;
+  syncNavRunLinks();
+  const nextUrl = new URL(window.location.href);
+  if (rawRunId && rawRunId !== "sample_venue") nextUrl.searchParams.set("run_id", rawRunId);
+  else nextUrl.searchParams.delete("run_id");
+  window.history.replaceState({}, "", nextUrl);
+  loadAndSolve(true);
+});
+
+async function initRunsAndSolve() {
+  if (!MOCK) {
+    try {
+      const r = await fetch(`${API_BASE}/runs-available`);
+      if (r.ok) {
+        const data = await r.json();
+        const readyRuns = (data.runs || []).filter((x) => x.ready);
+        // Auto-select latest real uploaded video run when user didn't pass an explicit ?run_id=
+        if (!explicitUrlRunId && (!rawRunId || rawRunId === "sample_venue") && data.latest_real_run_id) {
+          rawRunId = data.latest_real_run_id;
+          syncNavRunLinks();
+        }
+        const picker = $("#sel-run-picker");
+        const opts = readyRuns.map((er) => {
+          const tag = er.has_real_media ? `🎥 ${er.run_id} (${er.file_count} clip${er.file_count === 1 ? "" : "s"})` : `📋 ${er.run_id}`;
+          return `<option value="${esc(er.run_id)}"${er.run_id === rawRunId ? " selected" : ""}>${esc(tag)}</option>`;
+        });
+        opts.push(`<option value="sample_venue"${rawRunId === "sample_venue" ? " selected" : ""}>🧪 sample_venue (synthetic demo)</option>`);
+        picker.innerHTML = opts.join("");
+        picker.classList.remove("hidden");
+      }
+    } catch (_) {
+      // Ignore if offline
+    }
+  }
+  await loadAndSolve(true);
+}
 
 /* ---------- Animation Loop ---------- */
 function animate(now) {
@@ -2446,12 +2601,18 @@ function animate(now) {
 }
 requestAnimationFrame(animate);
 
+window.PIU_STAGE = {
+  getPlan: () => plan,
+  getWorldGroup: () => worldGroup,
+  getMeshEntries: () => meshEntries,
+  getViolatingIds: () => violatingIds,
+  rebuildScene: (r) => rebuildScene(r),
+};
+
 // The shop and route panels (ui/commerce.js, ui/journey.js) add their settings to /solve by wrapping
-// fetch when they mount, at DOMContentLoaded, which fires after this module has run. Solving right
-// here sent the first request without them (no Orior white-glove setting), so the first Re-solve
-// changed the plan with nothing changed. Their listeners were added before this one, so they run first.
-if (document.readyState === "complete") loadAndSolve(true);
-else document.addEventListener("DOMContentLoaded", () => loadAndSolve(true), { once: true });
+// fetch when they mount, at DOMContentLoaded, which fires after this module has run.
+if (document.readyState === "complete") initRunsAndSolve();
+else document.addEventListener("DOMContentLoaded", () => initRunsAndSolve(), { once: true });
 </script>
 </body>
 </html>

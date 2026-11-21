@@ -261,6 +261,12 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Replaces:** The `orior_curated_stays` UI default in `2026-11-21 13:58 · Integrate on-site Malin × Orior (Ireland) & Cinema Rental (Adorama / ARRI) domain rules`.
 - **See:** `backend/pack_api.py`, `frontend/ui/commerce.js`, `plan/PITCH_NOTES.md`, `frontend/pitch.html`
 
+## 2026-11-21 14:30 · Human + Robot Co-Move Biomechanics, `gemini-robotics-er-2-preview`, and Penn Station Occupancy Envelope
+- **Decision:** Add a fast standalone Human + Robot Co-Move & Destination Occupancy module (`backend/co_move.py`, `backend/co_move_api.py`, `frontend/ui/co-move.js`) plus `[jobs.robotics]` (`gemini-robotics-er-2-preview` on `v1beta`, with `gemini-4-neon` fallback): (1) split every solved move between realistic dock/concourse robotics (Stretch/Pickle box unloaders `<=50 lb`, Moynihan AMR shuttle carts, XSTO/Zonzini tracked stair dollies) and human biomechanics crews (40 lb box safe-lift target, fatigue-spaced `load_seq`, diagonal doorway tilt-and-pivot + leg-unbolting instructions, and `[y, x]` path/grip/keep-out spatial overlays); (2) explicitly account for **Penn Station already being full of commuters, escalators, counters, and FDNY egress lanes** by auditing each stop against net permitted tenant/pop-up envelopes (95.6% of Moynihan's 41,808 sq ft kept untouched), Stop 5 Mezzanine (+20 ft) freight-elevator limits, MTA off-peak load-in windows, and crowded-stall stress tests.
+- **Why:** Moving tech today stops at video quotes (Yembo/Shyft) while 60% of moving injuries are back injuries; pairing realistic dock/cart robotics with human biomechanics and accounting for occupied Penn Station spaces closes a major real-world & pitch plot hole without using pixel-hallucinated world physics (`genie-4`).
+- **By:** George.
+- **See:** `backend/co_move.py`, `backend/co_move_api.py`, `frontend/ui/co-move.js`, `backend/llm/models.toml`, `backend/llm/gemini.py`
+
 ## 2026-11-21 14:55 · Walk-in tier-by-tier truck loading (never step on first-level boxes)
 - **Decision:** Truck and room packing sequences must build vertical columns/tiers from the cab wall (`x=0`) toward the rear door (`x=L`) while movers stand on bare empty truck floor, and elevated items (`z>0`) must stay within 24 inches of their supporting stack's door-facing front (`walk_in_access` rule in `backend/verify.py`), rather than packing the entire floor in-to-out before loading upper levels.
 - **Why:** Filling the entire truck floor before loading level 2 forces movers to walk on top of first-level cardboard boxes to reach the front of the truck.
@@ -280,10 +286,22 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **By:** Chris.
 - **See:** `plan/VIDEO_SCRIPT.md` section 7
 
+## 2026-11-21 15:18 · Element 119 Time-Lapse (`render.py`), Vinny 15s Crew Radio TTS (`foreman.py`), and 3D Chaos + Pothole Test
+- **Decision:** Prioritize and ship: (1) **Element 119 Media-Out (`backend/render.py`, `backend/render_api.py`)** combining `gemini-nano-banana-2.1` Before/After Penn Station arrival keyframes (interactive drag slider, labelled illustrative) with a 6-second 720p `gemini-omni-1.2-flash` (`v1beta`) unpacking hyper-lapse MP4; (2) **Vinny + ARIA 15s NYC Crew Radio (`backend/foreman.py`)** using multi-speaker `gemini-3.8-flash-tts` (`Puck` + `Kore` on `v1beta`) grounded in live fleet/violation/LIFO metrics; and (3) **Raw 1-Call LLM Chaos Toggle + 3D NYC Pothole / 0.8g Brake Test + `eval/BASELINES.md`** (`eval/baseline_single_call.py`, `eval/baseline_bedroom.py`, `backend/eval_api.py`, `frontend/ui/showstopper.js`).
+- **Why:** Turns Element 119 media generation, multimodal audio, and the 25% baseline proof rubric into instant, memorable visual and audio moments inside `frontend/index.html`.
+- **By:** George.
+- **See:** `backend/render.py`, `backend/foreman.py`, `backend/render_api.py`, `backend/eval_api.py`, `frontend/ui/showstopper.js`, `eval/BASELINES.md`
+
 ## 2026-11-21 15:19 · Each move shows what its model calls cost
 - **Decision:** The app links to a Usage view for the move you are in (`/app/models.html?run_id=<move>`), and that view shows an estimated cost: the tokens each model reported for the move, times Google's list price for that model. All moves together have the same summary, and the table of every run has a cost column.
 - **Why:** People should see what their use of the app cost. (Chris)
 - **Limits:** It is an estimate at list prices (`backend/analysis/prices.toml`, read from Google's pricing page on Nov 21), not a bill: cached calls cost nothing, failed attempts and Google's discount for repeated input are not counted, and the event key may not be charged at all. Argon's price doubles on Dec 1, 2026; the file holds the price through Nov 30.
+
+## 2026-11-21 15:28 · QR box labels go on the TOP flaps only (never on the sides)
+- **Decision:** Place QR shipping labels strictly on the **TOP surface (`+Y`)** of every box across the 3D U-Haul truck view, 3D Penn Station venue view, printable QR label sheet (`MOUNT:TOP-FLAPS`), `backend/labels.py`, pitch notes, and the Nano Banana 2.1 + Gemini Omni 1.2 Flash arrival renders (keeping box side walls clean kraft cardboard).
+- **Why:** Looking down at boxes in 3D or standing over sealed cartons during staging/unloading scans naturally from the top flaps rather than sideways on vertical walls.
+- **By:** George.
+- **See:** `frontend/index.html`, `frontend/ui/penn-venue-3d.js`, `backend/labels.py`, `backend/render.py`, `frontend/pitch.html`, `plan/PITCH_NOTES.md`
 
 ## 2026-11-21 15:35 · Auto right-size to 9 ft Cargo Van + Potential Energy & Shake/Topple floor-first physics
 - **Decision:** Add `uhaul_van` (U-Haul 9 ft Cargo Van) and default fleet selection to `auto` (smallest van/truck that fits with 0 violations); keep boxes flat on the floor (`z=0`, minimum gravitational potential energy `U = m*g*z_cm`) whenever cargo fits comfortably on the deck (`<=50%` floor area), enforce `0.45g` braking/pothole slenderness bracing limits (`shake_stability`), and fail verification (`oversized_truck`) if a sparse single-van load is placed in a giant box truck.

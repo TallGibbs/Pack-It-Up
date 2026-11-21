@@ -73,7 +73,30 @@ model = "gemini:gemini-4-hydrogen"    # single-call baseline for eval comparison
 thinking = "low"
 
 [jobs.image]
-model = "gemini:gemini-nano-banana-2.1"  # illustrative Penn Station arrival render
+model = "gemini:gemini-nano-banana-2.1"  # illustrative Penn Station arrival render (multi-image ref fusion)
+timeout_s = 90
+
+[jobs.video]
+model = "gemini:gemini-omni-1.2-flash"   # Penn Station first->last frame arrival hyper-lapse MP4 (v1beta only)
+api_version = "v1beta"
+timeout_s = 300
+retries = 0
+
+[jobs.tts]
+model = "gemini:gemini-3.8-flash-tts"    # Vinny NYC Foreman + ARIA Verifier 15s multi-speaker crew radio (v1beta only)
+api_version = "v1beta"
+timeout_s = 45
+
+[jobs.robotics]
+model = "gemini:gemini-robotics-er-2-preview"  # Embodied spatial reasoning: [y,x] path-clear, robot picks, human grips & Penn keep-out zones
+api_version = "v1beta"
+thinking = "low"
+timeout_s = 35
+
+[jobs.robotics_fallback]
+model = "gemini:gemini-4-neon"                 # Drop-in spatial JSON fallback if robotics preview is rate-limited
+thinking = "low"
+timeout_s = 30
 
 # Submission video build (scripts/video/build.py, plan/VIDEO_SCRIPT.md). Not used by the app.
 
