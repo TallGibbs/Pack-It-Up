@@ -6,7 +6,7 @@ Built at the Cerebral Valley × Google DeepMind **Gemini 4 NYC hackathon** (Nov 
 
 ## Status
 
-Not started. Hacking begins at 10:30 AM EST on Nov 21, 2026.
+In progress. Track A (ingestion: photos and clips to a resolved inventory with sizes, weights and questions) runs end to end; see [backend/ingest/README.md](backend/ingest/README.md). Track B (solver, verifier, 3D view) is being built.
 
 ## What was built at the event
 
@@ -14,7 +14,8 @@ Not started. Hacking begins at 10:30 AM EST on Nov 21, 2026.
 - **At the event:** all code.
 - **Brought in:**
   - Penn Station reference photos and clips (`data/NYPenn/`), taken by the team before kickoff. Used as the move destination; not committed.
-  - _Still to list: open-source libraries and their licences, any reference tables._
+  - `data/item_catalog.csv`: starting item sizes and handling flags, drafted in the planning repo before kickoff and brought in at the event.
+  - Python libraries (see `requirements.txt`): `google-genai` (Apache-2.0), `fastapi` (MIT), `uvicorn` (BSD-3-Clause), `python-multipart` (Apache-2.0), `jsonschema` (MIT), `Pillow` (MIT-CMU), `pillow-heif` (BSD-3-Clause), `imageio-ffmpeg` (BSD-2-Clause; ships an ffmpeg binary under its own licence), `python-dotenv` (BSD-3-Clause).
 
 ## Layout
 
@@ -29,10 +30,19 @@ Not started. Hacking begins at 10:30 AM EST on Nov 21, 2026.
 
 ## Models
 
-_To be filled in: which Gemini 4 model or API does which job._
+Every model call goes through `backend/llm/` and is set per job in [backend/llm/models.toml](backend/llm/models.toml); `runs/<run_id>/calls.jsonl` logs which model did each call.
+
+| Job | Model | What it does |
+|---|---|---|
+| `perceive` | Gemini 4 Hydrogen (`gemini-4-hydrogen`) | One call per photo or clip: items, catalog match, size estimate, material, handling flags, fixtures and personal belongings |
+| `decide` | Gemini Decisions API (`gemini-decision-1`, api_version `v1alpha`) | Calibrated answers to gap questions: same item seen twice, catalog vs measured size, counts, built-in vs free-standing |
+| `decide_fallback` | Gemini 4 Hydrogen | Enum-constrained JSON answer if a Decisions API call fails |
 
 ## Setup
 
-_To be filled in._
-
 1. Copy `.env.example` to `.env` and add your Gemini API key. Never commit `.env`.
+2. `python -m venv .venv`, then `.venv\Scripts\pip install -r requirements.txt` (Windows) or `.venv/bin/pip install -r requirements.txt`.
+3. Check the models answer: `python -m backend.llm.hello`.
+4. Inventory a folder of photos and clips: `python -m backend.ingest data/Inputs/Malin --room "Malin lounge"`.
+5. API: `uvicorn backend.app:app --port 8000`, then `curl -F room="Lounge" -F files=@photo.jpg localhost:8000/upload` and `curl localhost:8000/inventory/<run_id>`.
+6. Score against a hand count: `python eval/score_inventory.py runs/<run_id> eval/hand_counts/malin.json`.
