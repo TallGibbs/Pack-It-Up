@@ -183,3 +183,10 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **By:** George.
 - **Replaces:** `plan/EVENT_DAY_PLAN.md` "Optional: Shopify bonus track — Only if we are ahead at 3:00 PM".
 - **See:** `backend/commerce.py`, `backend/commerce_api.py`, `frontend/ui/commerce.js`, `frontend/shop.html`, `frontend/index.html`
+
+## 2026-11-21 13:04 · Live Point A→B truck route tips, city parking, and calm end-to-end unpack support
+- **Decision:** The Track B output app (`frontend/index.html`) includes Point A to Point B route intelligence informed by real-time street routing, weather/wind, truck height/restriction data, and traffic speeds plus Gemini 4 synthesis: tolls, roads/parkways that prohibit trucks, a reminder to switch to commercial truck mode on the user's phone maps app, and city parking/curb tips. It also supports the user calmly through the entire move until unpacking the very last item, without being pushy or overbearing.
+- **Why:** Moving doesn't end when the 3D load plan is computed—renters get stuck on no-truck parkways, surprise tolls, city curb rules, and finding/unpacking boxes at destination.
+- **By:** George.
+- **Replaces:** `memory/open-questions.md` undecided stretch notes on "Truck-mode reminder" and "Route warnings".
+- **See:** `data/trucks.csv`, `backend/route_guide.py`, `backend/route_api.py`, `frontend/ui/journey.js`, `frontend/index.html`
