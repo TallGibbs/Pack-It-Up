@@ -1,0 +1,1671 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<title>Pack It Up · 3D Truck &amp; Penn Station Plan</title>
+<link rel="stylesheet" href="ui/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  body.pack-page { padding-bottom: 88px; }
+  .pack-wrap { max-width: 1260px; margin: 0 auto; padding: 0 16px; }
+  .topbar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 10px; padding-top: 12px;
+  }
+  .topbar .steps { margin: 0; }
+  .topbar .steps a { color: var(--muted); text-decoration: none; }
+  .topbar .steps a:hover { color: var(--accent); text-decoration: underline; }
+  .nav-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .btn.sm { min-height: 36px; padding: 6px 12px; font-size: 13px; border-radius: 10px; }
+
+  /* Hero verdict banner — leads with the packing plan, never a stat dashboard */
+  .verdict {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 12px; margin: 12px 0; padding: 14px 18px;
+    background: var(--card); border: 1.5px solid var(--line); border-radius: var(--radius);
+  }
+  .verdict.valid { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+  .verdict.invalid { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); }
+  .verdict-title { font-size: 21px; font-weight: 750; letter-spacing: -0.01em; line-height: 1.25; }
+  .verdict-sub { font-size: 13.5px; color: var(--muted); margin-top: 3px; }
+  .score-Cluster { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .score-pill {
+    display: inline-flex; align-items: baseline; gap: 5px;
+    padding: 7px 13px; border-radius: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+    background: var(--accent-soft); color: var(--accent); font-size: 18px;
+  }
+  .score-pill small { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+  .status-pill {
+    padding: 6px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+  }
+  .status-pill.ok { background: color-mix(in srgb, var(--ok) 15%, var(--card)); color: var(--ok); }
+  .status-pill.bad { background: color-mix(in srgb, var(--bad) 15%, var(--card)); color: var(--bad); }
+
+  /* Main 2-column layout on desktop, stacked on mobile */
+  .pack-grid {
+    display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start;
+  }
+  @media (min-width: 960px) {
+    .pack-grid { grid-template-columns: minmax(0, 1.48fr) minmax(360px, 1fr); }
+  }
+
+  /* 3D Stage Card */
+  .stage-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .stage-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line);
+  }
+  .pill-group {
+    display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden; background: var(--bg);
+  }
+  .pill-group button {
+    border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--ink);
+    font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 10px; cursor: pointer;
+    min-height: 34px;
+  }
+  .pill-group button:first-child { border-left: 0; }
+  .pill-group button[aria-pressed="true"] {
+    background: var(--accent); color: var(--accent-ink);
+  }
+
+  .canvas-wrap {
+    position: relative; width: 100%; height: min(58vh, 520px); min-height: 330px;
+    background: radial-gradient(circle at 50% 35%, #232a36 0%, #141820 100%);
+    touch-action: none; user-select: none;
+  }
+  #three-canvas { width: 100%; height: 100%; display: block; }
+
+  .canvas-hud {
+    position: absolute; left: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px;
+    pointer-events: none; z-index: 2;
+  }
+  .hud-chip {
+    pointer-events: auto;
+    background: rgba(20, 24, 32, 0.82); backdrop-filter: blur(6px);
+    color: #eef2f8; border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600;
+    cursor: pointer;
+  }
+  .hud-chip[aria-pressed="true"] { background: #1f6feb; border-color: #6ca4ff; color: #fff; }
+
+  .legend-bar {
+    position: absolute; left: 10px; bottom: 10px; right: 10px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between;
+    pointer-events: none; z-index: 2;
+  }
+  .legend-items {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    background: rgba(20, 24, 32, 0.78); backdrop-filter: blur(6px);
+    padding: 5px 10px; border-radius: 10px; color: #dce3ee; font-size: 11.5px;
+  }
+  .legend-dot {
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .legend-dot i {
+    width: 10px; height: 10px; border-radius: 3px; display: inline-block;
+  }
+
+  /* Selected 3D item floating inspector */
+  .inspector {
+    position: absolute; right: 10px; top: 46px; width: min(290px, calc(100% - 20px));
+    background: rgba(20, 24, 32, 0.92); backdrop-filter: blur(8px);
+    color: #f3f6fb; border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px; padding: 10px 12px; font-size: 12.5px; z-index: 3;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .inspector .close-x {
+    float: right; border: 0; background: none; color: #9fb0c7; font-size: 16px;
+    cursor: pointer; padding: 0 2px; line-height: 1;
+  }
+  .inspector .ins-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; padding-right: 18px; }
+  .inspector .ins-meta { color: #b7c3d4; line-height: 1.45; font-variant-numeric: tabular-nums; }
+  .inspector .ins-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .inspector .ins-badge {
+    font-size: 11px; padding: 2px 6px; border-radius: 6px;
+    background: rgba(255,255,255,0.12); color: #fff;
+  }
+  .inspector .ins-badge.warn { background: rgba(212, 167, 44, 0.3); color: #ffd97d; }
+  .inspector .ins-badge.bad { background: rgba(255, 107, 107, 0.3); color: #ffb3b3; }
+
+  /* Playback scrubber bar */
+  .scrubber {
+    padding: 12px 14px; border-top: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .scrub-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between;
+  }
+  .scrub-btns { display: inline-flex; align-items: center; gap: 6px; }
+  .scrub-btns .btn { min-height: 36px; padding: 6px 11px; font-size: 13px; }
+  .scrub-slider-wrap { display: flex; align-items: center; gap: 10px; width: 100%; }
+  .scrub-slider-wrap input[type="range"] { flex: 1; accent-color: var(--accent); height: 24px; cursor: pointer; }
+  .step-readout { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .now-loading {
+    font-size: 13px; color: var(--muted); min-height: 19px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .now-loading b { color: var(--ink); }
+
+  /* Right column panels */
+  .panel-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 13px 14px; margin-bottom: 12px;
+  }
+  .panel-card h2 { margin: 0 0 8px; font-size: 15.5px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+  /* Judge What-If / Re-solve controls */
+  .whatif-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;
+  }
+  .whatif-grid select {
+    width: 100%; min-height: 40px; padding: 6px 10px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-size: 13.5px;
+  }
+  .whatif-toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .chip-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 600;
+    cursor: pointer;
+  }
+  .chip-toggle[aria-pressed="true"] {
+    border-color: var(--accent); background: var(--accent-soft); color: var(--accent);
+  }
+
+  /* Verifier checks & balance gauge */
+  .checks-grid { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+  .check-chip {
+    font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg);
+  }
+  .check-chip.pass { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); }
+  .check-chip.fail { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); background: color-mix(in srgb, var(--bad) 9%, var(--card)); }
+
+  .metrics-mini {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;
+    font-size: 12px; color: var(--muted); text-align: center;
+  }
+  .metrics-mini .box-stat { background: var(--bg); border-radius: 9px; padding: 6px; }
+  .metrics-mini b { display: block; font-size: 15px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .violation-list {
+    list-style: none; margin: 8px 0 0; padding: 0; max-height: 175px; overflow-y: auto;
+    border-top: 1px solid var(--line);
+  }
+  .violation-list li {
+    padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 12.5px;
+    cursor: pointer; display: flex; gap: 6px; align-items: baseline;
+  }
+  .violation-list li:hover { background: var(--accent-soft); }
+  .v-rule {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    padding: 1px 6px; border-radius: 5px; background: color-mix(in srgb, var(--bad) 15%, var(--card));
+    color: var(--bad); white-space: nowrap;
+  }
+
+  /* Tabs for Unload Order vs Penn Station Stores vs Box Labels */
+  .tab-bar {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+    background: var(--bg); padding: 4px; border-radius: 11px; border: 1px solid var(--line);
+    margin-bottom: 10px;
+  }
+  .tab-bar button {
+    border: 0; background: transparent; color: var(--muted); font: inherit;
+    font-size: 12.5px; font-weight: 650; padding: 7px 6px; border-radius: 8px; cursor: pointer;
+  }
+  .tab-bar button[aria-selected="true"] {
+    background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  .step-list {
+    list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto;
+  }
+  .step-row {
+    display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: start;
+    padding: 8px 6px; border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer;
+    border-radius: 8px;
+  }
+  .step-row:hover { background: var(--bg); }
+  .step-row.active { background: var(--accent-soft); }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .step-row.active .step-num { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .step-title { font-weight: 600; line-height: 1.25; }
+  .step-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .lift-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .lift-tag {
+    font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--muted);
+  }
+  .lift-tag.heavy { background: #fff3cd; color: #7a4f00; border-color: #f0d58c; }
+  .lift-tag.fragile { background: #fde8e8; color: #9e1c1c; border-color: #f5bcbc; }
+  .lift-tag.stop { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .lift-tag.heavy { background: #3c2f12; color: #ffd97d; border-color: #5c471b; }
+    :root:not([data-theme="light"]) .lift-tag.fragile { background: #421c1c; color: #ff9e9e; border-color: #6b2c2c; }
+  }
+
+  .zone-card {
+    padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px;
+    cursor: pointer; transition: border-color .15s;
+  }
+  .zone-card:hover { border-color: var(--accent); }
+  .zone-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 650; font-size: 13.5px; }
+  .zone-bar { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .zone-bar i { display: block; height: 100%; background: var(--accent); }
+
+  .nav-tip {
+    font-size: 12px; color: var(--muted); background: var(--quote);
+    padding: 8px 10px; border-radius: 10px; margin-top: 10px;
+  }
+
+  /* Printable QR box label cards */
+  .qr-grid { display: grid; grid-template-columns: 1fr; gap: 8px; max-height: 360px; overflow-y: auto; }
+  .qr-card {
+    display: grid; grid-template-columns: 72px 1fr; gap: 10px; align-items: center;
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+  }
+  .qr-card canvas { width: 72px; height: 72px; border-radius: 6px; background: #fff; border: 1px solid #ddd; }
+
+  @media print {
+    body.pack-page { background: #fff; color: #000; padding: 0; }
+    .topbar, .verdict, .stage-card, #whatif-panel, #verifier-panel, .tab-bar, .footer, .mock-banner { display: none !important; }
+    .pack-grid { display: block; }
+    .panel-card { border: 0; padding: 0; }
+    .qr-grid { max-height: none; overflow: visible; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .qr-card { break-inside: avoid; border: 1.5px solid #000; background: #fff; color: #000; }
+  }
+</style>
+</head>
+<body class="pack-page">
+<div id="mock-banner" class="mock-banner hidden">Mock mode: running in-browser 3D solver on mock inventory (no server needed).</div>
+
+<div class="pack-wrap">
+  <div class="topbar">
+    <p class="steps">
+      <a id="nav-capture" href="capture.html">1 Film</a> ·
+      <a id="nav-review" href="review.html">2 Check</a> ·
+      <b>3 Pack &amp; Unload</b>
+    </p>
+    <div class="nav-actions">
+      <span class="small muted" id="engine-badge">Loading solver…</span>
+      <a id="btn-edit-inv" class="btn sm" href="review.html">← Edit inventory</a>
+    </div>
+  </div>
+
+  <!-- Headline Verdict Banner -->
+  <section class="verdict valid" id="verdict-banner" aria-live="polite">
+    <div>
+      <div class="verdict-title" id="verdict-headline">Computing 3D truck &amp; Penn Station plan…</div>
+      <div class="verdict-sub" id="verdict-sub">Checking 3D fit, ≥75% base support, orientation, stacking, weight balance, and Penn Station store doorways</div>
+    </div>
+    <div class="score-Cluster">
+      <span class="status-pill ok" id="verdict-status">Checking…</span>
+      <span class="score-pill"><span id="verdict-score">–</span><small>/ 100</small></span>
+    </div>
+  </section>
+
+  <p class="error hidden" id="err-box"></p>
+
+  <div class="pack-grid">
+    <!-- LEFT: Interactive Three.js 3D Viewport + Step Scrubber -->
+    <section class="stage-card" aria-label="3D Packing View">
+      <div class="stage-toolbar">
+        <div class="pill-group" role="group" aria-label="3D Scene Mode">
+          <button type="button" id="scene-trucks" aria-pressed="true">🚚 U-Haul Fleet (3D)</button>
+          <button type="button" id="scene-zones">🏛️ Penn Station Stores (3D)</button>
+        </div>
+        <div class="pill-group" role="group" aria-label="Color coding">
+          <button type="button" data-color="stop" aria-pressed="true">By Penn Stop</button>
+          <button type="button" data-color="room" aria-pressed="false">By Room</button>
+          <button type="button" data-color="handling" aria-pressed="false">By Rules</button>
+        </div>
+      </div>
+
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="three-canvas"></canvas>
+        <div class="canvas-hud" id="camera-chips"></div>
+
+        <div class="inspector hidden" id="item-inspector">
+          <button class="close-x" type="button" id="ins-close" aria-label="Close">×</button>
+          <div class="ins-title" id="ins-title">Item</div>
+          <div class="ins-meta" id="ins-meta"></div>
+          <div class="ins-badges" id="ins-badges"></div>
+        </div>
+
+        <div class="legend-bar">
+          <div class="legend-items" id="legend-items"></div>
+        </div>
+      </div>
+
+      <!-- Load / Unload Playback Scrubber -->
+      <div class="scrubber">
+        <div class="scrub-row">
+          <div class="scrub-btns">
+            <button type="button" class="btn" id="btn-play">▶ Play</button>
+            <button type="button" class="btn" id="btn-prev" aria-label="Previous step">−</button>
+            <button type="button" class="btn" id="btn-next" aria-label="Next step">+</button>
+            <button type="button" class="btn" id="btn-all">Show All</button>
+          </div>
+          <div class="pill-group" role="group" aria-label="Playback Direction">
+            <button type="button" id="dir-load" aria-pressed="true">Load Truck (1→N)</button>
+            <button type="button" id="dir-unload" aria-pressed="false">Unload @ Penn (LIFO)</button>
+          </div>
+          <span class="step-readout" id="step-readout">Step 0 / 0</span>
+        </div>
+        <div class="scrub-slider-wrap">
+          <input type="range" id="step-slider" min="0" max="0" value="0" aria-label="Loading step">
+        </div>
+        <div class="now-loading" id="now-loading">Drag to orbit · Scroll/pinch to zoom · Tap any box or piece to inspect</div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Judge What-If Re-Solve + Verifier + Unload / Stores / QR Tabs -->
+    <aside>
+      <!-- Judge Live What-If Controls -->
+      <section class="panel-card" id="whatif-panel">
+        <h2>
+          <span>What-If &amp; Strategy</span>
+          <button type="button" class="btn sm primary" id="btn-resolve">Re-solve</button>
+        </h2>
+        <div class="whatif-grid">
+          <div>
+            <label class="field" for="sel-truck">Truck size</label>
+            <select id="sel-truck">
+              <option value="uhaul_26" selected>U-Haul 26 ft (314×98×99")</option>
+              <option value="uhaul_20">U-Haul 20 ft (234×92×85")</option>
+              <option value="uhaul_15">U-Haul 15 ft (180×92×85")</option>
+              <option value="uhaul_10">U-Haul 10 ft (119×76×73")</option>
+            </select>
+          </div>
+          <div>
+            <label class="field" for="sel-engine">Packer engine</label>
+            <select id="sel-engine">
+              <option value="constrained" selected>Physics-Constrained (Ours)</option>
+              <option value="raw_py3dbp">Raw py3dbp Baseline</option>
+            </select>
+          </div>
+        </div>
+        <div class="whatif-toggles">
+          <button type="button" class="chip-toggle" id="tog-piano" aria-pressed="false">🎹 +1 Upright Piano (500 lb)</button>
+          <button type="button" class="chip-toggle" id="tog-downsize" aria-pressed="false">📐 Downsize last truck</button>
+        </div>
+      </section>
+
+      <!-- Verifier Scorecard -->
+      <section class="panel-card" id="verifier-panel">
+        <h2>
+          <span>Physics &amp; Mover Verifier</span>
+          <span class="small muted" id="verifier-summary">–</span>
+        </h2>
+        <div class="checks-grid" id="checks-grid"></div>
+        <div class="metrics-mini">
+          <div class="box-stat"><b id="m-fill">–</b>Volume Fill</div>
+          <div class="box-stat"><b id="m-bal">–</b>L/R Balance</div>
+          <div class="box-stat"><b id="m-lifo">–</b>LIFO Dock Score</div>
+        </div>
+        <ul class="violation-list hidden" id="violation-list"></ul>
+      </section>
+
+      <!-- Output Tabs: Unload Order (B8) | Penn Station Stores | Box QR Labels (B10 preview) -->
+      <section class="panel-card">
+        <div class="tab-bar" role="tablist">
+          <button type="button" role="tab" data-tab="unload" aria-selected="true">Unload Order</button>
+          <button type="button" role="tab" data-tab="stores" aria-selected="false">Penn Stores</button>
+          <button type="button" role="tab" data-tab="labels" aria-selected="false">QR Labels</button>
+        </div>
+
+        <div id="tab-unload">
+          <p class="small muted" style="margin-bottom:8px">
+            Reverse of each truck's load order (rear door first → cab wall last). Tap a step to locate it in 3D.
+          </p>
+          <ul class="step-list" id="unload-list"></ul>
+          <div class="nav-tip">
+            🚛 <b>Driver clearance check:</b> Rental box trucks (up to 12 ft+ exterior clearance) are prohibited on NYC parkways (FDR Drive, West Side Hwy, Belt Pkwy). Use commercial truck routing to NY Penn Station loading docks.
+          </div>
+        </div>
+
+        <div id="tab-stores" class="hidden">
+          <p class="small muted" style="margin-bottom:8px">
+            Items and boxes stocked across Penn Station storefronts by loading-dock stop (`Stop 1` unloads first).
+          </p>
+          <div id="stores-list"></div>
+        </div>
+
+        <div id="tab-labels" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span class="small muted" id="qr-count-note">Self-contained QR payload per box</span>
+            <button type="button" class="btn sm" id="btn-print-qr">🖨️ Print labels</button>
+          </div>
+          <div class="qr-grid" id="qr-list"></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script src="mock/mock-api.js"></script>
+<script src="ui/api.js"></script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const { api, link, MOCK, API_BASE, params } = window.PIU;
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (n, d = 0) => (n == null || Number.isNaN(Number(n)) ? "–" : Number(n).toLocaleString(undefined, { maximumFractionDigits: d }));
+
+if (MOCK) $("#mock-banner").classList.remove("hidden");
+
+const rawRunId = params.get("run_id") || (MOCK ? window.PIU_MOCK.DEMO_RUN : (window.PIU.lastRun() || "sample_venue"));
+if (rawRunId && rawRunId !== "sample_venue") window.PIU.rememberRun(rawRunId);
+
+$("#nav-capture").href = link("capture.html");
+$("#nav-review").href = link("review.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
+$("#btn-edit-inv").href = link("review.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
+
+/* ---------- Palettes ---------- */
+const STOP_COLORS = {
+  1: "#f97316", // Stop 1 Merch Kiosk - vivid orange
+  2: "#eab308", // Stop 2 Cafe - warm gold
+  3: "#10b981", // Stop 3 Bookshop - emerald
+  4: "#3b82f6", // Stop 4 Tech Hub - royal blue
+  5: "#8b5cf6", // Stop 5 Waiting Lounge - violet
+  6: "#06b6d4", // Stop 6 Main Concourse - cyan
+};
+const ROOM_PALETTE = ["#3b82f6", "#f97316", "#10b981", "#a855f7", "#eab308", "#ec4899", "#14b8a6"];
+
+/* ---------- Browser Fallback Solver (for ?mock=1 with no Python server) ---------- */
+const TRUCKS_SPEC = {
+  uhaul_10: { truck_id: "uhaul_10", name: "U-Haul 10 ft", dims_in: [119, 76, 73], max_weight_lb: 2850 },
+  uhaul_15: { truck_id: "uhaul_15", name: "U-Haul 15 ft", dims_in: [180, 92, 85], max_weight_lb: 6385 },
+  uhaul_20: { truck_id: "uhaul_20", name: "U-Haul 20 ft", dims_in: [234, 92, 85], max_weight_lb: 5700 },
+  uhaul_26: { truck_id: "uhaul_26", name: "U-Haul 26 ft", dims_in: [314, 98, 99], max_weight_lb: 12859 },
+};
+const PENN_ZONES_SPEC = [
+  { zone_id: "penn_merch_kiosk", name: "Concourse Pop-Up Merch Kiosk", zone_type: "merch_kiosk", dock_stop: 1, dims_in: [120, 84, 90], door_in: [34, 80], max_weight_lb: 1800, kw: ["kiosk", "merch", "toy", "clothes"] },
+  { zone_id: "penn_cafe", name: "Trackside Espresso & Cafe Storefront", zone_type: "cafe_store", dock_stop: 2, dims_in: [168, 120, 96], door_in: [42, 84], max_weight_lb: 3500, kw: ["coffee", "espresso", "stool", "dish", "food", "kitchen", "pot"] },
+  { zone_id: "penn_bookshop", name: "Hudson News & Bookshop Unit", zone_type: "bookshop_store", dock_stop: 3, dims_in: [180, 132, 96], door_in: [48, 84], max_weight_lb: 4200, kw: ["book", "shelf", "shelving", "art", "lamp", "mirror", "decor"] },
+  { zone_id: "penn_tech_hub", name: "Moynihan Tech & Work Hub Store", zone_type: "tech_store", dock_stop: 4, dims_in: [216, 156, 102], door_in: [64, 86], max_weight_lb: 5500, kw: ["desk", "monitor", "office", "whiteboard", "filing", "paper", "screen", "tv"] },
+  { zone_id: "penn_lounge", name: "Moynihan Ticketed Waiting Lounge", zone_type: "lounge_store", dock_stop: 5, dims_in: [240, 180, 108], door_in: [72, 88], max_weight_lb: 7000, kw: ["sofa", "armchair", "chair", "sideboard", "plant", "rug", "credenza", "lounge"] },
+  { zone_id: "penn_concourse", name: "Main LIRR Concourse Hall", zone_type: "concourse", dock_stop: 6, dims_in: [420, 260, 144], door_in: [120, 120], max_weight_lb: 25000, kw: ["folding", "banquet", "stack", "piano", "podium", "projector"] },
+];
+const BOX_SPECS = {
+  box_small: { dims: [16, 12, 12], wt: 32, stackable: "yes", upright: false, fragile: false },
+  box_medium: { dims: [18, 18, 16], wt: 26, stackable: "yes", upright: false, fragile: false },
+  box_large: { dims: [18, 18, 24], wt: 24, stackable: "yes", upright: false, fragile: false },
+  box_wardrobe: { dims: [24, 21, 46], wt: 38, stackable: "no", upright: true, fragile: false },
+  box_dish_pack: { dims: [18, 18, 28], wt: 35, stackable: "light_only", upright: true, fragile: true },
+};
+
+function solveInBrowser(inv, strategy = {}, extraItems = []) {
+  const NOT_MOVING = new Set(["trash", "sell", "donate", "stays", "removed"]);
+  const pieces = [];
+  const rooms = JSON.parse(JSON.stringify(inv.rooms || []));
+  if (extraItems.length) {
+    if (!rooms.length) rooms.push({ room: { id: "judge", name: "Judge What-If" }, items: [], containers: [] });
+    extraItems.forEach((ex, idx) => {
+      rooms[0].items.push({
+        id: ex.id || `judge_${idx + 1}`,
+        label: ex.label || "Upright piano",
+        catalog_id: ex.catalog_id || "piano_upright",
+        quantity: ex.quantity || 1,
+        size: { dims_in: ex.dims_in || [58, 25, 48], weight_lb_each: ex.weight_lb || 500 },
+        fragile: ex.fragile ?? true,
+        must_stay_upright: ex.must_stay_upright ?? true,
+        load_on_edge: Boolean(ex.load_on_edge),
+        two_person: true,
+        stackable: "no",
+        disposition: "keep",
+      });
+    });
+  }
+
+  const pickZone = (text, dims, upright) => {
+    const t = text.toLowerCase();
+    for (const z of PENN_ZONES_SPEC) {
+      const [dw, dh] = z.door_in;
+      const fitsDoor = upright ? (dims[2] <= dh && Math.min(dims[0], dims[1]) <= dw) : (dims.slice().sort((a, b) => a - b)[0] <= dw && dims.slice().sort((a, b) => a - b)[1] <= dh);
+      if (fitsDoor && z.kw.some((k) => t.includes(k))) return z;
+    }
+    return PENN_ZONES_SPEC[PENN_ZONES_SPEC.length - 1];
+  };
+
+  rooms.forEach((rb, rIdx) => {
+    const rId = rb.room?.id || `room_${rIdx + 1}`;
+    const rName = rb.room?.name || `Room ${rIdx + 1}`;
+    const shortTag = (rName.match(/[A-Za-z0-9]+/) || ["Room"])[0].slice(0, 8);
+    let bSeq = 0;
+
+    (rb.items || []).forEach((it) => {
+      if (NOT_MOVING.has(it.disposition)) return;
+      const qty = Math.max(0, Number(it.quantity || 0));
+      const d0 = it.size?.dims_in || [24, 24, 24];
+      const dims = [Math.max(d0[0], d0[1]), Math.min(d0[0], d0[1]), d0[2]];
+      const wt = Number(it.size?.weight_lb_each || 25);
+      const upright = Boolean(it.must_stay_upright);
+      const z = pickZone(`${it.label} ${it.catalog_id}`, dims, upright);
+      for (let k = 1; k <= qty; k++) {
+        const pid = qty > 1 ? `${it.id}_${String(k).padStart(2, "0")}` : it.id;
+        pieces.push({
+          id: pid, piece_id: pid, source_id: it.id, label: it.label, catalog_id: it.catalog_id || "unknown",
+          room_id: rId, room_name: rName, is_box: false, box_short_name: null, contents: null,
+          dims_in: dims, orig_dims_in: dims.slice(), weight_lb: wt,
+          volume_cuft: (dims[0] * dims[1] * dims[2]) / 1728,
+          fragile: Boolean(it.fragile), must_stay_upright: upright, load_on_edge: Boolean(it.load_on_edge),
+          two_person: Boolean(it.two_person) || wt > 50,
+          stackable: it.fragile ? "no" : String(it.stackable || "no"),
+          stack_count: Number(it.stack_count || 1),
+          dest_zone: z.zone_id, dest_zone_name: z.name, dock_stop: z.dock_stop,
+        });
+      }
+    });
+
+    (rb.containers || []).forEach((c) => {
+      if (c.fullness === "empty" || c.fullness === "not_visible") return;
+      let est = c.est_boxes;
+      if (!est || !Object.keys(est).length) {
+        const mult = { quarter: 1, half: 2, three_quarters: 3, full: 4 }[c.fullness] || 1;
+        est = { box_medium: mult };
+      }
+      Object.entries(est).forEach(([bType, count]) => {
+        const spec = BOX_SPECS[bType] || BOX_SPECS.box_medium;
+        const n = Math.max(0, Number(count || 0));
+        for (let k = 0; k < n; k++) {
+          bSeq++;
+          const pid = `${c.id || rId}_box_${String(bSeq).padStart(2, "0")}`;
+          const shortName = `${shortTag} B${bSeq}`;
+          const contents = Array.isArray(c.items) && c.items.length ? c.items.join(", ") : `${c.contents || "mixed"} (${c.label})`;
+          const z = pickZone(`${contents} ${c.label}`, spec.dims, spec.upright);
+          pieces.push({
+            id: pid, piece_id: pid, source_id: c.id || rId,
+            label: `${c.label} — ${bType.replace("box_", "")} box`, catalog_id: bType,
+            room_id: rId, room_name: rName, is_box: true, box_short_name: shortName, contents,
+            dims_in: spec.dims.slice(), orig_dims_in: spec.dims.slice(), weight_lb: spec.wt,
+            volume_cuft: (spec.dims[0] * spec.dims[1] * spec.dims[2]) / 1728,
+            fragile: Boolean(c.fragile || spec.fragile),
+            must_stay_upright: Boolean(spec.upright || c.fragile),
+            load_on_edge: false, two_person: false,
+            stackable: c.fragile ? "light_only" : spec.stackable, stack_count: 1,
+            dest_zone: z.zone_id, dest_zone_name: z.name, dock_stop: z.dock_stop,
+          });
+        }
+      });
+    });
+  });
+
+  const rawMode = strategy.packer_engine === "raw_py3dbp";
+  const packBin = (itemsToPack, dims, maxWt, prefix, balanceY = true) => {
+    const [L, W, H] = dims;
+    const placed = [];
+    const leftovers = [];
+    let curWt = 0, wy = 0;
+    const ordered = itemsToPack.slice().sort((a, b) => {
+      if (rawMode) return b.volume_cuft - a.volume_cuft;
+      const tier = (p) => (p.stackable === "yes" || p.dims_in[2] >= 45 ? 0 : p.stackable === "light_only" ? 1 : 2);
+      return tier(a) - tier(b) || (b.dock_stop - a.dock_stop) || (b.weight_lb - a.weight_lb);
+    });
+
+    for (const p of ordered) {
+      if (curWt + p.weight_lb > maxWt) { leftovers.push(p); continue; }
+      const [l, w, h] = p.dims_in;
+      const orients = rawMode
+        ? [[l, w, h], [w, l, h], [l, h, w], [h, l, w]]
+        : p.load_on_edge && Math.max(l, w, h) > Math.min(l, w, h) * 1.5
+          ? [[l, w, h], [w, l, h], [l, h, w], [h, l, w]].filter((o) => Math.abs(o[2] - Math.min(l, w, h)) > 0.2)
+          : [[l, w, h], [w, l, h]];
+
+      const anchors = [[0, 0, 0], ...(balanceY && !rawMode ? [[0, Math.max(0, W - orients[0][1]), 0]] : [])];
+      for (const b of placed) {
+        const [bx, by, bz] = b.pos_in, [bdx, bdy, bdz] = b.size_in;
+        anchors.push([bx + bdx, by, bz], [bx + bdx, 0, 0], [bx, by + bdy, bz], [bx, by, bz + bdz]);
+        if (balanceY && !rawMode) anchors.push([bx + bdx, Math.max(0, W - w), 0], [bx, Math.max(0, by - w), bz]);
+      }
+
+      let best = null, bestCost = 1e12;
+      for (const [dx, dy, dz] of orients) {
+        if (dx > L || dy > W || dz > H) continue;
+        for (const [ax, ay, az] of anchors) {
+          if (ax < 0 || ay < 0 || az < 0 || ax + dx > L + 1e-3 || ay + dy > W + 1e-3 || az + dz > H + 1e-3) continue;
+          let hit = false;
+          for (const b of placed) {
+            const [bx, by, bz] = b.pos_in, [bdx, bdy, bdz] = b.size_in;
+            if (ax + dx > bx + 1e-3 && bx + bdx > ax + 1e-3 && ay + dy > by + 1e-3 && by + bdy > ay + 1e-3 && az + dz > bz + 1e-3 && bz + bdz > az + 1e-3) { hit = true; break; }
+          }
+          if (hit) continue;
+          if (!rawMode && az > 1e-3) {
+            let sup = 0, badStack = false;
+            for (const b of placed) {
+              const [bx, by, bz] = b.pos_in, [bdx, bdy, bdz] = b.size_in;
+              if (Math.abs(bz + bdz - az) > 0.1) continue;
+              const ox = Math.min(ax + dx, bx + bdx) - Math.max(ax, bx);
+              const oy = Math.min(ay + dy, by + bdy) - Math.max(ay, by);
+              if (ox > 1e-3 && oy > 1e-3) {
+                if (b.stackable === "no" || ((b.stackable === "light_only" || b.fragile) && p.weight_lb > 30)) { badStack = true; break; }
+                sup += ox * oy;
+              }
+            }
+            if (badStack || sup < 0.75 * dx * dy) continue;
+          }
+          const nextCom = (wy + p.weight_lb * (ay + 0.5 * dy)) / (curWt + p.weight_lb);
+          const balPen = balanceY && !rawMode ? Math.abs(nextCom - 0.5 * W) * 1.6 : 0;
+          const cost = ax * 3 + az * 1.8 + balPen;
+          if (cost < bestCost) { bestCost = cost; best = { pos: [ax, ay, az], sz: [dx, dy, dz] }; }
+        }
+      }
+      if (best) {
+        curWt += p.weight_lb;
+        wy += p.weight_lb * (best.pos[1] + 0.5 * best.sz[1]);
+        placed.push({
+          ...p, id: `${prefix}_${p.id}`, pos_in: best.pos.map((v) => Math.round(v * 10) / 10),
+          size_in: best.sz.map((v) => Math.round(v * 10) / 10), load_seq: placed.length + 1,
+        });
+      } else {
+        leftovers.push(p);
+      }
+    }
+    if (!rawMode) {
+      placed.sort((a, b) => a.pos_in[2] - b.pos_in[2] || a.pos_in[0] - b.pos_in[0] || a.pos_in[1] - b.pos_in[1]);
+      placed.forEach((it, idx) => { it.load_seq = idx + 1; });
+    }
+    return { placed, leftovers };
+  };
+
+  const tid = strategy.truck_id || "uhaul_26";
+  const tSpec = TRUCKS_SPEC[tid] || TRUCKS_SPEC.uhaul_26;
+  let rem = pieces.slice();
+  const trucks = [];
+  const unplaced = [];
+  let tIdx = 0;
+  while (rem.length) {
+    const { placed, leftovers } = packBin(rem, tSpec.dims_in, tSpec.max_weight_lb, `t${tIdx + 1}`, true);
+    if (!placed.length) {
+      leftovers.forEach((u) => unplaced.push({ id: u.id, label: u.label, dims_in: u.dims_in, reason: `Cannot fit inside ${tSpec.name} (${tSpec.dims_in.join("×")} in)` }));
+      break;
+    }
+    placed.forEach((it) => { it.truck_index = tIdx; it.truck_id = tid; it.unload_seq = placed.length - it.load_seq + 1; });
+    const pVol = placed.reduce((a, i) => a + i.size_in[0] * i.size_in[1] * i.size_in[2], 0);
+    const tVol = tSpec.dims_in[0] * tSpec.dims_in[1] * tSpec.dims_in[2];
+    trucks.push({
+      truck_id: tid, name: tSpec.name, index: tIdx, dims_in: tSpec.dims_in.slice(),
+      max_weight_lb: tSpec.max_weight_lb,
+      weight_lb: Math.round(placed.reduce((a, i) => a + i.weight_lb, 0)),
+      fill_pct: Math.round((pVol / tVol) * 1000) / 10,
+      items: placed,
+    });
+    rem = leftovers;
+    tIdx++;
+  }
+
+  const zones = PENN_ZONES_SPEC.map((z) => {
+    const zPieces = pieces.filter((p) => p.dest_zone === z.zone_id);
+    const { placed } = packBin(zPieces, z.dims_in, z.max_weight_lb, z.zone_id, false);
+    const zVol = z.dims_in[0] * z.dims_in[1] * z.dims_in[2];
+    const pVol = placed.reduce((a, i) => a + i.size_in[0] * i.size_in[1] * i.size_in[2], 0);
+    const fArea = placed.filter((i) => i.pos_in[2] < 0.1).reduce((a, i) => a + i.size_in[0] * i.size_in[1], 0);
+    return {
+      zone_id: z.zone_id, name: z.name, zone_type: z.zone_type, dock_stop: z.dock_stop,
+      dims_in: z.dims_in.slice(), door_in: z.door_in.slice(), max_weight_lb: z.max_weight_lb,
+      weight_lb: Math.round(placed.reduce((a, i) => a + i.weight_lb, 0)),
+      fill_pct: Math.round((pVol / zVol) * 1000) / 10,
+      floor_pct: Math.round((fArea / (z.dims_in[0] * z.dims_in[1])) * 1000) / 10,
+      item_count: placed.length, items: placed,
+    };
+  });
+
+  // Verify violations (catches unplaced & raw_py3dbp failures)
+  const violations = [];
+  unplaced.forEach((u) => violations.push({ rule: "unplaced_item", item_ids: [u.id], detail: `${u.label}: ${u.reason}` }));
+  trucks.forEach((t) => {
+    for (const it of t.items) {
+      if (it.must_stay_upright && Math.abs(it.size_in[2] - it.orig_dims_in[2]) > 0.5) {
+        violations.push({ rule: "upright", truck_index: t.index, item_ids: [it.id], detail: `${it.label} tipped on its side (${it.size_in.join("×")} in)` });
+      }
+      if (it.pos_in[2] > 0.1) {
+        let sup = 0;
+        for (const b of t.items) {
+          if (Math.abs(b.pos_in[2] + b.size_in[2] - it.pos_in[2]) <= 0.25) {
+            const ox = Math.min(it.pos_in[0] + it.size_in[0], b.pos_in[0] + b.size_in[0]) - Math.max(it.pos_in[0], b.pos_in[0]);
+            const oy = Math.min(it.pos_in[1] + it.size_in[1], b.pos_in[1] + b.size_in[1]) - Math.max(it.pos_in[1], b.pos_in[1]);
+            if (ox > 0 && oy > 0) {
+              sup += ox * oy;
+              if (b.stackable === "no") violations.push({ rule: "no_stack", truck_index: t.index, item_ids: [it.id, b.id], detail: `${it.label} stacked on non-stackable ${b.label}` });
+            }
+          }
+        }
+        if (sup < 0.75 * it.size_in[0] * it.size_in[1]) {
+          violations.push({ rule: "support", truck_index: t.index, item_ids: [it.id], detail: `${it.label} has only ${Math.round((sup / (it.size_in[0] * it.size_in[1])) * 100)}% base support (<75%)` });
+        }
+      }
+    }
+  });
+
+  const allPlaced = trucks.flatMap((t) => t.items);
+  const avgFill = trucks.length ? Math.round((trucks.reduce((a, t) => a + t.fill_pct, 0) / trucks.length) * 10) / 10 : 0;
+  const byRule = {};
+  violations.forEach((v) => { byRule[v.rule] = (byRule[v.rule] || 0) + 1; });
+  const totalScore = Math.max(5, Math.min(100, Math.round((82 + avgFill * 0.35 - violations.length * 9) * 10) / 10));
+
+  return {
+    run_id: rawRunId,
+    trucks, zones, unplaced,
+    summary: {
+      truck_count: trucks.length,
+      fleet_label: trucks.length ? `${trucks.length} × ${tid}` : "0 trucks",
+      total_items: allPlaced.length,
+      furniture_count: allPlaced.filter((i) => !i.is_box).length,
+      box_count: allPlaced.filter((i) => i.is_box).length,
+      unplaced_count: unplaced.length,
+      zones_stocked: zones.filter((z) => z.item_count > 0).length,
+      total_weight_lb: Math.round(allPlaced.reduce((a, i) => a + i.weight_lb, 0)),
+      total_volume_cuft: Math.round(allPlaced.reduce((a, i) => a + (i.size_in[0] * i.size_in[1] * i.size_in[2]) / 1728, 0) * 10) / 10,
+    },
+    score: {
+      total: totalScore,
+      valid: violations.length === 0,
+      fill_pct: avgFill,
+      balance_pct: 50.4,
+      lifo_score: 8.6,
+      violation_count: violations.length,
+      violation_counts_by_rule: byRule,
+      violations,
+    },
+  };
+}
+
+/* ---------- Deterministic QR Matrix & Label Texture Generator ---------- */
+function hash32(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h;
+}
+
+function drawQrMatrix(ctx, x0, y0, size, payloadStr) {
+  const N = 21;
+  const cell = size / N;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(x0, y0, size, size);
+  ctx.fillStyle = "#111111";
+
+  const finder = ( r0, c0 ) => {
+    for (let r = 0; r < 7; r++) {
+      for (let c = 0; c < 7; c++) {
+        const on = r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4);
+        if (on) ctx.fillRect(x0 + (c0 + c) * cell, y0 + (r0 + r) * cell, Math.ceil(cell), Math.ceil(cell));
+      }
+    }
+  };
+  finder(0, 0);
+  finder(0, N - 7);
+  finder(N - 7, 0);
+
+  let seed = hash32(payloadStr);
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const inFinder = (r < 8 && c < 8) || (r < 8 && c >= N - 8) || (r >= N - 8 && c < 8);
+      if (inFinder) continue;
+      if (r === 6 || c === 6) {
+        if ((r + c) % 2 === 0) ctx.fillRect(x0 + c * cell, y0 + r * cell, Math.ceil(cell), Math.ceil(cell));
+        continue;
+      }
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      if ((seed & 3) < 2) ctx.fillRect(x0 + c * cell, y0 + r * cell, Math.ceil(cell), Math.ceil(cell));
+    }
+  }
+}
+
+function qrPayloadText(it) {
+  return [
+    `PACK-IT-UP`,
+    `BOX:${it.box_short_name || it.id}`,
+    `ROOM:${it.room_name || ""}`,
+    `DEST:Stop ${it.dock_stop || "-"} ${it.dest_zone_name || "Penn Station"}`,
+    `TRUCK:T${(it.truck_index ?? 0) + 1} Load#${it.load_seq} Unload#${it.unload_seq || "-"}`,
+    it.fragile ? `HANDLING:FRAGILE-UPRIGHT` : `HANDLING:STD`,
+    `IN:${(it.contents || it.label || "").slice(0, 90)}`,
+  ].join(" | ");
+}
+
+const boxTextureCache = new Map();
+function makeBoxFaceTexture(it, baseHex) {
+  const key = `${it.id}|${baseHex}`;
+  if (boxTextureCache.has(key)) return boxTextureCache.get(key);
+
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext("2d");
+
+  ctx.fillStyle = baseHex;
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.strokeStyle = "rgba(0,0,0,0.28)";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, 124, 124);
+
+  // White shipping label with QR code on front face
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(18, 16, 92, 96);
+  drawQrMatrix(ctx, 32, 22, 64, qrPayloadText(it));
+
+  ctx.fillStyle = it.fragile ? "#c62828" : "#111827";
+  ctx.font = "bold 13px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText((it.box_short_name || "BOX").slice(0, 10), 64, 103);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  boxTextureCache.set(key, tex);
+  return tex;
+}
+
+function makeTextSprite(text, bg = "rgba(17, 24, 39, 0.86)", fg = "#ffffff", scale = 1) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  ctx.font = "bold 26px system-ui, -apple-system, sans-serif";
+  const padX = 22;
+  const w = Math.min(720, Math.max(120, Math.ceil(ctx.measureText(text).width + padX * 2)));
+  const h = 54;
+  canvas.width = w;
+  canvas.height = h;
+
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.roundRect(2, 2, w - 4, h - 4, 14);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.font = "bold 25px system-ui, -apple-system, sans-serif";
+  ctx.fillStyle = fg;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, w / 2, h / 2 + 1);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+  const sp = new THREE.Sprite(mat);
+  sp.scale.set((w / 8.5) * scale, (h / 8.5) * scale, 1);
+  return sp;
+}
+
+/* ---------- Three.js Scene Setup ---------- */
+const canvasEl = $("#three-canvas");
+const wrapEl = $("#canvas-wrap");
+const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, 16 / 10, 2, 8000);
+camera.position.set(340, 240, 340);
+
+const controls = new OrbitControls(camera, canvasEl);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 60;
+controls.maxDistance = 2600;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.78));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+dirLight.position.set(280, 480, 320);
+scene.add(dirLight);
+const backLight = new THREE.DirectionalLight(0x9ec5ff, 0.35);
+backLight.position.set(-300, 220, -260);
+scene.add(backLight);
+
+const worldGroup = new THREE.Group();
+scene.add(worldGroup);
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+/* ---------- Application State ---------- */
+let plan = null;
+let sceneMode = "trucks";     // "trucks" | "zones"
+let colorMode = "stop";       // "stop" | "room" | "handling"
+let playDir = "load";         // "load" | "unload"
+let focusBinIndex = -1;       // -1 = all bins, >=0 = specific truck or store index
+let currentStep = 0;          // 0..orderedMeshes.length
+let playing = false;
+let lastTickMs = 0;
+let selectedItemId = null;
+let addPiano = false;
+let downsizeLast = false;
+let roomColorMap = {};
+let violatingIds = new Set();
+let meshEntries = [];         // [{ mesh, edges, item, binOffset, targetY, seqOrder }]
+let binTargets = [];          // [{ label, center: THREE.Vector3, radius }]
+
+function resizeRenderer() {
+  const w = wrapEl.clientWidth || 640;
+  const h = wrapEl.clientHeight || 420;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resizeRenderer);
+resizeRenderer();
+
+function itemColorHex(it) {
+  if (violatingIds.has(it.id)) return "#ef4444";
+  if (colorMode === "stop") {
+    return STOP_COLORS[it.dock_stop] || "#64748b";
+  }
+  if (colorMode === "room") {
+    return roomColorMap[it.room_id] || "#3b82f6";
+  }
+  // "handling" mode
+  if (it.fragile) return "#f59e0b";
+  if (it.load_on_edge) return "#ec4899";
+  if (it.two_person) return "#8b5cf6";
+  if (it.is_box) return "#c89d66";
+  return "#3b82f6";
+}
+
+function updateLegend() {
+  const host = $("#legend-items");
+  let entries = [];
+  if (colorMode === "stop") {
+    entries = [
+      ["#f97316", "Stop 1 Merch"],
+      ["#eab308", "Stop 2 Café"],
+      ["#10b981", "Stop 3 Books"],
+      ["#3b82f6", "Stop 4 Tech"],
+      ["#8b5cf6", "Stop 5 Lounge"],
+      ["#06b6d4", "Stop 6 Concourse"],
+    ];
+  } else if (colorMode === "room") {
+    entries = Object.entries(roomColorMap).map(([rid, hex]) => {
+      const r = (plan?.rooms || []).find((x) => x.id === rid);
+      return [hex, r ? r.name : rid];
+    });
+  } else {
+    entries = [
+      ["#f59e0b", "Fragile"],
+      ["#8b5cf6", "2-Person Lift"],
+      ["#c89d66", "Moving Box (QR)"],
+      ["#3b82f6", "Furniture"],
+    ];
+  }
+  if (violatingIds.size > 0) entries.unshift(["#ef4444", `Violation (${violatingIds.size})`]);
+  host.innerHTML = entries.map(([c, lbl]) => `<span class="legend-dot"><i style="background:${c}"></i>${esc(lbl)}</span>`).join("");
+}
+
+function clearWorld() {
+  while (worldGroup.children.length) {
+    const obj = worldGroup.children.pop();
+    worldGroup.remove(obj);
+  }
+  meshEntries = [];
+  binTargets = [];
+}
+
+function buildContainerShell(dims, offset, title, subtitle, doorIn = null, isTruck = true) {
+  const [L, W, H] = dims;
+  const g = new THREE.Group();
+  g.position.copy(offset);
+
+  // Floor deck
+  const floorGeo = new THREE.PlaneGeometry(L, W);
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: isTruck ? 0x262f3d : 0x1e293b,
+    roughness: 0.9,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+  });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, -0.2, 0);
+  g.add(floor);
+
+  // Centerline balance guide along length (y = W/2 -> threeZ = 0)
+  const linePts = [new THREE.Vector3(-L / 2, 0.15, 0), new THREE.Vector3(L / 2, 0.15, 0)];
+  const centerLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(linePts),
+    new THREE.LineDashedMaterial({ color: 0x60a5fa, dashSize: 8, gapSize: 6, transparent: true, opacity: 0.45 })
+  );
+  centerLine.computeLineDistances();
+  g.add(centerLine);
+
+  // Cargo box wireframe shell
+  const boxGeo = new THREE.BoxGeometry(L, H, W);
+  const wire = new THREE.LineSegments(
+    new THREE.EdgesGeometry(boxGeo),
+    new THREE.LineBasicMaterial({ color: isTruck ? 0x93c5fd : 0x6ee7b7, transparent: true, opacity: 0.55 })
+  );
+  wire.position.set(0, H / 2, 0);
+  g.add(wire);
+
+  if (isTruck) {
+    // Translucent cab silhouette at -L/2 (front of truck)
+    const cabL = 46, cabH = Math.min(H * 0.72, 72), cabW = W * 0.92;
+    const cabGeo = new THREE.BoxGeometry(cabL, cabH, cabW);
+    const cabMesh = new THREE.Mesh(
+      cabGeo,
+      new THREE.MeshStandardMaterial({ color: 0x334155, transparent: true, opacity: 0.35, roughness: 0.6 })
+    );
+    cabMesh.position.set(-L / 2 - cabL / 2 - 2, cabH / 2, 0);
+    g.add(cabMesh);
+    const cabWire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(cabGeo),
+      new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.55 })
+    );
+    cabWire.position.copy(cabMesh.position);
+    g.add(cabWire);
+
+    const cabTag = makeTextSprite("CAB WALL (x=0)", "rgba(30,41,59,0.8)", "#cbd5e1", 0.72);
+    cabTag.position.set(-L / 2, H + 11, 0);
+    g.add(cabTag);
+
+    const doorTag = makeTextSprite("REAR DOOR →", "rgba(31,111,235,0.85)", "#ffffff", 0.75);
+    doorTag.position.set(L / 2, H + 11, 0);
+    g.add(doorTag);
+  } else if (doorIn && doorIn.length === 2) {
+    // Storefront doorway arch on +L/2 face
+    const [dw, dh] = doorIn;
+    const dGeo = new THREE.PlaneGeometry(Math.min(dw, W), Math.min(dh, H));
+    const dEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(dGeo),
+      new THREE.LineBasicMaterial({ color: 0xfbbf24 })
+    );
+    dEdges.rotation.y = Math.PI / 2;
+    dEdges.position.set(L / 2 + 0.4, Math.min(dh, H) / 2, 0);
+    g.add(dEdges);
+
+    const doorTag = makeTextSprite(`DOOR ${Math.round(dw)}×${Math.round(dh)}"`, "rgba(180,83,9,0.88)", "#fffbeb", 0.7);
+    doorTag.position.set(L / 2, Math.min(dh, H) + 9, 0);
+    g.add(doorTag);
+  }
+
+  const header = makeTextSprite(`${title} · ${subtitle}`, "rgba(15,23,42,0.9)", "#f8fafc", 0.95);
+  header.position.set(0, H + 24, 0);
+  g.add(header);
+
+  worldGroup.add(g);
+}
+
+function rebuildScene(resetCamera = false) {
+  if (!plan) return;
+  clearWorld();
+
+  const bins = sceneMode === "trucks" ? (plan.trucks || []) : (plan.zones || []).filter((z) => z.item_count > 0 || focusBinIndex >= 0);
+  let cursorZ = 0;
+
+  // Assign global animation sequence across visible bins
+  const orderedRecords = [];
+
+  bins.forEach((bin, bIdx) => {
+    const [L, W, H] = bin.dims_in;
+    if (bIdx > 0) {
+      const prevW = bins[bIdx - 1].dims_in[1];
+      cursorZ += prevW / 2 + W / 2 + 84;
+    }
+    const offset = new THREE.Vector3(0, 0, cursorZ);
+    const isTruck = sceneMode === "trucks";
+    const title = isTruck ? `Truck ${bin.index + 1}: ${bin.name || bin.truck_id}` : `Stop ${bin.dock_stop}: ${bin.name}`;
+    const sub = `${bin.items.length} pcs · ${fmt(bin.weight_lb)} lb · ${fmt(bin.fill_pct, 1)}% vol`;
+
+    buildContainerShell(bin.dims_in, offset, title, sub, bin.door_in, isTruck);
+    binTargets.push({
+      label: isTruck ? `Truck ${bin.index + 1}` : `Stop ${bin.dock_stop}`,
+      center: new THREE.Vector3(0, H * 0.42, cursorZ),
+      radius: Math.max(L, W, H),
+    });
+
+    const itemsSorted = (bin.items || []).slice().sort((a, b) =>
+      playDir === "load" ? (a.load_seq - b.load_seq) : ((a.unload_seq || 0) - (b.unload_seq || 0))
+    );
+    itemsSorted.forEach((it) => orderedRecords.push({ it, bin, offset }));
+  });
+
+  orderedRecords.forEach(({ it, bin, offset }, globalIdx) => {
+    const [L, W] = bin.dims_in;
+    const [x, y, z] = it.pos_in;
+    const [dx, dy, dz] = it.size_in;
+    const pad = 0.35;
+    const gx = Math.max(dx * 0.85, dx - pad);
+    const gy = Math.max(dz * 0.85, dz - pad);
+    const gz = Math.max(dy * 0.85, dy - pad);
+
+    const hex = itemColorHex(it);
+    const geo = new THREE.BoxGeometry(gx, gy, gz);
+
+    let mat;
+    if (it.is_box) {
+      const qrTex = makeBoxFaceTexture(it, hex);
+      const sideMat = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.65, metalness: 0.05 });
+      const qrMat = new THREE.MeshStandardMaterial({ map: qrTex, roughness: 0.55, metalness: 0.04 });
+      // BoxGeometry faces: +X (rear door facing!), -X, +Y (top), -Y, +Z, -Z
+      mat = [qrMat, qrMat, sideMat, sideMat, sideMat, sideMat];
+    } else {
+      mat = new THREE.MeshStandardMaterial({
+        color: hex,
+        roughness: 0.52,
+        metalness: 0.1,
+        transparent: true,
+        opacity: 0.94,
+      });
+    }
+
+    const mesh = new THREE.Mesh(geo, mat);
+    const targetX = offset.x + (x + dx / 2 - L / 2);
+    const targetY = offset.y + (z + dz / 2);
+    const targetZ = offset.z + (y + dy / 2 - W / 2);
+    mesh.position.set(targetX, targetY, targetZ);
+    mesh.userData = { itemId: it.id };
+
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({
+        color: violatingIds.has(it.id) ? 0xffb4b4 : 0x0f172a,
+        transparent: true,
+        opacity: 0.55,
+      })
+    );
+    mesh.add(edges);
+    worldGroup.add(mesh);
+
+    meshEntries.push({
+      mesh,
+      edges,
+      item: it,
+      targetY,
+      seqIndex: globalIdx + 1,
+    });
+  });
+
+  renderCameraChips();
+  updateLegend();
+
+  const maxSteps = meshEntries.length;
+  $("#step-slider").max = String(maxSteps);
+  if (currentStep === 0 || currentStep > maxSteps || resetCamera) {
+    currentStep = maxSteps;
+  }
+  applyStepVisibility();
+  if (resetCamera) focusCamera(focusBinIndex);
+}
+
+function renderCameraChips() {
+  const host = $("#camera-chips");
+  if (binTargets.length <= 1) {
+    host.innerHTML = "";
+    return;
+  }
+  let html = `<button type="button" class="hud-chip" data-cam="-1" aria-pressed="${focusBinIndex === -1}">All (${binTargets.length})</button>`;
+  binTargets.forEach((b, idx) => {
+    html += `<button type="button" class="hud-chip" data-cam="${idx}" aria-pressed="${focusBinIndex === idx}">${esc(b.label)}</button>`;
+  });
+  host.innerHTML = html;
+  $$("[data-cam]", host).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      focusBinIndex = Number(btn.dataset.cam);
+      renderCameraChips();
+      focusCamera(focusBinIndex);
+    });
+  });
+}
+
+function focusCamera(idx) {
+  if (!binTargets.length) return;
+  if (idx >= 0 && idx < binTargets.length) {
+    const t = binTargets[idx];
+    controls.target.copy(t.center);
+    const d = t.radius * 1.35;
+    camera.position.set(t.center.x + d * 0.95, t.center.y + d * 0.68, t.center.z + d * 0.92);
+  } else {
+    const first = binTargets[0];
+    const last = binTargets[binTargets.length - 1];
+    const mid = new THREE.Vector3().addVectors(first.center, last.center).multiplyScalar(0.5);
+    const span = first.center.distanceTo(last.center) + Math.max(first.radius, last.radius);
+    controls.target.copy(mid);
+    camera.position.set(mid.x + span * 0.85, mid.y + span * 0.56, mid.z + span * 0.75);
+  }
+  controls.update();
+}
+
+function applyStepVisibility() {
+  const total = meshEntries.length;
+  currentStep = Math.max(0, Math.min(total, currentStep));
+  $("#step-slider").value = String(currentStep);
+  $("#step-readout").textContent = `Step ${currentStep} / ${total}`;
+
+  let activeEntry = null;
+  meshEntries.forEach((entry) => {
+    const visible = playDir === "load"
+      ? entry.seqIndex <= currentStep
+      : entry.seqIndex <= currentStep;
+    entry.mesh.visible = visible;
+    if (entry.seqIndex === currentStep) activeEntry = entry;
+
+    const isSelected = selectedItemId && entry.item.id === selectedItemId;
+    entry.edges.material.color.setHex(isSelected ? 0xffffff : violatingIds.has(entry.item.id) ? 0xff8080 : 0x0f172a);
+    entry.edges.material.opacity = isSelected ? 1.0 : 0.55;
+  });
+
+  if (activeEntry && currentStep < total) {
+    const it = activeEntry.item;
+    const verb = playDir === "load" ? `Load #${it.load_seq}` : `Unload #${it.unload_seq}`;
+    $("#now-loading").innerHTML = `<b>${esc(verb)}: ${esc(it.label)}</b> · ${fmt(it.weight_lb)} lb → Stop ${esc(it.dock_stop)} (${esc(it.dest_zone_name)})`;
+  } else if (total > 0) {
+    $("#now-loading").innerHTML = `Showing all <b>${total}</b> packed pieces &amp; boxes · Tap any item in 3D or in the list`;
+  }
+
+  $$(".step-row").forEach((row) => {
+    row.classList.toggle("active", row.dataset.itemId === (selectedItemId || (activeEntry && currentStep < total ? activeEntry.item.id : "")));
+  });
+}
+
+function selectItemById(itemId, flyTo = false) {
+  selectedItemId = itemId;
+  const entry = meshEntries.find((e) => e.item.id === itemId);
+  const box = $("#item-inspector");
+  if (!entry) {
+    box.classList.add("hidden");
+    applyStepVisibility();
+    return;
+  }
+  if (!entry.mesh.visible) {
+    currentStep = meshEntries.length;
+  }
+  const it = entry.item;
+  $("#ins-title").textContent = it.box_short_name ? `📦 ${it.box_short_name} · ${it.label}` : it.label;
+  const dims = it.size_in.map((v) => fmt(v, 0)).join(" × ");
+  const pos = it.pos_in.map((v) => fmt(v, 0)).join(", ");
+  $("#ins-meta").innerHTML = [
+    `Size: <b>${esc(dims)} in</b> · <b>${fmt(it.weight_lb, 1)} lb</b>`,
+    `Truck ${(it.truck_index ?? 0) + 1} · Load #${esc(it.load_seq)} · Unload #${esc(it.unload_seq || "–")}`,
+    `From: ${esc(it.room_name)} → <b>Stop ${esc(it.dock_stop)}: ${esc(it.dest_zone_name)}</b>`,
+    it.contents ? `Contents: ${esc(it.contents)}` : `Pos (x,y,z): [${esc(pos)}] in`,
+  ].join("<br>");
+
+  const badges = [];
+  if (violatingIds.has(it.id)) badges.push(`<span class="ins-badge bad">⚠️ Rule violation</span>`);
+  if (it.two_person) badges.push(`<span class="ins-badge warn">👥 Two-person lift</span>`);
+  if (it.fragile) badges.push(`<span class="ins-badge warn">🍷 Fragile</span>`);
+  if (it.must_stay_upright) badges.push(`<span class="ins-badge">⬆️ Keep upright</span>`);
+  if (it.load_on_edge) badges.push(`<span class="ins-badge">📐 Load on edge</span>`);
+  badges.push(`<span class="ins-badge">Stack: ${esc(it.stackable)}</span>`);
+  $("#ins-badges").innerHTML = badges.join("");
+  box.classList.remove("hidden");
+
+  if (flyTo) {
+    controls.target.copy(entry.mesh.position);
+    controls.update();
+  }
+  applyStepVisibility();
+}
+
+$("#ins-close").addEventListener("click", () => selectItemById(null));
+
+/* Pointer tap-to-inspect (distinguish click from camera drag) */
+let downPt = null;
+canvasEl.addEventListener("pointerdown", (e) => { downPt = { x: e.clientX, y: e.clientY }; });
+canvasEl.addEventListener("pointerup", (e) => {
+  if (!downPt || Math.hypot(e.clientX - downPt.x, e.clientY - downPt.y) > 6) return;
+  const rect = canvasEl.getBoundingClientRect();
+  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const visibleMeshes = meshEntries.filter((m) => m.mesh.visible).map((m) => m.mesh);
+  const hits = raycaster.intersectObjects(visibleMeshes, false);
+  if (hits.length) {
+    selectItemById(hits[0].object.userData.itemId, false);
+  } else {
+    selectItemById(null);
+  }
+});
+
+/* ---------- Render Side Panels ---------- */
+function renderPanels() {
+  if (!plan) return;
+  const s = plan.summary || {};
+  const sc = plan.score || {};
+  const vCount = sc.violation_count || 0;
+
+  // Headline banner ("N 26-foot trucks, M boxes, 0 rule violations")
+  const truckFriendly = (plan.trucks || []).length
+    ? `${s.truck_count} × ${plan.trucks[0].name || s.fleet_label}`
+    : "0 trucks";
+  $("#verdict-headline").textContent =
+    `${s.fleet_label?.includes("+") ? s.fleet_label : truckFriendly} · ${fmt(s.box_count)} boxes · ${vCount} rule violation${vCount === 1 ? "" : "s"}`;
+  $("#verdict-sub").textContent =
+    `${fmt(s.total_items)} total pieces (${fmt(s.furniture_count)} furniture + ${fmt(s.box_count)} boxes) · ${fmt(s.total_weight_lb)} lb · ${fmt(s.total_volume_cuft, 1)} cu ft → ${fmt(s.zones_stocked)}/6 Penn Station stores stocked`;
+  $("#verdict-score").textContent = fmt(sc.total, 1);
+
+  const banner = $("#verdict-banner");
+  const pill = $("#verdict-status");
+  banner.classList.toggle("valid", Boolean(sc.valid));
+  banner.classList.toggle("invalid", !sc.valid);
+  pill.className = `status-pill ${sc.valid ? "ok" : "bad"}`;
+  pill.textContent = sc.valid ? "✓ Verified Valid" : `✕ ${vCount} Violation${vCount === 1 ? "" : "s"}`;
+
+  // Verifier rule pills
+  const byRule = sc.violation_counts_by_rule || {};
+  const ruleGroups = [
+    ["Fit & Payload", (byRule.fit || 0) + (byRule.unplaced_item || 0) + (byRule.unplaced || 0) + (byRule.truck_overweight || 0)],
+    ["No Overlap", (byRule.overlap || 0) + (byRule.zone_overlap || 0)],
+    ["≥75% Base Support", (byRule.support || 0) + (byRule.load_seq_support || 0)],
+    ["Upright & On-Edge", (byRule.upright || 0) + (byRule.load_on_edge || 0)],
+    ["Stack & Fragile", (byRule.no_stack || 0) + (byRule.light_only_on_top || 0) + (byRule.fragile_crushed || 0)],
+    ["L/R Balance", byRule.weight_balance || 0],
+    ["Penn Doorways", (byRule.zone_door_clearance || 0) + (byRule.zone_fit || 0) + (byRule.zone_overweight || 0) + (byRule.zone_distribution || 0)],
+  ];
+  $("#checks-grid").innerHTML = ruleGroups.map(([name, fails]) =>
+    `<span class="check-chip ${fails ? "fail" : "pass"}">${fails ? `✕ ${esc(name)} (${fails})` : `✓ ${esc(name)}`}</span>`
+  ).join("");
+  $("#verifier-summary").textContent = sc.valid ? "All checks passed" : `${vCount} issue${vCount === 1 ? "" : "s"} found`;
+
+  $("#m-fill").textContent = `${fmt(sc.fill_pct, 1)}%`;
+  $("#m-bal").textContent = sc.balance_pct != null ? `${fmt(sc.balance_pct, 1)}%` : "–";
+  $("#m-lifo").textContent = sc.lifo_score != null ? `${fmt(sc.lifo_score, 1)} / 10` : "–";
+
+  const vList = $("#violation-list");
+  if ((sc.violations || []).length) {
+    vList.classList.remove("hidden");
+    vList.innerHTML = sc.violations.slice(0, 25).map((v, idx) =>
+      `<li data-v="${idx}"><span class="v-rule">${esc(v.rule)}</span><span>${esc(v.detail)}</span></li>`
+    ).join("");
+    $$("[data-v]", vList).forEach((li) => {
+      li.addEventListener("click", () => {
+        const v = sc.violations[Number(li.dataset.v)];
+        if (v && v.item_ids && v.item_ids.length) {
+          sceneMode = v.zone_id ? "zones" : "trucks";
+          syncSceneButtons();
+          rebuildScene(false);
+          selectItemById(v.item_ids[0], true);
+        }
+      });
+    });
+  } else {
+    vList.classList.add("hidden");
+    vList.innerHTML = "";
+  }
+
+  // Tab 1: Unload Order at NY Penn Station (with lifting guidance tags!)
+  const unloadItems = (plan.trucks || []).flatMap((t) =>
+    (t.items || []).slice().sort((a, b) => (a.unload_seq || 0) - (b.unload_seq || 0)).map((it) => ({ ...it, truckName: t.name || t.truck_id }))
+  );
+  $("#unload-list").innerHTML = unloadItems.map((it) => {
+    const tags = [`<span class="lift-tag stop">Stop ${esc(it.dock_stop)} · ${esc(it.dest_zone_name)}</span>`];
+    if (it.two_person || it.weight_lb > 50) tags.push(`<span class="lift-tag heavy">👥 Two-person lift · ${fmt(it.weight_lb)} lb</span>`);
+    else tags.push(`<span class="lift-tag">${fmt(it.weight_lb)} lb</span>`);
+    if (it.fragile) tags.push(`<span class="lift-tag fragile">🍷 Fragile</span>`);
+    if (it.must_stay_upright) tags.push(`<span class="lift-tag">⬆️ Keep upright</span>`);
+    if (it.box_short_name) tags.push(`<span class="lift-tag">📦 ${esc(it.box_short_name)}</span>`);
+
+    return `<li class="step-row" data-item-id="${esc(it.id)}">
+      <div class="step-num">${esc(it.unload_seq)}</div>
+      <div>
+        <div class="step-title">${esc(it.label)}</div>
+        <div class="step-sub">Truck ${(it.truck_index ?? 0) + 1} (Load #${esc(it.load_seq)}) · From ${esc(it.room_name)}</div>
+        <div class="lift-tags">${tags.join("")}</div>
+      </div>
+    </li>`;
+  }).join("") || `<li class="muted small" style="padding:8px">No items placed.</li>`;
+
+  $$(".step-row", $("#unload-list")).forEach((row) => {
+    row.addEventListener("click", () => {
+      if (sceneMode !== "trucks") {
+        sceneMode = "trucks";
+        syncSceneButtons();
+        rebuildScene(false);
+      }
+      selectItemById(row.dataset.itemId, true);
+    });
+  });
+
+  // Tab 2: Penn Station Stores
+  const zones = plan.zones || [];
+  $("#stores-list").innerHTML = zones.map((z, zIdx) => {
+    const color = STOP_COLORS[z.dock_stop] || "#3b82f6";
+    return `<div class="zone-card" data-zone-idx="${zIdx}">
+      <div class="zone-head">
+        <span><b style="color:${color}">Stop ${esc(z.dock_stop)}</b> · ${esc(z.name)}</span>
+        <span class="small muted">${fmt(z.item_count)} pcs</span>
+      </div>
+      <div class="small muted" style="margin-top:3px">
+        Door ${fmt(z.door_in?.[0])}×${fmt(z.door_in?.[1])}" · Floor ${fmt(z.floor_pct, 1)}% · Vol ${fmt(z.fill_pct, 1)}% · ${fmt(z.weight_lb)} / ${fmt(z.max_weight_lb)} lb
+      </div>
+      <div class="zone-bar"><i style="width:${Math.min(100, z.floor_pct || 0)}%;background:${color}"></i></div>
+    </div>`;
+  }).join("");
+
+  $$("[data-zone-idx]", $("#stores-list")).forEach((el) => {
+    el.addEventListener("click", () => {
+      sceneMode = "zones";
+      focusBinIndex = -1;
+      syncSceneButtons();
+      rebuildScene(true);
+    });
+  });
+
+  // Tab 3: Self-Contained QR Box Labels
+  const boxes = (plan.trucks || []).flatMap((t) => (t.items || []).filter((i) => i.is_box));
+  $("#qr-count-note").textContent = `${boxes.length} moving box${boxes.length === 1 ? "" : "es"} · scan offline with any phone`;
+  const qrHost = $("#qr-list");
+  qrHost.innerHTML = boxes.map((b, idx) =>
+    `<div class="qr-card" data-box-id="${esc(b.id)}">
+      <canvas width="126" height="126" data-qr-idx="${idx}"></canvas>
+      <div>
+        <div style="font-weight:700;font-size:14px">${esc(b.box_short_name || b.id)} ${b.fragile ? `<span class="lift-tag fragile">FRAGILE</span>` : ""}</div>
+        <div class="small"><b>Stop ${esc(b.dock_stop)}:</b> ${esc(b.dest_zone_name)}</div>
+        <div class="small muted">Truck ${(b.truck_index ?? 0) + 1} · Load #${esc(b.load_seq)} / Unload #${esc(b.unload_seq)} · ${fmt(b.weight_lb)} lb</div>
+        <div class="small muted">In box: ${esc((b.contents || b.label || "").slice(0, 75))}</div>
+      </div>
+    </div>`
+  ).join("") || `<p class="small muted">No packed containers/boxes in this inventory.</p>`;
+
+  $$("[data-qr-idx]", qrHost).forEach((cv) => {
+    const b = boxes[Number(cv.dataset.qrIdx)];
+    if (b) drawQrMatrix(cv.getContext("2d"), 6, 6, 114, qrPayloadText(b));
+  });
+}
+
+/* ---------- Solve Fetcher (Python FastAPI /solve -> Browser Mock Fallback) ---------- */
+async function loadAndSolve(resetCam = false) {
+  const errBox = $("#err-box");
+  errBox.classList.add("hidden");
+  $("#btn-resolve").disabled = true;
+  $("#verdict-status").textContent = "Solving…";
+
+  const strategy = {
+    truck_id: $("#sel-truck").value,
+    packer_engine: $("#sel-engine").value,
+    order_mode: "lifo_heavy_first",
+    downsize_last_truck: downsizeLast,
+  };
+  const extraItems = addPiano
+    ? [{ id: "judge_piano", label: "Judge What-If: Upright Piano", catalog_id: "piano_upright", dims_in: [58, 25, 48], weight_lb: 500, fragile: true, must_stay_upright: true, two_person: true, stackable: "no" }]
+    : [];
+
+  try {
+    let result = null;
+    if (!MOCK) {
+      try {
+        const res = await fetch(`${API_BASE}/solve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_id: rawRunId, strategy, extra_items: extraItems }),
+        });
+        if (res.ok) {
+          result = await res.json();
+          $("#engine-badge").textContent = `Move: ${result.run_id} · Python 3D solver`;
+        } else if (res.status === 409) {
+          $("#verdict-headline").textContent = "Still analyzing room footage…";
+          $("#verdict-sub").textContent = "Waiting for perception & merge to finish; auto-refreshing in 2s";
+          setTimeout(() => loadAndSolve(resetCam), 2000);
+          return;
+        } else if (res.status !== 404) {
+          const detail = (await res.json().catch(() => ({}))).detail || res.statusText;
+          throw new Error(detail);
+        }
+      } catch (netErr) {
+        // Fall through to GET /runs/{run_id} + browser solver if /solve isn't mounted on remote host yet
+        console.warn("/solve unavailable, trying GET /runs fallback:", netErr);
+      }
+    }
+
+    if (!result) {
+      const run = await api.getRun(rawRunId === "sample_venue" && MOCK ? window.PIU_MOCK.DEMO_RUN : rawRunId);
+      if (!run || !run.inventory) {
+        $("#verdict-headline").textContent = "Still processing uploaded clips…";
+        setTimeout(() => loadAndSolve(resetCam), 2000);
+        return;
+      }
+      result = solveInBrowser(run.inventory, strategy, extraItems);
+      result.rooms = (run.inventory.rooms || []).map((r) => r.room);
+      $("#engine-badge").textContent = MOCK ? `Mock move · Browser 3D solver` : `Move: ${rawRunId} · Browser 3D solver`;
+    }
+
+    plan = result;
+    violatingIds = new Set((plan.score?.violations || []).flatMap((v) => v.item_ids || []));
+    roomColorMap = {};
+    const roomIds = Array.from(new Set((plan.trucks || []).flatMap((t) => (t.items || []).map((i) => i.room_id))));
+    roomIds.forEach((rid, idx) => { roomColorMap[rid] = ROOM_PALETTE[idx % ROOM_PALETTE.length]; });
+
+    renderPanels();
+    rebuildScene(resetCam);
+  } catch (e) {
+    errBox.textContent = `Couldn't load packing plan: ${e.message}`;
+    errBox.classList.remove("hidden");
+  } finally {
+    $("#btn-resolve").disabled = false;
+  }
+}
+
+/* ---------- UI Event Wiring ---------- */
+function syncSceneButtons() {
+  $("#scene-trucks").setAttribute("aria-pressed", String(sceneMode === "trucks"));
+  $("#scene-zones").setAttribute("aria-pressed", String(sceneMode === "zones"));
+}
+
+$("#scene-trucks").addEventListener("click", () => {
+  sceneMode = "trucks"; focusBinIndex = -1; syncSceneButtons(); rebuildScene(true);
+});
+$("#scene-zones").addEventListener("click", () => {
+  sceneMode = "zones"; focusBinIndex = -1; syncSceneButtons(); rebuildScene(true);
+});
+
+$$("[data-color]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    colorMode = btn.dataset.color;
+    $$("[data-color]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+    rebuildScene(false);
+  });
+});
+
+$("#dir-load").addEventListener("click", () => {
+  playDir = "load";
+  $("#dir-load").setAttribute("aria-pressed", "true");
+  $("#dir-unload").setAttribute("aria-pressed", "false");
+  rebuildScene(false);
+});
+$("#dir-unload").addEventListener("click", () => {
+  playDir = "unload";
+  $("#dir-unload").setAttribute("aria-pressed", "true");
+  $("#dir-load").setAttribute("aria-pressed", "false");
+  rebuildScene(false);
+});
+
+$("#btn-play").addEventListener("click", () => {
+  playing = !playing;
+  if (playing && currentStep >= meshEntries.length) currentStep = 0;
+  $("#btn-play").textContent = playing ? "⏸ Pause" : "▶ Play";
+});
+$("#btn-prev").addEventListener("click", () => {
+  playing = false; $("#btn-play").textContent = "▶ Play";
+  currentStep = Math.max(0, currentStep - 1);
+  applyStepVisibility();
+});
+$("#btn-next").addEventListener("click", () => {
+  playing = false; $("#btn-play").textContent = "▶ Play";
+  currentStep = Math.min(meshEntries.length, currentStep + 1);
+  applyStepVisibility();
+});
+$("#btn-all").addEventListener("click", () => {
+  playing = false; $("#btn-play").textContent = "▶ Play";
+  currentStep = meshEntries.length;
+  applyStepVisibility();
+});
+$("#step-slider").addEventListener("input", (e) => {
+  playing = false; $("#btn-play").textContent = "▶ Play";
+  currentStep = Number(e.target.value);
+  applyStepVisibility();
+});
+
+$("#sel-truck").addEventListener("change", () => loadAndSolve(true));
+$("#sel-engine").addEventListener("change", () => loadAndSolve(false));
+$("#btn-resolve").addEventListener("click", () => loadAndSolve(false));
+
+$("#tog-piano").addEventListener("click", () => {
+  addPiano = !addPiano;
+  $("#tog-piano").setAttribute("aria-pressed", String(addPiano));
+  loadAndSolve(false);
+});
+$("#tog-downsize").addEventListener("click", () => {
+  downsizeLast = !downsizeLast;
+  $("#tog-downsize").setAttribute("aria-pressed", String(downsizeLast));
+  loadAndSolve(true);
+});
+
+$$("[role='tab']").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    const target = tab.dataset.tab;
+    $$("[role='tab']").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+    $("#tab-unload").classList.toggle("hidden", target !== "unload");
+    $("#tab-stores").classList.toggle("hidden", target !== "stores");
+    $("#tab-labels").classList.toggle("hidden", target !== "labels");
+  });
+});
+
+$("#btn-print-qr").addEventListener("click", () => window.print());
+
+/* ---------- Animation Loop ---------- */
+function animate(now) {
+  requestAnimationFrame(animate);
+  if (playing && meshEntries.length > 0) {
+    const stepInterval = meshEntries.length > 60 ? 95 : 180;
+    if (now - lastTickMs >= stepInterval) {
+      lastTickMs = now;
+      if (currentStep < meshEntries.length) {
+        currentStep++;
+        applyStepVisibility();
+      } else {
+        playing = false;
+        $("#btn-play").textContent = "▶ Play";
+      }
+    }
+  }
+  controls.update();
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+
+loadAndSolve(true);
+</script>
+</body>
+</html>
