@@ -53,3 +53,9 @@ Every model call is logged to `runs/<run_id>/calls.jsonl` and cached in `.cache/
 
 Gemini hears each clip's soundtrack in the same perceive call. The model returns a timestamped `transcript` (narrator vs background) and `spoken_facts`; merge applies them. Order of trust: a typed answer, then the narrator, then the catalog, then the model's visual estimate. Transcripts are saved to `runs/<id>/transcripts/` and never committed. If the perceive model can't hear (no `audio_in`), shared code in `backend/llm/` transcribes the soundtrack with the `transcribe` job first and puts the transcript in the prompt; `MODEL_PERCEIVE_DISABLE=video_in,audio_in` forces that path for testing.
 - Containers with `kind: open_surfaces` carry `est_volume_cuft` and `est_boxes` for loose decor.
+- Closed containers (doors or drawers shut) come out with `fullness: "empty"`, `contents_unknown: true` and `note: "contents unknown, assumed empty"` (Chris's decision, Nov 21: footage can't see inside, so nothing guesses). The furniture holding them gets `contents_unknown: true`. The user is always asked (`hidden_contents`, `always_show: true`); the answer replaces the assumption.
+- Upholstered seating is grouped by seat count (prompt v3 `seat_class`): `armchair` = single seat, `sofa_loveseat` = two seats, `sofa_3seat` = three or more.
+
+## Questions
+
+`questions.json` lists every question with `status` (`open` or `answered`), `answered_by` (`decisions_api`, `generate_json_fallback`, `speech`, `user`) and `shown` (the top 5 open ones by volume at stake, plus any with `always_show`). Count questions (`count_check`) offer numbers up to twice the estimate plus `"more"`, and take any typed whole number (`free_text: "number"`); `"more"` itself is not accepted as an answer.

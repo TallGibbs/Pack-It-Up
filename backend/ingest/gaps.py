@@ -194,13 +194,19 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
             # count_check: partly visible or many of them
             if it["partially_visible"] or it["quantity"] > 4:
                 q = it["quantity"]
-                counts = sorted({max(1, q - 1), q, q + 1, q + 2, *it.get("per_file_counts", {}).values()})
+                # Not capped at what the files showed: hidden or occupied pieces push the true count up
+                # (Malin: 16 work chairs, footage showed at most 10). Add 1.5x and 2x, plus "more" and typed numbers.
+                counts = sorted({max(1, q - 1), q, q + 1, q + 2, round(q * 1.5), q * 2,
+                                 *it.get("per_file_counts", {}).values()})
+                options = {str(c): f"{c}" for c in counts}
+                options["more"] = f"more than {counts[-1]}"
                 srcs = sorted(it.get("per_file_counts", {}), key=lambda f: -it["per_file_counts"][f])[:2]
                 media = [_whole_media(rd, files_by_name, f, f"[{f}]") for f in srcs]
                 qs.append({"id": _qid("count_check", it["id"]), "kind": "count_check", "refers_to": it["id"],
                            "text": f"How many {it['label']} are there in this room in total? Count each physical one "
-                                   f"once even if it appears in several photos or twice in the video; ignore reflections.",
-                           "options": {str(c): f"{c}" for c in counts}, "ask": "decisions_api",
+                                   f"once even if it appears in several photos or twice in the video; ignore reflections. "
+                                   f"Some may be hidden behind people, bags or other furniture, or cut off at the edge.",
+                           "options": options, "free_text": "number", "ask": "decisions_api",
                            "volume_at_stake": s["volume_cuft_each"] * max(1, q * 0.25),
                            "confidence": it["confidence"], "media": media})
             # fixture_check (added to the spec's list): a "movable" item that another file called a fixture
@@ -234,10 +240,10 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
                 continue
             media = [_crop_media(rd, files_by_name, a["file"], a["evidence"].get("box_2d"),
                                  a["evidence"].get("timestamp_s"), f"Already counted, piece {i + 1}: {a['label']} (from {a['file']})")
-                     for i, a in enumerate(base[:6])]
+                     for i, a in enumerate(base[:8])]
             media.append(_crop_media(rd, files_by_name, b["file"], b["evidence"].get("box_2d"),
                                      b["evidence"].get("timestamp_s"), f"New sighting: {b['label']} (from {b['file']})"))
-            counted = "; ".join(f"{i + 1}) {a['label']}" for i, a in enumerate(base[:6]))
+            counted = "; ".join(f"{i + 1}) {a['label']}" for i, a in enumerate(base[:8]))
             qs.append({"id": _qid("same_item", f["item_id"], b["file"], b["label"]),
                        "kind": "same_item", "refers_to": f["item_id"],
                        "text": f"The last image is a new sighting ({b['label']}, from {b['file']}). The images before it "
@@ -250,16 +256,17 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
                        "volume_at_stake": it["size"]["volume_cuft_each"] * b["quantity"],
                        "confidence": b["confidence"], "media": media})
 
-        # hidden_contents: closed cabinets
+        # hidden_contents: closed cabinets. Footage can't see inside, so the Decisions API isn't asked
+        # (Chris, Nov 21): resolve assumes empty, and the user is always asked.
         for c in m_room["containers"]:
             if c["fullness"] != "not_visible":
                 continue
             src = c["seen_in"][0]
             ev = c.get("evidence") or {}
             qs.append({"id": _qid("hidden_contents", inv_room["room"]["id"], c["label"]), "kind": "hidden_contents",
-                       "refers_to": c["label"],
-                       "text": f"The {c['label']} was closed. About how full is it?",
-                       "options": {f: f.replace("_", " ") for f in FULLNESS}, "ask": "decisions_api_then_user",
+                       "refers_to": c["label"], "always_show": True,
+                       "text": f"The {c['label']} was closed, so we've assumed it's empty. About how full is it?",
+                       "options": {f: f.replace("_", " ") for f in FULLNESS}, "ask": "user",
                        "volume_at_stake": CONTAINER_CUFT.get(c["size"], 15), "confidence": 0.3,
                        "media": [_crop_media(rd, files_by_name, src, ev.get("box_2d"), ev.get("timestamp_s"), "")]})
 
@@ -361,7 +368,7 @@ def build_questions(run_id: str) -> list[dict]:
         r = results.get(q["id"])
         if r and "answer" in r:
             q["model_answer"] = {k: r[k] for k in ("answer", "confidence", "rationale", "via")}
-            if r["confidence"] >= AUTO_APPLY:
+            if r["confidence"] >= AUTO_APPLY and r["answer"] != "more":  # "more" needs a number from the user
                 store_answer(run_id, {"kind": q["kind"], "question_id": q["id"], "answer": r["answer"],
                                       "source": r["via"], "confidence": r["confidence"],
                                       "patch": _patch_for(q, r["answer"])})
@@ -372,9 +379,13 @@ def build_questions(run_id: str) -> list[dict]:
             q["model_error"] = r["error"]
         q["status"] = "open"
 
-    open_qs = sorted((q for q in qs if q["status"] == "open"), key=lambda q: -q["rank_score"])
+    # Questions marked always_show (closed containers) are shown on top of the MAX_SHOWN ranked ones.
+    open_qs = sorted((q for q in qs if q["status"] == "open" and not q.get("always_show")), key=lambda q: -q["rank_score"])
     for i, q in enumerate(open_qs):
         q["shown"] = i < MAX_SHOWN
+    for q in qs:
+        if q["status"] == "open" and q.get("always_show"):
+            q["shown"] = True
     for q in qs:  # keep any earlier question that no longer triggers but was answered
         old.pop(q["id"], None)
     kept = [q for q in old.values() if q.get("status") == "answered"]
@@ -393,8 +404,13 @@ def answer_question(run_id: str, question_id: str, answer, source: str = "user")
     if q is None:
         raise KeyError(question_id)
     answer = str(answer).strip()
-    if q.get("options") and answer not in q["options"]:
+    if q.get("free_text") == "number" and answer not in (q.get("options") or {}):
+        if not answer.isdigit() or not 0 < int(answer) <= 500:
+            raise ValueError(f"answer must be one of {list(q['options'])} or a whole number from 1 to 500")
+    elif q.get("options") and answer not in q["options"]:
         raise ValueError(f"answer must be one of {list(q['options'])}")
+    if answer == "more":
+        raise ValueError("type the number instead of 'more'")
     if not answer:
         raise ValueError("empty answer")
     full = q

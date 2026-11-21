@@ -45,7 +45,7 @@ def score(inv: dict, hand: dict) -> dict:
     # so "table" for the second table is tried after "coffee table" and "communal".
     for e in sorted(entries, key=lambda e: -max(len(w) for w in e["match"])):
         for idx, it in enumerate(items):
-            if idx not in assigned and it["catalog_id"] == "unknown" and _has(it["label"], e["match"]):
+            if idx not in assigned and _has(it["label"], e["match"]):  # any line no catalog entry claimed
                 assigned[idx] = e["key"]
     # Pass 3: optional items (neither missed nor extra).
     for o in hand.get("optional", []):
@@ -57,7 +57,15 @@ def score(inv: dict, hand: dict) -> dict:
     for e in entries:
         got = [items[i] for i, k in assigned.items() if k == e["key"]]
         n = sum(i["quantity"] for i in got)
-        rows.append({"key": e["key"], "label": e["label"], "hand": e["quantity"], "inventory": n,
+        dims_check = None
+        if e.get("dims_in") and got:
+            d = got[0]["size"]["dims_in"]  # [length, width, height]
+            exp = e["dims_in"]
+            dims_check = {"inventory_dims_in": d, "expected": exp,
+                          "height_pct_error": round(100 * (d[2] - exp["height"]) / exp["height"], 1) if exp.get("height") else None,
+                          "width_ok": (d[0] >= exp["width_min"]) if exp.get("width_min") else None}
+        rows.append({"key": e["key"], "label": e["label"], "verified": e.get("verified", "photos"), "dims_check": dims_check,
+                     "hand": e["quantity"], "inventory": n,
                      "found": min(n, e["quantity"]), "missed": max(0, e["quantity"] - n),
                      "double_counted": max(0, n - e["quantity"]),
                      "matched_lines": [f"{i['label']} x{i['quantity']} ({i['catalog_id']})" for i in got]})
@@ -117,9 +125,15 @@ def print_report(res: dict) -> None:
     print(f"Run {res['run_id']} vs hand count '{res['hand_count']}'")
     if set(res["inventory_files"]) != set(res["hand_files"]):
         print(f"  note: inventory files {res['inventory_files']} differ from hand-count files {res['hand_files']}")
-    print(f"\n  {'hand-counted item':<44} {'hand':>4} {'inv':>4} {'found':>5} {'missed':>6} {'double':>6}")
+    print(f"\n  {'hand-counted item':<44} {'hand':>4} {'inv':>4} {'found':>5} {'missed':>6} {'double':>6}  checked")
     for r in res["rows"]:
-        print(f"  {r['label'][:44]:<44} {r['hand']:>4} {r['inventory']:>4} {r['found']:>5} {r['missed']:>6} {r['double_counted']:>6}")
+        print(f"  {r['label'][:44]:<44} {r['hand']:>4} {r['inventory']:>4} {r['found']:>5} {r['missed']:>6} "
+              f"{r['double_counted']:>6}  {r['verified'].replace('_', ' ')}")
+    for r in res["rows"]:
+        if r.get("dims_check"):
+            dc = r["dims_check"]
+            print(f"  size vs in person, {r['key']}: inventory {dc['inventory_dims_in']} in; expected {dc['expected']}; "
+                  f"height error {dc['height_pct_error']}%, width at least expected: {dc['width_ok']}")
     s = res["summary"]
     print(f"\n  FOUND {s['found']} of {s['hand_units']} hand-counted units (recall {s['recall_pct']}%), "
           f"MISSED {s['missed']}, DOUBLE COUNTED {s['double_counted']}; "

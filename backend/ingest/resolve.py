@@ -72,7 +72,10 @@ def pick_size(item: dict, row: dict | None) -> tuple[list[float], str, dict | No
         vol_ratio = (vision[0] * vision[1] * vision[2]) / (cat[0] * cat[1] * cat[2])
         # Spec rule: longest side within +-35%. Added: volume within 0.5x-2x, which catches a
         # 96-in-wide shelving unit matched to a 32-in-wide bookshelf (same longest side, 4.7x the volume).
-        if abs(ratio - 1) <= SIZE_TOLERANCE and VOLUME_RANGE[0] <= vol_ratio <= VOLUME_RANGE[1]:
+        # A catalog pick that other files didn't make (merge folded an `unknown` group into it) is doubtful:
+        # use the footage size and ask.
+        if (abs(ratio - 1) <= SIZE_TOLERANCE and VOLUME_RANGE[0] <= vol_ratio <= VOLUME_RANGE[1]
+                and not item.get("catalog_doubtful")):
             return _orient(cat), "catalog", None
         return vision, "vision_estimate", {"catalog_dims_in": _orient(cat), "vision_dims_in": vision,
                                            "longest_side_ratio": round(ratio, 2), "volume_ratio": round(vol_ratio, 2)}
@@ -173,8 +176,13 @@ def _containers(room: dict) -> list[dict]:
         if c["kind"] == "open_surfaces":
             open_count += c.get("est_item_count", 0)
             continue
+        # Closed doors: contents unknown. Assume empty for box counts and flag it (Chris, Nov 21);
+        # the user is always asked (gaps.py hidden_contents).
+        unknown = c["fullness"] == "not_visible"
         out.append({"id": f"{rid}_cont_{len(out) + 1:02d}", "label": c["label"], "kind": c["kind"],
-                    "contents": c["contents"], "fullness": c["fullness"], "size": c["size"],
+                    "contents": c["contents"], "fullness": "empty" if unknown else c["fullness"], "size": c["size"],
+                    "contents_unknown": unknown, "observed_fullness": c["fullness"],
+                    **({"note": "contents unknown, assumed empty"} if unknown else {}),
                     "est_item_count": c.get("est_item_count", 0), "seen_in": c.get("seen_in", []),
                     "evidence": {"source": c["seen_in"][0], **(c.get("evidence") or {})} if c.get("seen_in") else None,
                     "set_by_speech": c.get("set_by_speech", []), "created_by_speech": c.get("created_by_speech", False)})
@@ -197,6 +205,13 @@ def _containers(room: dict) -> list[dict]:
 def resolve_room(room: dict) -> dict:
     items = [resolve_item(it) for it in room["items"] if it.get("disposition") != "removed"]
     containers = _containers(room)
+    # Flag the piece of furniture that holds a closed container ("credenza sideboard" <- "credenza sideboard drawers").
+    from .merge import canon_key
+    closed = {canon_key(c["label"]) for c in containers if c.get("contents_unknown")}
+    for it in items:
+        if closed and canon_key(it["label"]) in closed:
+            it["contents_unknown"] = True
+            it["notes"] = (it.get("notes", "") + " Contents unknown, assumed empty.").strip()
     keep = [i for i in items if i["disposition"] not in NOT_ON_TRUCK]
     box_vol = sum(c.get("est_volume_cuft", 0) for c in containers)
     return {

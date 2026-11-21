@@ -178,6 +178,8 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
                 if ["small", "medium", "large"].index(c["size"]) > ["small", "medium", "large"].index(cur["size"]):
                     cur["size"] = c["size"]
 
+    _fold_unknown_groups(groups)
+
     # Personal belongings: same "largest single-file count" rule per kind.
     for f, kinds in personal_per_file.items():
         for k, n in kinds.items():
@@ -224,6 +226,7 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
             "disposition": "undecided",
             "notes": "",
             "heard_only": gk.startswith("heard:"),
+            "catalog_doubtful": any(it.get("catalog_doubtful") for _, it in entries),
             "set_by_speech": [],
         }
         if item["heard_only"]:
@@ -237,13 +240,16 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
                 else:
                     apply_item_fact(item, f)
         # Rule 4: entries in other files whose colours match nothing in the best file.
+        # Each new sighting is compared with the best file's pieces AND the sightings flagged before it,
+        # so the same chair seen in two other files isn't added twice (cream boucle = white sculptural).
+        earlier: list[dict] = []
         for f, ms in by_file.items():
             if f == best_file:
                 continue
             for m in ms:
                 if not any(compatible(m["label"], b["label"]) for b in base):
-                    # Ask whether m is any of the pieces already counted (all of `base`), not just one of them.
-                    flags.append({"kind": "same_item", "item_id": item_id, "base": base, "b": m})
+                    flags.append({"kind": "same_item", "item_id": item_id, "base": base + earlier, "b": m})
+                    earlier.append(m)
 
     # Contents facts set a container (created for the item if the model listed none); facts that point at
     # nothing but name an unfilmed item become a heard-only line.
@@ -284,6 +290,43 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
         "uncertain": uncertain,
         "merge_flags": flags,
     }
+
+
+_GENERIC = {"with", "and", "the", "of", "a", "an", "in", "on", "large", "small", "long", "short", "tall", "low", "big",
+            "background", "foreground", "left", "right", "center", "centre", "round", "square", "rectangular", "oval",
+            "wood", "wooden", "marble", "stone", "metal", "glass", "top", "base", "upholstered", "leather", "fabric",
+            "dark", "light", "pale", "single", "seat", "two", "three", "double", "white", "black", "set"}
+
+
+def _distinct_words(label: str, noun: str) -> set[str]:
+    words = set(re.findall(r"[a-z]+", label.lower())) - _GENERIC - set(noun.split("_"))
+    return {w for w in words if len(w) > 3 and not colours(w)}
+
+
+def _fold_unknown_groups(groups: dict) -> None:
+    """The same kind of item can come back with a catalog pick in one file and `unknown` in another
+    (Malin: communal tables as dining_table_6 in one clip, unknown elsewhere), which splits one set into
+    two lines. Fold an unknown:<noun> group into a catalog group with the same head noun when their labels
+    share a distinctive word ("communal"). The size check then judges the catalog pick."""
+    for gk in [k for k in groups if k.startswith("unknown:")]:
+        noun = gk.split(":", 1)[1]
+        mine = set().union(*(_distinct_words(it["label"], noun) for _, it in groups[gk]))
+        if not mine:
+            continue
+        for ck in [k for k in groups if not k.startswith(("unknown:", "heard:"))]:
+            nouns = {canon_key(it["label"]) for _, it in groups[ck]}
+            if nouns != {noun}:
+                continue
+            theirs = set().union(*(_distinct_words(it["label"], noun) for _, it in groups[ck]))
+            if mine & theirs:
+                for p, it in groups.pop(gk):
+                    it["notes"] = (it.get("notes", "") + f" Folded from unknown into {ck} (shared: "
+                                   f"{', '.join(sorted(mine & theirs))}).").strip()
+                    it["catalog_id"] = ck
+                    groups[ck].append((p, it))
+                for _, it in groups[ck]:  # other files didn't recognise the catalog pick: let resolve doubt it
+                    it["catalog_doubtful"] = True
+                break
 
 
 def _speech_record(field: str, value, f: dict) -> dict:

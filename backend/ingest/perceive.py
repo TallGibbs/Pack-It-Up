@@ -13,9 +13,9 @@ from backend import catalog
 from backend.llm import LLMError, Media, for_job
 
 from .common import read_json, run_dir, update_status, write_json
-from .schemas import PERCEPTION_SCHEMA
+from .schemas import PERCEPTION_SCHEMA, SEAT_CLASS_CATALOG
 
-PROMPT_VERSION = "perceive_v2"
+PROMPT_VERSION = "perceive_v3"
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / f"{PROMPT_VERSION}.md"
 MAX_PARALLEL = 6
 
@@ -124,6 +124,10 @@ def perceive_file(run_id: str, entry: dict, job_name: str = "perceive") -> dict:
     known = catalog.load()
     for it in out["items"]:
         it["label"] = clean_label(it["label"])
+        # Upholstered seating is grouped and sized by seat count: the class decides the catalog row.
+        sc = it.get("seat_class", "none")
+        if sc in SEAT_CLASS_CATALOG and not (sc == "single_seat" and it["catalog_id"] == "recliner"):
+            it["catalog_id"] = SEAT_CLASS_CATALOG[sc]
         if it["catalog_id"] != "unknown" and it["catalog_id"] not in known:
             it.setdefault("notes", f"model gave unknown catalog id {it['catalog_id']!r}")
             it["catalog_id"] = "unknown"

@@ -115,4 +115,10 @@ PERCEPTION_SCHEMA = {
 PERCEPTION_SCHEMA["properties"]["items"]["items"]["properties"]["heard_only"] = {
     "type": "boolean", "description": "named in the audio but never seen on camera"}
 PERCEPTION_SCHEMA["properties"]["items"]["items"]["required"].append("heard_only")
+# Prompt v3: upholstered seating by seat count, since size is what packing needs.
+SEAT_CLASSES = ["none", "single_seat", "two_seat", "three_seat", "sectional"]
+SEAT_CLASS_CATALOG = {"single_seat": "armchair", "two_seat": "sofa_loveseat", "three_seat": "sofa_3seat",
+                      "sectional": "sofa_sectional_piece"}
+PERCEPTION_SCHEMA["properties"]["items"]["items"]["properties"]["seat_class"] = {"type": "string", "enum": SEAT_CLASSES}
+PERCEPTION_SCHEMA["properties"]["items"]["items"]["required"].append("seat_class")
 PERCEPTION_SCHEMA["required"] += ["transcript", "spoken_facts"]

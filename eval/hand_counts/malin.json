@@ -1,32 +1,285 @@
 {
   "room": "Malin lounge",
-  "files": ["IMG_6705.JPEG", "IMG_6707.JPEG", "IMG_6708.JPEG"],
-  "note": "Counted by eye from the three photos on Nov 21 2026, before the first model run. Items are matched by catalog_id first, then by any keyword in `match` appearing in the item label. `optional` items are not counted as missed if absent, and not as wrong if present.",
+  "files": [
+    "IMG_6703.MP4",
+    "IMG_6704.MP4",
+    "IMG_6705.JPEG",
+    "IMG_6707.JPEG",
+    "IMG_6708.JPEG"
+  ],
+  "note": "First counted by eye from the three photos on Nov 21 2026, before the first model run. Corrected the same day by Chris, who checked the room in person (entries with verified: in_person). In-person counts include things that are in the room but hidden or out of frame in the photos and clips (6 bar stools, 16 work chairs, a second sofa on the right side), so a perfect score is not reachable from this footage alone. Matching is by catalog_id first, then by any keyword in `match` appearing in the item label. `optional` items are neither missed if absent nor wrong if present.",
   "movable": [
-    {"key": "sofa_3seat", "label": "olive green sofa", "quantity": 1, "match": ["sofa", "couch"], "files": ["IMG_6705.JPEG"]},
-    {"key": "sofa_loveseat", "label": "mustard velvet loveseat", "quantity": 1, "match": ["loveseat", "settee", "mustard"], "files": ["IMG_6705.JPEG"]},
-    {"key": "armchair", "label": "armchairs (rust, burgundy, olive, cream boucle)", "quantity": 4, "match": ["armchair", "lounge chair", "accent chair", "club chair", "barrel"], "files": ["IMG_6705.JPEG", "IMG_6708.JPEG"]},
-    {"key": "ottoman", "label": "stacked leather pouf / ottoman (incl. blue one by the window)", "quantity": 3, "match": ["ottoman", "pouf", "stool, stacked"], "files": ["IMG_6705.JPEG"]},
-    {"key": "bar_stool", "label": "bar stools", "quantity": 4, "match": ["bar stool", "counter stool", "stool"], "files": ["IMG_6705.JPEG"]},
-    {"key": "counter_table", "label": "long stone-top counter on turned legs (may be fixed to wall)", "quantity": 1, "match": ["counter", "console", "bar table", "high table"], "files": ["IMG_6705.JPEG"]},
-    {"key": "coffee_table", "label": "tiled coffee table", "quantity": 1, "match": ["coffee table"], "files": ["IMG_6705.JPEG"]},
-    {"key": "end_table", "label": "side tables (fluted wood, green onyx)", "quantity": 2, "match": ["side table", "end table", "accent table", "drum table", "pedestal"], "files": ["IMG_6705.JPEG"]},
-    {"key": "floor_lamp", "label": "floor lamp", "quantity": 1, "match": ["floor lamp"], "files": ["IMG_6705.JPEG"]},
-    {"key": "area_rug_rolled", "label": "area rugs", "quantity": 2, "match": ["rug"], "files": ["IMG_6705.JPEG", "IMG_6708.JPEG"]},
-    {"key": "communal_table", "label": "long communal table with wood rail", "quantity": 1, "match": ["communal", "long table", "conference", "dining table", "work table", "worktable"], "files": ["IMG_6708.JPEG"]},
-    {"key": "second_table", "label": "second (rear) table", "quantity": 1, "match": ["table"], "files": ["IMG_6708.JPEG"]},
-    {"key": "dining_chair", "label": "upholstered dining chairs with curved arms", "quantity": 8, "match": ["dining chair", "chair"], "files": ["IMG_6708.JPEG"]},
-    {"key": "shelving_unit", "label": "open metal shelving unit (etagere)", "quantity": 1, "match": ["shelving", "etagere", "étagère", "shelf unit", "shelves"], "files": ["IMG_6708.JPEG"]},
-    {"key": "sideboard", "label": "sideboards / credenzas (stone-top cabinet, credenza under shelving)", "quantity": 2, "match": ["sideboard", "credenza", "buffet", "cabinet"], "files": ["IMG_6707.JPEG", "IMG_6708.JPEG"]},
-    {"key": "console_table", "label": "wood console behind the rear table", "quantity": 1, "match": ["console"], "files": ["IMG_6708.JPEG"]},
-    {"key": "table_lamp", "label": "table lamp", "quantity": 1, "match": ["table lamp", "lamp"], "files": ["IMG_6708.JPEG"]},
-    {"key": "potted_plant", "label": "large potted plant", "quantity": 1, "match": ["plant", "tree"], "files": ["IMG_6708.JPEG"]},
-    {"key": "framed_art", "label": "large framed art (left wall in 6705, blue canvas in 6708, canvas in 6707) plus small framed photo", "quantity": 4, "match": ["art", "painting", "canvas", "frame", "print", "photo"], "files": ["IMG_6705.JPEG", "IMG_6707.JPEG", "IMG_6708.JPEG"]}
+    {
+      "key": "sofa_3seat",
+      "label": "three-seat sofas (olive green; a second on the right side of the room, hard to see)",
+      "quantity": 2,
+      "verified": "in_person",
+      "match": [
+        "sofa",
+        "couch",
+        "three-seat"
+      ]
+    },
+    {
+      "key": "sofa_loveseat",
+      "label": "two-seat sofa (mustard velvet)",
+      "quantity": 1,
+      "verified": "in_person",
+      "match": [
+        "loveseat",
+        "settee",
+        "two-seat"
+      ]
+    },
+    {
+      "key": "armchair",
+      "label": "single-seat chairs: orange barrel, burgundy (model said 'dark brown'), olive/grey, cream boucle (= 'white sculptural armchair' in IMG_6704 at 9.5 s)",
+      "quantity": 4,
+      "verified": "in_person",
+      "match": [
+        "armchair",
+        "single-seat",
+        "accent chair",
+        "lounge chair",
+        "club chair",
+        "barrel"
+      ]
+    },
+    {
+      "key": "ottoman",
+      "label": "stacked leather pouf / ottoman (incl. blue one by the window)",
+      "quantity": 3,
+      "verified": "photos",
+      "match": [
+        "ottoman",
+        "pouf"
+      ]
+    },
+    {
+      "key": "bar_stool",
+      "label": "bar stools (some hard to see in IMG_6705)",
+      "quantity": 6,
+      "verified": "in_person",
+      "match": [
+        "bar stool",
+        "counter stool",
+        "stool"
+      ]
+    },
+    {
+      "key": "counter_table",
+      "label": "long stone-top counter on turned legs (may be fixed to wall)",
+      "quantity": 1,
+      "verified": "photos",
+      "match": [
+        "counter",
+        "bar table",
+        "high table"
+      ]
+    },
+    {
+      "key": "coffee_table",
+      "label": "tiled coffee table",
+      "quantity": 1,
+      "verified": "photos",
+      "match": [
+        "coffee table"
+      ]
+    },
+    {
+      "key": "end_table",
+      "label": "side tables (fluted wood, green onyx)",
+      "quantity": 2,
+      "verified": "photos",
+      "match": [
+        "side table",
+        "end table",
+        "accent table",
+        "drum table",
+        "pedestal"
+      ]
+    },
+    {
+      "key": "floor_lamp",
+      "label": "floor lamp",
+      "quantity": 1,
+      "verified": "photos",
+      "match": [
+        "floor lamp"
+      ]
+    },
+    {
+      "key": "area_rug_rolled",
+      "label": "area rugs",
+      "quantity": 2,
+      "verified": "photos",
+      "match": [
+        "rug"
+      ]
+    },
+    {
+      "key": "communal_table",
+      "label": "communal work tables with wood rail",
+      "quantity": 2,
+      "verified": "in_person",
+      "match": [
+        "communal",
+        "work table",
+        "worktable",
+        "long table",
+        "conference",
+        "dining table"
+      ]
+    },
+    {
+      "key": "dining_chair",
+      "label": "upholstered wood work chairs, 8 per table (most occupied or hidden in the footage)",
+      "quantity": 16,
+      "verified": "in_person",
+      "match": [
+        "dining chair",
+        "work chair",
+        "chair"
+      ]
+    },
+    {
+      "key": "shelving_unit",
+      "label": "double-wide open metal shelving on a credenza base (IMG_6708), free-standing",
+      "quantity": 1,
+      "verified": "in_person",
+      "match": [
+        "metal shelving",
+        "etagere",
+        "étagère",
+        "metal and glass",
+        "metal and wood",
+        "double-wide",
+        "double-bay",
+        "lower cabinet",
+        "credenza base"
+      ]
+    },
+    {
+      "key": "bookshelf_tall",
+      "label": "dark-wood open shelving / room divider (IMG_6703 at 5 s, right side of IMG_6705), free-standing",
+      "quantity": 1,
+      "verified": "in_person",
+      "match": [
+        "bookshelf",
+        "room divider",
+        "wood shelving",
+        "shelving"
+      ],
+      "dims_in": {
+        "height": 96,
+        "width_min": 96,
+        "note": "about 96 in tall and slightly wider than tall"
+      }
+    },
+    {
+      "key": "sideboard",
+      "label": "sideboard / credenza (IMG_6707; closed doors, contents unknown)",
+      "quantity": 1,
+      "verified": "in_person",
+      "match": [
+        "sideboard",
+        "credenza",
+        "buffet",
+        "cabinet"
+      ]
+    },
+    {
+      "key": "console_table",
+      "label": "wood console behind the rear table",
+      "quantity": 1,
+      "verified": "photos",
+      "match": [
+        "console"
+      ]
+    },
+    {
+      "key": "table_lamp",
+      "label": "table lamp",
+      "quantity": 1,
+      "verified": "photos",
+      "match": [
+        "table lamp",
+        "lamp"
+      ]
+    },
+    {
+      "key": "potted_plant",
+      "label": "large potted plant",
+      "quantity": 1,
+      "verified": "photos",
+      "match": [
+        "plant",
+        "tree"
+      ]
+    },
+    {
+      "key": "framed_art",
+      "label": "large framed art (left wall in 6705, blue canvas in 6708, canvas in 6707) plus small framed photo",
+      "quantity": 4,
+      "verified": "photos",
+      "match": [
+        "art",
+        "painting",
+        "canvas",
+        "frame",
+        "print",
+        "photo"
+      ]
+    }
+  ],
+  "containers": [
+    {
+      "label": "sideboard in IMG_6707",
+      "fullness": "unknown",
+      "verified": "in_person",
+      "note": "doors closed; contents unknown even in person"
+    }
   ],
   "optional": [
-    {"key": "trash_can", "label": "trash bins", "quantity": 2, "match": ["trash", "bin", "waste"]},
-    {"key": "espresso_machine", "label": "espresso machine and grinder on the bar", "quantity": 2, "match": ["espresso", "grinder", "coffee machine"]}
+    {
+      "key": "trash_can",
+      "label": "trash bins",
+      "quantity": 2,
+      "match": [
+        "trash",
+        "bin",
+        "waste"
+      ]
+    },
+    {
+      "key": "espresso_machine",
+      "label": "espresso machine and grinder on the bar",
+      "quantity": 2,
+      "match": [
+        "espresso",
+        "grinder",
+        "coffee machine"
+      ]
+    }
   ],
-  "fixtures": ["wall mirror", "built-in shelving", "espresso bar counter", "wall sconces", "track lighting", "ring pendant light", "pendant lights", "security camera", "exit sign", "fire extinguisher", "tiled column"],
-  "personal_belongings": ["backpacks", "laptops", "coats and jackets", "water bottles", "coffee cups", "food"]
+  "fixtures": [
+    "wall mirror",
+    "espresso bar counter",
+    "wall sconces",
+    "track lighting",
+    "ring pendant light",
+    "pendant lights",
+    "security camera",
+    "exit sign",
+    "fire extinguisher",
+    "tiled column"
+  ],
+  "personal_belongings": [
+    "backpacks",
+    "laptops",
+    "coats and jackets",
+    "water bottles",
+    "coffee cups",
+    "food"
+  ]
 }
