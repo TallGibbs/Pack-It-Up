@@ -8,7 +8,7 @@ from __future__ import annotations
 import threading
 from collections import defaultdict
 
-from .common import run_dir, update_status
+from .common import read_json, run_dir, update_status
 from .merge import merge
 from .perceive import perceive_all
 from .resolve import resolve
@@ -45,6 +45,8 @@ def rebuild(run_id: str, questions: bool = False) -> dict:
     from . import gaps  # late import: gaps imports resolve
 
     with run_lock(run_id):
+        rd = run_dir(run_id)
+        was_done = (read_json(rd / "status.json", {}) or {}).get("stage") == "done"
         merge(run_id)
         gaps.reapply_answers(run_id)
         inv = resolve(run_id)
@@ -53,6 +55,13 @@ def rebuild(run_id: str, questions: bool = False) -> dict:
             merge(run_id)                 # so rebuild from scratch and apply them once
             gaps.reapply_answers(run_id)
             inv = resolve(run_id)
+        # merge and resolve stamp their own stage. A review edit (answer, quantity, added item) on a
+        # finished run must leave it "done", or the pages read it as still processing and poll forever.
+        if was_done:
+            with _active_guard:
+                idle = _active[run_id] == 0
+            if idle:
+                update_status(rd, stage="done")
         return inv
 
 
