@@ -74,7 +74,7 @@ If the tunnel or wifi fails, open a move from earlier today on the laptop and sa
 
 | Risk | What we do |
 |---|---|
-| The tunnel stops without anyone noticing. At 13:59 the address returned 530 because `cloudflared` had exited; the API was still up | Make `run_demo.ps1` restart the tunnel when it exits, and check `/health` before each demo |
+| The tunnel or the API stops without anyone noticing (13:59 and 14:41) | Since 14:56 `run_demo.ps1` runs a keeper that starts either one again within about 10 seconds. Still check `run_demo.ps1 -Status` before each demo |
 | The laptop sleeps or closes while we present on it | Keep-awake on, lid open, on power. The address works only while this laptop runs |
 | Several judges upload at once on the event API key | Not measured. Two phones at once worked at 13:47 with cached photos only |
 | `GET /analysis/runs` lists every move's id to anyone | Leave it, or hide it behind a setting before the QR goes out |
@@ -85,7 +85,7 @@ If the tunnel or wifi fails, open a move from earlier today on the laptop and sa
 1. **Results table (proof, 25%).** Done at 14:50: [eval/RESULTS.md](../eval/RESULTS.md), built by `python eval/results_table.py` from the 24 moves on the demo laptop (14 different sets of footage). One per set: the stock `py3dbp` packer's plan broke no rule on 3 of 14, ours on 13 of 14; U-Haul's bedroom rule picked too small a truck on 7 of 14; Neon raised the score on 9 of 14. Venue lounge against the in-person count: recall 67% to 75%. Not built: a single-model-call baseline. Run the script again before submitting if new moves should count.
 2. **A model in Track B (model use, 20%).** Done at 14:14: "Plan with Neon" is live (decisions.md 14:14). On move 133201 it goes from two 26 ft trucks (91.5) to one (95.2).
 3. **README.** Status still says Track B is being built. Add what the app does now, the results table, and whether `data/trucks.csv`, `penn_zones.csv` and `sample_venue.json` were brought in.
-4. **Tunnel restart** in `run_demo.ps1`.
+4. **Tunnel restart** in `run_demo.ps1`. Done at 14:56, for the API too.
 5. **Slides and QR image.** Eight slides since 14:55: cover with the code, how it works, four "in action" slides with screenshots of move 133201 (film, check the list, Neon plans the load, which model did what), what we measured, try it yourself. The code is bottom right on every slide between the cover and the close. The screenshots are in the deck only, not in git. Chris has them as a private Claude deck that downloads as PowerPoint or PDF. The baseline line on the "what we measured" slide is a placeholder until the results table exists.
 
 ## Timeline
