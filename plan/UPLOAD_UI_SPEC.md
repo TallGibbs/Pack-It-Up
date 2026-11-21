@@ -12,7 +12,8 @@ Plain HTML and JS, no build step, no framework. New files only; `frontend/index.
 |---|---|
 | `frontend/capture.html` | Capture and progress screens |
 | `frontend/review.html` | Review and handoff screens |
-| `frontend/ui/api.js` | API client: real server or mock, chosen by the URL |
+| `frontend/ui/capture.js`, `frontend/ui/review.js` | Each page's script (moved out of the HTML at 12:40) |
+| `frontend/ui/api.js` | API client: real server or mock, chosen by the URL; also the helpers both pages share |
 | `frontend/ui/style.css` | Shared styles, phone first |
 | `frontend/mock/mock-api.js` | In-browser mock of the Track A routes |
 | `frontend/mock/inventory.json` | Fixture in the `inventory_v2` shape, with `set_by_speech` and questions |
@@ -69,6 +70,8 @@ Shown on the capture page under each room card as soon as an upload starts. The 
 - **Handling badges** that matter for loading: fragile, two-person, keep upright.
 - **Quantity stepper** (− n +). Sends `PATCH /inventory/{run_id}/items/{id}` with `{quantity}` 400 ms after the last tap. Setting 0 marks the item trash (the server does this).
 - **Disposition** (decision 11:38): Move (`keep`), Stays (`stays`), Sell (`sell`), Toss (`trash`) as a segmented control, sent with `PATCH {disposition}`. `undecided` counts as moving and shows Move outlined. Stays, Sell and Toss rows dim and drop out of the totals. Any other value (an older `donate`) shows as a badge until a segment is tapped.
+
+**Add an item** (added 12:40): a "+ Add an item" button under each room's list, for something the camera didn't see ("add a piano"). It opens a sheet with a searchable catalog list grouped by category (`GET /catalog`), a quantity stepper, and "Not in the list" for a typed name plus length, width and height in inches. It sends `POST /inventory/{run_id}/items` with `{room, catalog_id, quantity}` or `{room, label, dims_in, quantity}`; the reply is the updated inventory. Added rows show an "added by you" badge, count in the totals, and are removed with Toss or quantity 0.
 
 **Below the items:** containers (bookshelf, cabinet: contents, fullness, about N boxes), then one footnote line for what's left out: "Left out: 14 fixtures, 13 personal belongings (5 laptops, 5 jackets, 3 backpacks)".
 

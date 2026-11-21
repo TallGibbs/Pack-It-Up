@@ -8,21 +8,22 @@ The phone pages for Track A: film or pick photos and clips, watch them being pro
 
 | File | What it does |
 |---|---|
-| `capture.html` | Room cards, upload queue, per-file progress, the top open question, footer links to review and the plan |
-| `review.html` | Totals bar, question cards, item list with quantity and Move / Stays / Sell / Toss, handoff button |
-| `ui/api.js` | `window.PIU`: the API client (real server or mock), page links, the last-run memory, placeholder thumbnails |
+| `capture.html` + `ui/capture.js` | Room cards, upload queue, per-file progress, the top open question, coming back to a move, footer links to review and the plan |
+| `review.html` + `ui/review.js` | Totals bar, question cards, item list with quantity and Move / Stays / Sell / Toss, "Add an item", handoff button |
+| `ui/api.js` | `window.PIU`: the API client (real server or mock) and everything both pages share: `$`, `esc`, `isVideo`, `thumbHtml`, page links, the last-run memory |
 | `ui/questions.js` | `window.PIU_Q`: which questions to show, question card HTML, click wiring. Used by both pages |
 | `ui/style.css` | Shared styles, phone first |
-| `mock/mock-api.js` | `window.PIU_MOCK`: the same five API methods, run in the browser from `mock/inventory.json` |
+| `mock/mock-api.js` | `window.PIU_MOCK`: the same API methods, run in the browser from `mock/inventory.json` |
 
-Each page loads `mock/mock-api.js`, then `ui/api.js`, then `ui/questions.js`, then its own inline script. The order matters: `api.js` picks the mock when the URL has `?mock=1`.
+The HTML files hold markup only. Each page loads `mock/mock-api.js`, then `ui/api.js`, then `ui/questions.js`, then its own script. The order matters: `api.js` picks the mock when the URL has `?mock=1`, and the later files take their helpers from `window.PIU`. A helper two pages need goes in `ui/api.js`, not in both page scripts.
 
 ## Rules the code follows
 
-- **The server's reply is the state.** `POST /answer` and `PATCH …/items/{id}` return the whole inventory, and `GET /runs/{run_id}` returns status plus inventory. Pages re-render from the reply and keep only small pending state (a quantity being typed, a request in flight).
+- **The server's reply is the state.** `POST /answer`, `PATCH …/items/{id}` and `POST …/items` (add an item) return the whole inventory, and `GET /runs/{run_id}` returns status plus inventory. Pages re-render from the reply and keep only small pending state (a quantity being typed, a request in flight).
 - **Every API method exists twice:** in `real` in `ui/api.js` and in `PIU_MOCK`. Add or change both, with the same arguments and reply shape. Routes are listed at the top of `backend/ingest/api.py`.
 - **Links between pages go through `PIU.link(page, {run_id})`** so `?mock=1` and `?api=` carry over.
 - **Text from the server or the user goes through `esc()` or `textContent`**, never straight into `innerHTML`.
+- **Items the user adds are ordinary items.** "Add an item" sends a catalog id (or a typed name and size); the server sizes it and returns it in the inventory with `source: "user_added"`, and quantity and Move / Stays / Sell / Toss work on it like on any other row.
 
 ## What a "move" is
 
