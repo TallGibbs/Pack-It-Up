@@ -23,6 +23,7 @@ ROLES = {
     "decide": ("Answers", "Calibrated answers to gap questions: same item?, how many?, built in?, how full?"),
     "decide_fallback": ("Answers (backup)", "Enum-constrained answer when a Decisions API call fails"),
     "plan": ("Plans", "Reads the checker's violations and changes the packing strategy"),
+    "managed_agent": ("Competes", "Strategy agents each try a packing plan in their own Google managed-agent sandbox (Antigravity)"),
     "baseline": ("Baseline", "One-call packing plan, scored by our checker for comparison"),
     "image": ("Draws", "Illustrative arrival image (not the plan)"),
     "hello": ("Check", "Connection check"),
@@ -119,7 +120,9 @@ def _load_run(con: sqlite3.Connection, run_id: str, rd: Path, sig: str) -> None:
                 r = json.loads(line)
             except ValueError:
                 continue  # a half-written last line
-            rows.append((run_id, seq, r.get("ts"), r.get("job"), r.get("provider"), r.get("model"), r.get("kind"),
+            # A managed-agent call logs the agent's name as `model` and the model it ran on as `agent_model`.
+            # This table answers "which model did which job", so it keeps the model; `kind` still says managed_agent.
+            rows.append((run_id, seq, r.get("ts"), r.get("job"), r.get("provider"), r.get("agent_model") or r.get("model"), r.get("kind"),
                          r.get("prompt_version"), r.get("file"), r.get("cache"), int(bool(r.get("valid"))),
                          r.get("latency_s"), r.get("tokens_in"), r.get("tokens_out"), r.get("thoughts"),
                          r.get("attempt"), r.get("media_mode"), r.get("error")))
