@@ -32,6 +32,7 @@ SUPPORT_Z_TOL = 0.25
 DEFAULT_MIN_SUPPORT = 0.75
 DEFAULT_LIGHT_MAX_LB = 30.0
 DEFAULT_BALANCE_BAND = (0.40, 0.60)
+DEFAULT_MAX_REACH_SETBACK_IN = 25.0
 
 
 def _rect_union_area(rects: list[tuple[float, float, float, float]]) -> float:
@@ -71,6 +72,31 @@ def _aabb(item: dict) -> tuple[float, float, float, float, float, float]:
     x, y, z = item["pos_in"]
     dx, dy, dz = item["size_in"]
     return float(x), float(y), float(z), float(x + dx), float(y + dy), float(z + dz)
+
+
+def compute_stand_x(boxes: list[tuple[float, float, float, float, float, float]]) -> list[float]:
+    """Return each item's required floor-standing plane `stand_x[i]` toward the rear door.
+
+    For a floor item (`z1 == 0`), the mover stands on the empty truck deck right at its
+    door-facing face `x2`. For an elevated item (`z1 > 0`), all items beneath it must
+    already be in place, so the mover stands at `max(x2_i, max_{j beneath i} stand_x[j])`.
+    """
+    n = len(boxes)
+    stand_x = [b[3] for b in boxes]
+    z_order = sorted(range(n), key=lambda k: (boxes[k][2], boxes[k][5]))
+    for i in z_order:
+        ax1, ay1, az1, ax2, ay2, _ = boxes[i]
+        if az1 <= SUPPORT_Z_TOL:
+            continue
+        for j in range(n):
+            if i == j:
+                continue
+            bx1, by1, _, bx2, by2, bz2 = boxes[j]
+            if bz2 <= az1 + SUPPORT_Z_TOL:
+                if min(ax2, bx2) - max(ax1, bx1) > EPS and min(ay2, by2) - max(ay1, by1) > EPS:
+                    if stand_x[j] > stand_x[i]:
+                        stand_x[i] = stand_x[j]
+    return stand_x
 
 
 def _orig_dims(item: dict) -> list[float] | None:
@@ -214,7 +240,8 @@ def verify_truck(
                     item_ids=[aid, bid],
                 ))
 
-    # 3. Base support (>= 75%), stacking rules, and load_seq support order
+    # 3. Base support (>= 75%), stacking rules, load_seq support order, and walk-in tier reachability
+    stand_x = compute_stand_x(boxes)
     for i, it in enumerate(items):
         ax1, ay1, az1, ax2, ay2, az2 = boxes[i]
         dx, dy = ax2 - ax1, ay2 - ay1
@@ -283,6 +310,39 @@ def verify_truck(
                 truck_index=t_idx,
                 item_ids=[aid],
             ))
+
+        # Walk-in tier check: movers must never have to step onto lower-level boxes/cargo to place an upper item.
+        setback = stand_x[i] - ax2
+        if setback > DEFAULT_MAX_REACH_SETBACK_IN + EPS:
+            violations.append(_violation(
+                "walk_in_access",
+                f"{aid} at x={ax1:.0f}..{ax2:.0f} in (z={az1:.0f} in) sits {setback:.0f} in behind its support front "
+                f"x={stand_x[i]:.0f} in — unreachable from truck floor without climbing onto lower cargo",
+                truck_index=t_idx,
+                item_ids=[aid],
+            ))
+        elif aseq is not None:
+            premature_front: tuple[float, int, str, float, float] | None = None
+            for j, other in enumerate(items):
+                if i == j:
+                    continue
+                bseq = other.get("load_seq")
+                if bseq is None or int(bseq) >= int(aseq):
+                    continue
+                bx1, _, _, bx2, _, _ = boxes[j]
+                if bx1 >= stand_x[i] - 0.05 and bx2 > stand_x[i] + 0.5:
+                    cand = (bx2, int(bseq), str(other.get("id", f"item_{j}")), bx1, bx2)
+                    if premature_front is None or cand[0] > premature_front[0]:
+                        premature_front = cand
+            if premature_front is not None:
+                _, bseq_bad, bid_bad, bx1_bad, bx2_bad = premature_front
+                violations.append(_violation(
+                    "walk_in_access",
+                    f"{aid} (load_seq={aseq}, x={ax1:.0f}..{ax2:.0f} in, z={az1:.0f} in) is loaded after door-side "
+                    f"cargo {bid_bad} (load_seq={bseq_bad}, x={bx1_bad:.0f}..{bx2_bad:.0f} in), forcing movers to step on lower boxes",
+                    truck_index=t_idx,
+                    item_ids=[aid, bid_bad],
+                ))
 
     # 4. Left-right weight balance across truck width (y axis)
     cog_y_ratio = (weighted_y / (total_wt * W)) if (total_wt > 0 and W > 0) else 0.5
@@ -435,6 +495,7 @@ RULE_WEIGHTS: dict[str, float] = {
     "light_only_on_top": 7.0,
     "fragile_crushed": 9.0,
     "load_seq_support": 6.0,
+    "walk_in_access": 8.0,
     "weight_balance": 10.0,
     "zone_door_clearance": 10.0,
     "zone_fit": 10.0,

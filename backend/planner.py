@@ -22,8 +22,12 @@ from pathlib import Path
 from typing import Any
 
 from backend import catalog, expand, solver
-from backend.llm import LLMError
-from backend.llm.managed_agents import has_api_key, plan_job
+from backend.llm import LLMError, managed_agents
+from backend.llm.managed_agents import plan_job
+
+
+def has_api_key() -> bool:
+    return managed_agents.has_api_key()
 
 TRUCK_IDS = ["uhaul_10", "uhaul_15", "uhaul_20", "uhaul_26"]
 PACKER_ENGINES = ["constrained", "raw_py3dbp"]

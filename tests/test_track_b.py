@@ -194,3 +194,57 @@ def test_b4_deliberately_broken_plans_fail_with_named_violations() -> None:
     assert not res["valid"]
     assert "zone_door_clearance" in res["violation_counts_by_rule"]
     assert "zone_distribution" in res["violation_counts_by_rule"]
+
+
+def test_walk_in_tier_loading_never_steps_on_lower_boxes() -> None:
+    """Ensure trucks build vertical tiers cab-to-door instead of carpeting the floor then stacking level 2."""
+    sample = json.loads((ROOT / "data" / "sample_venue.json").read_text(encoding="utf-8"))
+    mock_inv = json.loads((ROOT / "frontend" / "mock" / "inventory.json").read_text(encoding="utf-8"))
+    box_heavy = {
+        "rooms": [{
+            "room": {"id": "apt", "name": "Apartment"},
+            "items": [],
+            "containers": [
+                {"id": "c1", "label": "Study", "fullness": "full", "contents": "books", "est_boxes": {"box_small": 16, "box_medium": 16}},
+                {"id": "c2", "label": "Closet", "fullness": "full", "contents": "clothes", "est_boxes": {"box_large": 12}},
+            ],
+        }],
+    }
+
+    for inv in (sample, mock_inv, box_heavy):
+        plan = solver.solve(inv)
+        assert "walk_in_access" not in plan["score"]["violation_counts_by_rule"]
+        for t in plan["trucks"]:
+            items = t["items"]
+            boxes = [verify._aabb(it) for it in items]
+            stand_x = verify.compute_stand_x(boxes)
+            for idx, it in enumerate(items):
+                x1, _, z1, x2, _, _ = boxes[idx]
+                if z1 <= verify.SUPPORT_Z_TOL:
+                    continue
+                assert stand_x[idx] - x2 <= verify.DEFAULT_MAX_REACH_SETBACK_IN + 1e-3
+                for other in items:
+                    if other["load_seq"] < it["load_seq"]:
+                        ox1 = other["pos_in"][0]
+                        ox2 = ox1 + other["size_in"][0]
+                        assert not (ox1 >= stand_x[idx] - 0.05 and ox2 > stand_x[idx] + 0.5)
+
+    # Regression check: old bottom-up `(z, x, y)` sequence (floor packed in->out, then level 2 packed in->out)
+    # MUST be rejected by `verify.verify` with `walk_in_access`.
+    broken_floor_first = _base_truck([
+        {"id": "floor_cab", "label": "box 1", "pos_in": [0, 40, 0], "size_in": [18, 18, 16], "weight_lb": 25, "stackable": "yes", "load_seq": 1},
+        {"id": "floor_mid", "label": "box 2", "pos_in": [18, 40, 0], "size_in": [18, 18, 16], "weight_lb": 25, "stackable": "yes", "load_seq": 2},
+        {"id": "lvl2_cab", "label": "box 3", "pos_in": [0, 40, 16], "size_in": [18, 18, 16], "weight_lb": 20, "stackable": "yes", "load_seq": 3},
+    ])
+    res_seq = verify.verify(broken_floor_first, check_zones=False)
+    assert not res_seq["valid"]
+    assert "walk_in_access" in res_seq["violation_counts_by_rule"]
+
+    # Regression check: elevated box set > 25" back from front of a long floor base is rejected with `walk_in_access`.
+    broken_deep_setback = _base_truck([
+        {"id": "long_base", "label": "6ft table", "pos_in": [0, 34, 0], "size_in": [72, 30, 16], "weight_lb": 60, "stackable": "yes", "load_seq": 1},
+        {"id": "deep_box", "label": "unreachable box", "pos_in": [0, 40, 16], "size_in": [16, 16, 12], "weight_lb": 20, "stackable": "yes", "load_seq": 2},
+    ])
+    res_reach = verify.verify(broken_deep_setback, check_zones=False)
+    assert not res_reach["valid"]
+    assert "walk_in_access" in res_reach["violation_counts_by_rule"]
