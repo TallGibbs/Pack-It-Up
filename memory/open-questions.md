@@ -12,6 +12,13 @@ Move an item to [decisions.md](decisions.md) once it is decided, and delete it h
 - **Who owns `backend/catalog.py` and `data/item_catalog.csv`?** The plan gives them to George; the Track A session created first versions so ingestion could start. George should extend them rather than rewrite them. (Chris and George)
 - **Living room media.** `data/Inputs/Living Room/` is empty. Is the home photo still coming? (Chris)
 
+## Left by the Track A ingestion session (12:10)
+- **Demo processes.** The API (laptop-only, port 8000) and the named tunnel run in two minimized windows on Chris's laptop. If the laptop restarts, run `powershell -ExecutionPolicy Bypass -File run_demo.ps1` from the repo, then check https://packitup.temperedanalytics.com/health. A separate quick tunnel (trycloudflare.com) started by the upload UI session may also still be running.
+- **"Plan the truck load" is a 404** until Track B adds `frontend/index.html`. (George)
+- **Capture page sends an upload with no files** (seen once as a 422). Small guard in `frontend/capture.html`. (Track A UI)
+- **A real narrated clip** for the audio check; the passing check used a text-to-speech stand-in. Film it in the Camera app and add it with Choose files. (Chris)
+- **Accuracy work is on hold** (decision 11:55): one run per prompt can't separate prompt v3 from run-to-run variation; recall on Malin is 67-75% against the in-person count.
+
 ## Ideas proposed, not decided
 - **Lifting guidance on unload steps:** tags such as "two-person lift" or "over 50 lb", using the catalog's `two_person` flag and weights. About 30 minutes in B8. Suggested as core.
 - **Truck-mode reminder:** one checklist line on the final plan screen telling drivers to use a truck-aware nav setting. About 5 minutes. Check which apps really have a truck mode before naming one.
