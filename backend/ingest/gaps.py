@@ -548,8 +548,17 @@ def build_questions(run_id: str) -> list[dict]:
             q["shown"] = True
     for q in qs:  # keep any earlier question that no longer triggers but was answered
         old.pop(q["id"], None)
+    raw = build_merged(run_id)
+    targets_alive = (
+        {it["id"] for src in (merged, raw) for r in src["rooms"] for it in r["items"]}
+        | {aid for src in (merged, raw) for r in src["rooms"] for it in r["items"]
+           for aid in [it.get("legacy_id"), *it.get("alias_ids", [])] if aid}
+        | {c["label"] for src in (merged, raw) for r in src["rooms"] for c in r["containers"]}
+        | {r["id"] for r in merged["rooms"]}
+    )
     kept = [q for q in old.values() if q.get("status") == "answered"
-            and (q["id"] in answered or q.get("answered_by") == "speech")]  # not one whose answer was withdrawn
+            and q.get("refers_to") in targets_alive
+            and (q["id"] in answered or (q.get("answered_by") == "speech" and q.get("quote_source") in files_by_name))]
     pub = [_public(q) for q in qs] + kept
     pub.sort(key=lambda q: (q["status"] != "open", not q.get("shown", False), -q.get("rank_score", 0)))
     write_json(rd / "questions.json", {"run_id": run_id, "questions": pub,

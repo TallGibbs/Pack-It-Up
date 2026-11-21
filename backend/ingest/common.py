@@ -72,9 +72,16 @@ def scrub(text) -> str:
 
 
 def update_status(rd: Path, **changes) -> dict:
-    """Merge into runs/<id>/status.json. `files={name: {...}}` merges per file."""
+    """Merge into runs/<id>/status.json. `files={name: {...}}` merges per file; `drop_files` removes entries."""
     with _status_lock:
         st = read_json(rd / "status.json", {"stage": "created", "files": {}, "errors": []})
+        drop_files = changes.pop("drop_files", None)
+        if drop_files:
+            drop = set(drop_files)
+            for k in drop:
+                st["files"].pop(k, None)
+            if "perceive_failed" in st:
+                st["perceive_failed"] = [k for k in st["perceive_failed"] if k not in drop]
         files = changes.pop("files", None)
         if files:
             for k, v in files.items():

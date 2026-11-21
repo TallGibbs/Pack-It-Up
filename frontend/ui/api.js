@@ -86,10 +86,11 @@
 
   const real = {
     // POST /upload with XHR, because fetch has no upload progress.
-    upload(files, room, runId, onProgress, who) {
+    upload(files, room, runId, onProgress, who, signal) {
       return new Promise((resolve, reject) => {
         files = (files || []).filter(Boolean);
         if (!files.length) return reject(new Error("No file to send. Choose it again.")); // never a request with no files (FAILURES.md 12:05)
+        if (signal && signal.aborted) return reject(Object.assign(new Error("Upload cancelled."), { aborted: true }));
         const fd = new FormData();
         files.forEach((f) => fd.append("files", f, f.name));
         fd.append("room", room);
@@ -97,6 +98,7 @@
         if (who) fd.append("who", who);
         const xhr = new XMLHttpRequest();
         xhr.open("POST", API_BASE + "/upload");
+        if (signal) signal.addEventListener("abort", () => xhr.abort(), { once: true });
         xhr.upload.onprogress = (e) => e.lengthComputable && onProgress && onProgress(e.loaded / e.total);
         xhr.onload = () => {
           let data = null;
@@ -105,12 +107,15 @@
           else if (xhr.status === 413) reject(new Error("Too big to send in one go (100 MB limit). Use a shorter clip."));
           else reject(new Error(detailText(data && data.detail, `Upload failed (${xhr.status || "network"}).`)));
         };
+        xhr.onabort = () => reject(Object.assign(new Error("Upload cancelled."), { aborted: true }));
         // Airplane mode, a dropped signal, or the server stopped: the same words fit all three.
         xhr.onerror = () => reject(new Error("No connection. Check your signal, then tap Retry."));
         xhr.send(fd);
       });
     },
     getRun: (runId) => json("GET", `/runs/${encodeURIComponent(runId)}`),
+    deleteFile: (runId, fileName) =>
+      json("DELETE", `/runs/${encodeURIComponent(runId)}/files/${encodeURIComponent(fileName)}`),
     answer: (runId, questionId, answer) =>
       json("POST", `/answer/${encodeURIComponent(runId)}`, { question_id: questionId, answer }),
     patchItem: (runId, itemId, changes) =>

@@ -28,6 +28,8 @@
   const usedNames = new Set();   // every file name in this run, lower case: the server keys files by name
   const queue = [];
   let uploading = false;
+  let currentJob = null;     // {room, rows, ctrl} while an upload XHR is in flight
+  let stateSeq = 0;          // bumped on deletes so an older in-flight poll doesn't overwrite fresh state
   let pollTimer = null;      // a poll is scheduled
   let polling = false;       // a poll is waiting on the server
   let lastRun = null;
@@ -42,11 +44,13 @@
     const el = $("#room-tpl").content.firstElementChild.cloneNode(true);
     const room = { el, name: "", locked: false, files: [] };
     const input = $(".room-name", el);
+    const delBtn = $(".room-del", el);
     // The filming tips sit in the newest card only; repeated in every card they push the file rows off a small screen.
     rooms.forEach((r) => r.el.querySelectorAll(".hint").forEach((h) => h.remove()));
     input.placeholder = rooms.length ? "Kitchen" : "Living room";
     input.value = "Room " + (rooms.length + 1);
     input.addEventListener("focus", () => { if (/^Room \d+$/.test(input.value)) input.select(); });
+    if (delBtn) delBtn.addEventListener("click", () => removeRoom(room));
     [$(".cam", el), $(".lib", el)].forEach((inp) => {
       inp.addEventListener("click", () => setWaiting(room, true));   // the camera or photo picker is opening
       inp.addEventListener("cancel", () => setWaiting(room, false)); // closed without choosing (Safari 16.4+)
@@ -54,7 +58,23 @@
     });
     rooms.push(room);
     $("#rooms").appendChild(el);
+    updateRoomHeaders();
     return room;
+  }
+
+  function updateRoomHeaders() {
+    rooms.forEach((r) => {
+      const delBtn = $(".room-del", r.el);
+      if (delBtn) delBtn.classList.toggle("hidden", rooms.length <= 1 || r.files.length > 0 || !!r.waiting);
+    });
+  }
+
+  function removeRoom(room) {
+    if (rooms.length <= 1 || room.files.length > 0) return;
+    const idx = rooms.indexOf(room);
+    if (idx >= 0) rooms.splice(idx, 1);
+    room.el.remove();
+    updateRoomHeaders();
   }
 
   // Between tapping a pick button and the browser's "change" event the page hears nothing, and on a
@@ -82,6 +102,16 @@
     input.value = name;
     input.readOnly = true;
     room.el.querySelectorAll(".hint").forEach((h) => h.remove()); // read once; now the file rows need the space
+    updateRoomHeaders();
+  }
+
+  function maybeUnlockRoom(room) {
+    if (room.files.length === 0) {
+      room.locked = false;
+      $(".room-name", room.el).readOnly = false;
+      $(".room-sum", room.el).classList.add("hidden");
+    }
+    updateRoomHeaders();
   }
 
   function roomName(room) {
@@ -150,13 +180,18 @@
     if (uploading || !queue.length) return;
     uploading = true;
     const job = queue.shift();
+    job.rows = job.rows.filter((r) => !r.removed);
+    if (!job.rows.length) { uploading = false; pump(); return; }
+    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    currentJob = { ...job, ctrl };
     job.rows.forEach((r) => { r.phase = "uploading"; r.pct = 0; r.err = ""; });
     render(job.room);
+    let postDelete = [];
     try {
       const res = await api.upload(job.rows.map((r) => r.file), job.room.name, runId, (p) => {
-        job.rows.forEach((r) => (r.pct = p));
+        job.rows.forEach((r) => { if (!r.removeAfterUpload) r.pct = p; });
         render(job.room);
-      }, who);
+      }, who, ctrl && ctrl.signal);
       adoptRun(res.run_id);
       const skipped = new Set((res.skipped || []).map((s) => (typeof s === "string" ? s : s.name)));
       // The reply's `files` lists what the room now holds. A file in neither list was dropped without a
@@ -164,16 +199,21 @@
       // used to sit at "received" with the footer at "Still looking…" for good (FAILURES.md 13:10).
       const kept = Array.isArray(res.files) ? new Set(res.files) : null;
       job.rows.forEach((r) => {
+        if (r.removeAfterUpload) { postDelete.push(r); return; }
         r.phase = skipped.has(r.name) ? "failed" : kept && !kept.has(r.name) ? "dropped" : "sent";
         if (r.phase === "failed") r.err = "server skipped this file";
       });
       if (!firstSentAt) firstSentAt = Date.now();
       startPolling();
     } catch (e) {
-      job.rows.forEach((r) => { r.phase = "failed"; r.err = e.message; });
+      if (!e || !e.aborted) {
+        job.rows.forEach((r) => { if (!r.removed) { r.phase = "failed"; r.err = e.message; } });
+      }
     }
+    currentJob = null;
     render(job.room);
     uploading = false;
+    postDelete.forEach((r) => deleteFromServer(job.room, r));
     pump();
   }
 
@@ -184,9 +224,91 @@
     pump();
   }
 
+  function dropLocalRow(room, row) {
+    row.removed = true;
+    room.files = room.files.filter((x) => x !== row);
+    usedNames.delete(row.name.toLowerCase());
+    maybeUnlockRoom(room);
+    render(room);
+  }
+
+  function syncAfterDelete(run) {
+    const anyFiles = rooms.some((r) => r.files.length > 0);
+    if (!anyFiles && (!run || !run.inventory)) {
+      shownQ = "";
+      $("#live-q").innerHTML = "";
+      $("#footer").classList.add("hidden");
+      setStepLinks(null);
+      rooms.forEach((r) => $(".room-sum", r.el).classList.add("hidden"));
+      return;
+    }
+    if (run) {
+      updateFooter(run);
+      shownQ = "";
+      renderLiveQ(run.inventory, true);
+      if (!allFinished(run)) startPolling();
+    }
+  }
+
+  async function deleteFromServer(room, row) {
+    row.phase = "removing";
+    stateSeq++;
+    render(room);
+    try {
+      const run = runId ? await api.deleteFile(runId, row.name) : null;
+      stateSeq++;
+      dropLocalRow(room, row);
+      lastRun = run;
+      syncAfterDelete(run);
+    } catch (e) {
+      stateSeq++;
+      if (e && e.status === 404) {
+        dropLocalRow(room, row);
+        syncAfterDelete(lastRun);
+        return;
+      }
+      row.phase = "sent";
+      row.removeAfterUpload = false;
+      render(room);
+      notice(`Couldn't remove ${row.name}: ${e.message}`);
+    }
+  }
+
+  function removeFile(room, row) {
+    if (row.phase === "removing") return;
+    notice("");
+    if (row.phase === "queued") {
+      queue.forEach((j) => { j.rows = j.rows.filter((x) => x !== row); });
+      for (let i = queue.length - 1; i >= 0; i--) if (!queue[i].rows.length) queue.splice(i, 1);
+      dropLocalRow(room, row);
+      syncAfterDelete(lastRun);
+      return;
+    }
+    if (row.phase === "uploading") {
+      row.removeAfterUpload = true;
+      if (currentJob && currentJob.rows.every((x) => x.removeAfterUpload)) {
+        currentJob.rows.forEach((x) => dropLocalRow(currentJob.room, x));
+        if (currentJob.ctrl) currentJob.ctrl.abort();
+        syncAfterDelete(lastRun);
+      } else {
+        row.phase = "removing";
+        render(room);
+      }
+      return;
+    }
+    if (row.phase === "failed" || row.phase === "dropped") {
+      if (runId) api.deleteFile(runId, row.name).catch(() => {});
+      dropLocalRow(room, row);
+      syncAfterDelete(lastRun);
+      return;
+    }
+    deleteFromServer(room, row);
+  }
+
   // ---------- progress ----------
   // What a file's row says: {text, cls, bar (0 to 1, while uploading), busy (the server is working on it)}.
   function fileProgress(r) {
+    if (r.phase === "removing") return { text: "removing…", cls: "", busy: true };
     if (r.phase === "queued") return { text: "waiting", cls: "" , bar: 0 };
     if (r.phase === "uploading") return { text: `uploading ${Math.round(r.pct * 100)}%`, cls: "", bar: r.pct };
     if (r.phase === "failed") return { text: r.err || "failed", cls: "failed" };
@@ -204,6 +326,7 @@
   }
 
   function render(room) {
+    updateRoomHeaders();
     const ul = $(".files", room.el);
     ul.innerHTML = "";
     room.files.forEach((r) => {
@@ -211,13 +334,18 @@
       const li = document.createElement("li");
       if (st.cls === "failed") li.className = "failed"; // the reason goes on its own line, so the name stays readable
       li.innerHTML = `<span aria-hidden="true">${r.kind === "video" ? "🎥" : "📷"}</span>
-        <span class="name"></span><span class="state ${st.cls}"></span>`;
+        <span class="name"></span><span class="state ${st.cls}"></span>
+        <button class="file-del" type="button" title="Remove file">×</button>`;
       $(".name", li).textContent = r.name;
       $(".state", li).textContent = st.text;
+      const del = $(".file-del", li);
+      del.setAttribute("aria-label", `Remove ${r.name}`);
+      del.disabled = r.phase === "removing";
+      del.onclick = () => removeFile(room, r);
       if (r.phase === "failed") {
         const b = document.createElement("button");
         b.className = "btn link"; b.type = "button"; b.textContent = "Retry";
-        b.style.gridColumn = "2 / 4"; b.style.justifySelf = "end";
+        b.style.gridColumn = "2 / -1"; b.style.justifySelf = "end";
         b.onclick = () => retry(room, r);
         li.appendChild(b);
       } else if (r.phase === "uploading" || st.busy) {
@@ -231,6 +359,7 @@
     });
     if (room.waiting) { // see setWaiting
       const li = document.createElement("li");
+      li.className = "waiting-row";
       li.innerHTML = `<span aria-hidden="true">⏳</span><span class="name">Getting your files from the phone…</span>
         <span class="state">a few seconds</span><div class="bar busy"><i></i></div>`;
       ul.appendChild(li);
@@ -242,15 +371,17 @@
     if (queue.length || uploading) return false;
     const pending = rows.some((r) => r.phase === "sent" && !["done", "failed"].includes((r.server || {}).perceive));
     const stage = run && run.status && run.status.stage;
-    return !pending && (stage === "done" || stage === "failed");
+    return !pending && (stage === "done" || stage === "failed" || stage === "created");
   }
 
   async function poll() {
     pollTimer = null;
     if (!runId || document.hidden) return;
     polling = true;
+    const seq = stateSeq;
     try {
       const run = await api.getRun(runId);
+      if (seq !== stateSeq) { polling = false; startPolling(); return; }
       lastRun = run;
       const files = (run.status && run.status.files) || {};
       rooms.forEach((room) => {

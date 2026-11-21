@@ -431,12 +431,16 @@ def _group_label(gk: str, base: list[dict]) -> str:
 def build_merged(run_id: str) -> dict:
     """What the files alone say, in memory: no answers applied, nothing written."""
     rd = run_dir(run_id)
-    manifest = read_json(rd / "manifest.json")
-    perc = [read_json(p) for p in sorted((rd / "perception").glob("*.json"))]
+    manifest = read_json(rd / "manifest.json") or {"rooms": [], "files": []}
+    live = {f["name"] for f in manifest.get("files", [])}
+    perc = [read_json(p) for p in sorted((rd / "perception").glob("*.json"))
+            if p.name.removesuffix(".json") in live]
+    added_rooms = {a.get("room_id") for a in read_json(rd / "answers.json", {"answers": []})["answers"]
+                   if a.get("kind") == "add_item"}
     rooms = []
     for room in manifest["rooms"]:
         ps = [p for p in perc if p["room_id"] == room["id"]]
-        if ps:
+        if ps or room["id"] in added_rooms:
             rooms.append(merge_room(ps, room))
     return {"run_id": run_id, "rooms": rooms, "answers_applied": []}
 

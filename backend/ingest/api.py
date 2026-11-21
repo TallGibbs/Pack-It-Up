@@ -2,6 +2,7 @@
 
 POST /upload                          multipart files + room (+ run_id to add to that run, + who: the signed-in name) -> {run_id}
 GET  /runs/{run_id}                   rooms, stage status per file, then inventory and questions
+DELETE /runs/{run_id}/files/{name}    remove an uploaded photo or clip and rebuild the inventory -> same shape as GET /runs/{run_id}
 GET  /inventory/{run_id}              inventory.json
 POST /answer/{run_id}                 {question_id, answer} -> updated inventory
 PATCH /inventory/{run_id}/items/{id}  {quantity?, disposition?, catalog_id?} -> updated inventory
@@ -25,9 +26,9 @@ from backend import catalog
 from backend.llm import media as mu
 
 from . import gaps
-from .common import new_run_id, read_json, run_dir, slug, write_json
+from .common import new_run_id, read_json, run_dir, slug, update_status, write_json
 from .intake import ACCEPTED, intake
-from .pipeline import begin_pipeline, end_pipeline, rebuild, run_lock, run_pipeline
+from .pipeline import begin_pipeline, end_pipeline, is_pipeline_active, rebuild, run_lock, run_pipeline
 
 router = APIRouter(tags=["ingest"])
 
@@ -102,6 +103,60 @@ def run_status(run_id: str):
         out["partial"] = status.get("stage") != "done"
         out["questions"] = [q for q in inv.get("questions", []) if q.get("status") == "open"]
     return out
+
+
+@router.delete("/runs/{run_id}/files/{file_name}")
+def delete_file(run_id: str, file_name: str):
+    rd = _rd(run_id)
+    if not file_name or Path(file_name).name != file_name or file_name in (".", ".."):
+        raise HTTPException(400, "bad file name")
+    with _intake_locks[run_id]:
+        manifest = read_json(rd / "manifest.json") or {"rooms": [], "files": [], "skipped": []}
+        removed = [f for f in manifest.get("files", []) if f["name"] == file_name]
+        skipped_before = len(manifest.get("skipped", []))
+        manifest["files"] = [f for f in manifest.get("files", []) if f["name"] != file_name]
+        manifest["skipped"] = [s for s in manifest.get("skipped", [])
+                               if (s if isinstance(s, str) else s.get("name")) != file_name]
+        st_files = (read_json(rd / "status.json", {}) or {}).get("files", {})
+        if not removed and len(manifest["skipped"]) == skipped_before and file_name not in st_files:
+            raise HTTPException(404, f"no file {file_name!r} in run {run_id}")
+        added_rooms = {a.get("room_id") for a in read_json(rd / "answers.json", {"answers": []})["answers"]
+                       if a.get("kind") == "add_item"}
+        live_rooms = {f["room_id"] for f in manifest["files"]} | added_rooms
+        manifest["rooms"] = [r for r in manifest.get("rooms", []) if r["id"] in live_rooms]
+        write_json(rd / "manifest.json", manifest)
+
+        still_used = {f.get("path") for f in manifest["files"]} | {f.get("audio_path") for f in manifest["files"]}
+        to_unlink = [
+            rd / "uploads" / file_name,
+            rd / "perception" / f"{file_name}.json",
+            rd / "transcripts" / f"{file_name}.json",
+        ]
+        for entry in removed:
+            for key in ("path", "audio_path"):
+                rel = entry.get(key)
+                if rel and rel not in still_used:
+                    to_unlink.append(rd / rel)
+        for p in to_unlink:
+            try:
+                p.unlink(missing_ok=True)
+            except OSError:
+                pass
+        update_status(rd, drop_files=[file_name])
+
+    with run_lock(run_id):
+        had_questions = (rd / "questions.json").exists()
+        if manifest["files"] or added_rooms:
+            rebuild(run_id, questions=had_questions)
+        else:
+            for name in ("merged.json", "inventory.json", "questions.json"):
+                try:
+                    (rd / name).unlink(missing_ok=True)
+                except OSError:
+                    pass
+            if not is_pipeline_active(run_id):
+                update_status(rd, stage="created")
+    return run_status(run_id)
 
 
 @router.get("/inventory/{run_id}")
