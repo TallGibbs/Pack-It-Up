@@ -160,9 +160,22 @@ def edit_item(run_id: str, item_id: str, changes: dict) -> dict:
         raise ValueError(f"cannot edit {sorted(bad)}; editable: {sorted(EDITABLE)}")
     if "disposition" in changes and changes["disposition"] not in DISPOSITIONS:
         raise ValueError(f"disposition must be one of {sorted(DISPOSITIONS)}")
-    if "quantity" in changes and (not isinstance(changes["quantity"], int) or changes["quantity"] < 0):
-        raise ValueError("quantity must be a non-negative integer")
-    if changes.get("quantity") == 0:
+    qty = changes.get("quantity")
+    if "quantity" in changes and (isinstance(qty, bool) or not isinstance(qty, int) or not 0 <= qty <= ADDED_MAX_QTY):
+        raise ValueError(f"quantity must be a whole number from 0 to {ADDED_MAX_QTY}")
+    # An edit is stored and re-applied on every rebuild, so a value the later stages can't read (a label
+    # that isn't text, a catalog id that isn't one) made every later edit on the run fail with a 500
+    # (FAILURES.md 13:10). Refuse it here instead.
+    if "label" in changes:
+        label = " ".join(changes["label"].split())[:80] if isinstance(changes["label"], str) else ""
+        if not label:
+            raise ValueError("label must be text, and not empty")
+        changes = {**changes, "label": label}
+    if "catalog_id" in changes:
+        cid = changes["catalog_id"]
+        if not isinstance(cid, str) or (cid != "unknown" and catalog.get(cid) is None):
+            raise ValueError(f"no catalog item {cid!r}; GET /catalog lists them, or use 'unknown'")
+    if qty == 0 and not isinstance(qty, bool):
         changes = {**changes, "quantity": 1, "disposition": "trash"}
     merged = read_json(run_dir(run_id) / "merged.json")
     if merged is None or _find_item(merged, item_id)[1] is None:
