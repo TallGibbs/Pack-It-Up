@@ -40,4 +40,11 @@ thinking = "low"
 model = "gemini:gemini-4-hydrogen"    # generic enum generate_json, used when the Decisions API call fails
 thinking = "low"
 
-# Track B adds plan, baseline and image.
+[jobs.plan]
+# Track B planner loop (backend/planner.py): reads the checker's score and violations, returns changed
+# solver settings. Text in, small JSON out. Neon is the planning model in plan/EVENT_DAY_PLAN.md.
+model = "gemini:gemini-4-neon"
+thinking = "low"
+timeout_s = 60
+
+# Track B still to add: baseline and image.
