@@ -273,3 +273,8 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Chris's answers to D1-D6 in the plan.
 - **By:** Chris.
 - **See:** `plan/VIDEO_SCRIPT.md` section 7
+
+## 2026-11-21 15:19 · Each move shows what its model calls cost
+- **Decision:** The app links to a Usage view for the move you are in (`/app/models.html?run_id=<move>`), and that view shows an estimated cost: the tokens each model reported for the move, times Google's list price for that model. All moves together have the same summary, and the table of every run has a cost column.
+- **Why:** People should see what their use of the app cost. (Chris)
+- **Limits:** It is an estimate at list prices (`backend/analysis/prices.toml`, read from Google's pricing page on Nov 21), not a bill: cached calls cost nothing, failed attempts and Google's discount for repeated input are not counted, and the event key may not be charged at all. Argon's price doubles on Dec 1, 2026; the file holds the price through Nov 30.
