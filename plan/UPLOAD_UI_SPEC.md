@@ -45,7 +45,8 @@ Shown on the capture page under each room card as soon as an upload starts. The 
   `uploading 43%` → `received` → `looking…` → `done · 23 items · 18 s` (or `failed`, with the error).
 - Data: client-side upload progress until the POST returns, then `GET /runs/{run_id}` every second. `status.files[name]` gives `intake`, `perceive`, `items`, `seconds`; `status.stage` gives the run stage; `status.errors` lists failures.
 - A running count from the partial inventory: "31 items found so far".
-- **Review button.** Appears as soon as `GET /runs` returns an `inventory`, labelled "Review 31 items". It becomes the main button when `status.stage` is `done`, or after 60 seconds (the speed budget: show what finished, mark the rest pending). Going to review never cancels files still processing.
+- **Live question** (decision 11:38). The top open question appears as a card under the progress list as soon as the server raises it, and is answered there with one tap (`POST /answer`). After an answer the next one shows; the rest stay on the review page. `always_show` questions (closed cupboards) come first. The page scrolls to the first card once.
+- **Footer buttons.** "Check list" (to `review.html`) and **"Plan the truck load →"** (straight to `index.html?run_id=…`, skipping review). Both appear as soon as `GET /runs` returns an `inventory`. "Plan the truck load" becomes the main button when `status.stage` is `done`, or after 60 seconds (the speed budget: show what finished, mark the rest pending). Leaving never cancels files still processing.
 - Polling stops when the stage is `done` or `failed`, or the page is hidden, and restarts when it's shown again.
 
 ## Screen 3: Review
@@ -54,7 +55,7 @@ Shown on the capture page under each room card as soon as an upload starts. The 
 
 **Top bar:** the move totals that matter to the truck: items, cubic feet, pounds, and "+ N boxes" from containers. They update after every edit.
 
-**Question cards first**, at most 5, in the order the server gives (it ranks by cubic feet at stake). Each card:
+**Question cards first**, at most 5 plus any `always_show` ones, in the order the server gives (it ranks by cubic feet at stake). `same_item` and `fixture_check` questions are never open cards (decision 11:38): their text is written for the model, so they show collapsed with the Decisions API's best guess and a "Change" link. Each card:
 
 - The crop of the item or container, the question text, and one button per option. One tap answers it: `POST /answer/{run_id}` with `{question_id, answer}`. The reply is the updated inventory; re-render from it.
 - Questions the Decisions API already answered, or the narrator already answered, show collapsed as "Answered by the Decisions API: …" or "You said: '…'", with a "Change" link that reopens the options.
@@ -67,7 +68,7 @@ Shown on the capture page under each room card as soon as an upload starts. The 
 - **"You said" quotes** from `set_by_speech`: `“these chairs stack” — 0:07 in IMG_6703`.
 - **Handling badges** that matter for loading: fragile, two-person, keep upright.
 - **Quantity stepper** (− n +). Sends `PATCH /inventory/{run_id}/items/{id}` with `{quantity}` 400 ms after the last tap. Setting 0 marks the item trash (the server does this).
-- **Disposition**: Keep, Sell, Donate, Trash as a segmented control, sent with `PATCH {disposition}`. `undecided` counts as moving and shows Keep outlined. Sell, donate and trash rows dim and drop out of the totals.
+- **Disposition** (decision 11:38): Move (`keep`), Stays (`stays`), Sell (`sell`), Toss (`trash`) as a segmented control, sent with `PATCH {disposition}`. `undecided` counts as moving and shows Move outlined. Stays, Sell and Toss rows dim and drop out of the totals. Any other value (an older `donate`) shows as a badge until a segment is tapped.
 
 **Below the items:** containers (bookshelf, cabinet: contents, fullness, about N boxes), then one footnote line for what's left out: "Left out: 14 fixtures, 13 personal belongings (5 laptops, 5 jackets, 3 backpacks)".
 
@@ -75,18 +76,19 @@ Edits apply optimistically and are replaced by the server's reply. If a request 
 
 ## Screen 4: Handoff
 
-A sticky bar at the bottom of the review screen: **"Plan the truck load →"** with the totals under it. Open questions don't block it; it says "2 questions open" beside the button.
+**"Plan the truck load →"** in the sticky bar of both pages, with the totals beside it on the review page. Open questions don't block it; it says "2 questions open".
 
-It opens Track B's page with the run: `index.html?run_id={run_id}` (plus `&api=` or `&mock=1` if set). **To agree with George:** `index.html` reads `run_id`, then calls Track B's solve route (for example `POST /solve {run_id}`) or reads `GET /inventory/{run_id}` itself. Re-solve after a review edit is the same link.
+It opens Track B's page with the run: `index.html?run_id={run_id}` (plus `&api=` or `&mock=1` if set). Edits only change the inventory; Track B solves when its page opens, so re-solve after an edit is tapping the button again (decision 11:38). The proposed contract for George (which fields to read) is in [memory/open-questions.md](../memory/open-questions.md).
 
 ## Data the pages read
 
 Checked against real runs from the ingestion session at 11:40. The pages render without any optional field; they just show less.
 
-- **Items:** the `inventory_v2` item shape from resolve, including `set_by_speech: [{field, value, quote, source, timestamp_s}]` and `heard_only`. One sentence can set two fields, so quotes are shown once each. Disposition `stays` (from speech: "this sofa stays") shows as a "stays behind" badge, and the row drops out of the totals; tapping Keep overrides it.
+- **Items:** the `inventory_v2` item shape from resolve, including `set_by_speech: [{field, value, quote, source, timestamp_s}]` and `heard_only`. One sentence can set two fields, so quotes are shown once each. Disposition `stays` (from speech: "this sofa stays") selects Stays, and the row drops out of the totals. `contents_unknown` shows "contents unknown, assumed empty".
 - **Containers:** `set_by_speech` quotes are shown inline. Container evidence has no `sha256`, so the crop borrows the hash of an item seen in the same file.
 - **Questions,** as `backend/ingest/gaps.py` writes them in `inventory.questions`:
-  - `options` is `{key: label}`. The button shows the label and `POST /answer` sends the key. `options: null` with `free_text: true` shows a text box.
+  - `options` is `{key: label}`. The button shows the label and `POST /answer` sends the key. `options: null` with `free_text: true` shows a text box. `free_text: "number"` next to options adds a number box, and the `more` option is dropped (the API rejects it as an answer).
+  - `always_show: true` (closed cupboards) is shown on top of the 5 ranked questions, never capped.
   - `refers_to` is an item id, a container label or a room id; the card's crop comes from that target.
   - `shown: true` marks the open questions the server wants the user to see (at most 5); the rest are counted in "N smaller questions not shown".
   - `suggested` and `model_answer.confidence` mark the Decisions API's best guess on its button ("best guess · 36%").
@@ -105,11 +107,11 @@ The server runs on the laptop (`uvicorn backend.app:app --host 0.0.0.0 --port 80
 | **Tunnel** (Cloudflare quick tunnel: `cloudflared tunnel --url http://localhost:8000`) | Phone opens the `https://…trycloudflare.com` address | Any network with internet, including isolated wifi | Needs `cloudflared` installed before the demo. Free tunnel limit is 100 MB per request. Quick tunnels have no uptime guarantee | Phone → internet → laptop: venue upstream bandwidth twice |
 | **No phone** | Copy the files to the laptop (AirDrop or cable) and use the capture page on the laptop | Always | Slower on stage | n/a |
 
-**Recommendation.** At 10:30-ish, test the LAN route once: open `http://<laptop IP>:8000/health` on the phone. If it answers, use LAN and keep a tunnel running as backup. If it doesn't, use the tunnel. Rehearse the "No phone" route once; it's the fallback in the demo script.
+**Decided (11:38): test LAN now, tunnel as backup.** Test the LAN route once: open `http://<laptop IP>:8000/health` on the phone. If it answers, use LAN and keep a tunnel running as backup. If it doesn't, use the tunnel. Rehearse the "No phone" route once; it's the fallback in the demo script.
 
 **HTTP is enough.** A file input with `capture` opens the camera over plain HTTP; it isn't a secure-context feature. `getUserMedia` (a live camera preview in the page) needs HTTPS or `localhost`, so it only works through the tunnel. These pages don't use it: the phone's own camera app records better video, with audio, and needs no permission prompt.
 
-**One port.** A tunnel exposes one port, so the pages should be served by the same FastAPI app as the API: mount `frontend/` as static files in `backend/app.py` (for example at `/app`). That's a one-line change to a file the ingestion session owns; **ask Chris**. Until then, `python -m http.server 8080` in `frontend/` serves the pages, with `?api=http://<laptop IP>:8000`; CORS is already open in `app.py`.
+**One port.** A tunnel exposes one port, so `backend/app.py` serves `frontend/` at `/app` (decision 11:38): the phone opens `/app/capture.html` on the same address as the API. For page work without the API, `python -m http.server 8080` in `frontend/` still works, with `?api=` or `?mock=1`.
 
 ## Done when
 
