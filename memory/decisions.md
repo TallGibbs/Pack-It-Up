@@ -214,3 +214,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **By:** Chris, on the review session's recommendation.
 - **See:** [backend/ingest/README.md](../backend/ingest/README.md), FAILURES.md 13:55 row
 
+## 2026-11-21 13:55 · Track B joined into `main`
+- **Decision:** George's `track-b` (33d6084) is merged into `main`, and the demo runs the joined app: capture, review, then `frontend/index.html` solving from the move's latest inventory through `POST /solve`. New Track B work lands on `main` from here, not on `track-b`.
+- **Why:** The trial merge had only keep-both conflicts in five shared files, George's tests passed, his solver packed every inventory in `runs/`, and a trash edit and an added piano on the review page each changed the next solve.
+- **Limits:** George has not been asked about work he hasn't pushed. Track B makes no model calls yet (B6, B7 and B9 are not built). George's files are as they were on `track-b`.
+- **By:** Chris, on the join study session's recommendation.
+- **See:** commit 5d3ce65, FAILURES.md 13:55 row
