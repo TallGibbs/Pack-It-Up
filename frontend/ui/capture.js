@@ -2,7 +2,7 @@
 // the top open question, and coming back to a move. Needs ui/api.js and ui/questions.js first.
 (function () {
   "use strict";
-  const { api, link, MOCK, params, $, isVideo, thumbHtml } = window.PIU;
+  const { api, link, MOCK, params, $, isVideo, thumbHtml, totalBoxes } = window.PIU;
   const ACCEPT_EXT = /\.(jpe?g|png|heic|heif|webp|mp4|mov|m4v)$/i;
   const TUNNEL = /trycloudflare\.com$/i.test(location.hostname);
   const WARN_MB = TUNNEL ? 90 : 200;
@@ -160,7 +160,8 @@
     if (r.phase === "uploading") return { text: `uploading ${Math.round(r.pct * 100)}%`, cls: "", bar: r.pct };
     if (r.phase === "failed") return { text: r.err || "failed", cls: "failed" };
     const s = r.server || {};
-    if (s.perceive === "done") return { text: `done · ${s.items ?? "?"} items${s.seconds != null ? ` · ${Math.round(s.seconds)} s` : ""}`, cls: "done" };
+    // "seen", not "items": the count includes fixtures and small things that end up in boxes
+    if (s.perceive === "done") return { text: `done · ${s.items ?? "?"} seen${s.seconds != null ? ` · ${Math.round(s.seconds)} s` : ""}`, cls: "done" };
     if (s.perceive === "failed") return { text: "couldn't read this file" + (s.error ? `: ${s.error.slice(0, 80)}` : ""), cls: "failed" };
     if (s.perceive === "running") return { text: r.kind === "video" ? "watching and listening…" : "looking…", cls: "", busy: true };
     if (s.intake === "done") return { text: "received, queued", cls: "", busy: true };
@@ -237,6 +238,17 @@
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden && runId) startPolling(); });
 
+  const plural = (k, word) => `${k} ${word}${k === 1 ? "" : word === "box" ? "es" : "s"}`;
+
+  // What an inventory holds, in words: "12 items + 4 boxes". Boxes count too: a shelf of small decor
+  // is 0 items and 4 boxes, and "0 items" alone reads as "found nothing" (FAILURES.md 12:45).
+  function foundText(inv) {
+    const n = inv.totals.item_count;
+    const boxes = totalBoxes(inv);
+    if (n && boxes) return `${plural(n, "item")} + ${plural(boxes, "box")}`;
+    return boxes ? `${plural(boxes, "box")} of small things` : plural(n, "item");
+  }
+
   function updateFooter(run) {
     const btn = $("#review-btn");
     const plan = $("#plan-btn");
@@ -250,14 +262,13 @@
       btn.textContent = "Check list";
       return;
     }
-    const n = inv.totals.item_count;
     const nRooms = inv.rooms.length;
     [btn, plan].forEach((b) => b.removeAttribute("aria-disabled"));
     btn.textContent = "Check list";
     const slow = firstSentAt && Date.now() - firstSentAt > 60000;
     plan.classList.toggle("primary", done || slow);
     const failed = Object.values(run.status.files || {}).filter((f) => f.perceive === "failed").length;
-    const head = done ? `${n} items in ${nRooms} room${nRooms > 1 ? "s" : ""}` : `${n} items found so far`;
+    const head = done ? `${foundText(inv)} in ${plural(nRooms, "room")}` : `${foundText(inv)} found so far`;
     const sub = done ? (failed ? `${failed} file(s) couldn't be read` : "Ready to check")
                      : slow ? "Still working; you can review what's ready" : "Still looking…";
     $("#found").innerHTML = "<b></b><span></span>";
@@ -380,9 +391,8 @@
     }
     if (runId) return; // an upload got there first
     const names = (run.rooms || []).map((r) => r.name);
-    const n = run.inventory ? run.inventory.totals.item_count : null;
     $("#resume-what").textContent = [names.slice(0, 3).join(", ") + (names.length > 3 ? "…" : ""),
-      n != null ? `${n} items` : "still being listed"].filter(Boolean).join(" · ");
+      run.inventory ? foundText(run.inventory) : "still being listed"].filter(Boolean).join(" · ");
     $("#resume-yes").href = link("capture.html", { run_id: id });
     $("#resume").classList.remove("hidden");
   }

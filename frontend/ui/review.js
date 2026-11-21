@@ -2,7 +2,7 @@
 // and Move / Stays / Sell / Toss, and "Add an item". Needs ui/api.js and ui/questions.js first.
 (function () {
   "use strict";
-  const { api, link, MOCK, params, $, esc, thumbHtml } = window.PIU;
+  const { api, link, MOCK, params, $, esc, thumbHtml, boxCount, totalBoxes } = window.PIU;
   const fmt = (n, d = 0) => (n == null ? "–" : Number(n).toLocaleString(undefined, { maximumFractionDigits: d }));
   const mmss = (t) => (t == null ? "" : `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, "0")}`);
   const MAX_QUESTIONS = 5;
@@ -127,7 +127,6 @@
   // ---------- lookups ----------
   const allItems = () => (inv ? inv.rooms.flatMap((r) => r.items) : []);
   const findItem = (id) => allItems().find((i) => i.id === id);
-  const boxCount = (c) => Object.values(c.est_boxes || {}).reduce((a, n) => a + n, 0);
 
   const thumb = (ev, label) => thumbHtml(runId, inv, ev, label, { lazy: true });
 
@@ -146,7 +145,7 @@
 
   function renderTotals() {
     const t = inv.totals || {};
-    const boxes = inv.rooms.flatMap((r) => r.containers || []).reduce((a, c) => a + boxCount(c), 0);
+    const boxes = totalBoxes(inv);
     const vals = { "t-items": fmt(t.item_count), "t-vol": fmt(t.volume_cuft), "t-wt": fmt(t.weight_lb), "t-boxes": boxes ? "+" + boxes : "0" };
     Object.entries(vals).forEach(([id, v]) => {
       const el = document.getElementById(id);

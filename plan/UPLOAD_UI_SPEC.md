@@ -43,9 +43,9 @@ Query parameters, on either page:
 Shown on the capture page under each room card as soon as an upload starts. The screen is never blank.
 
 - One row per file: kind icon (photo or clip), name, then its current step:
-  `uploading 43%` → `received` → `looking…` → `done · 23 items · 18 s` (or `failed`, with the error).
+  `uploading 43%` → `received` → `looking…` → `done · 23 seen · 18 s` (or `failed`, with the error). "Seen" counts everything in the file, including fixtures and small things that end up in boxes.
 - Data: client-side upload progress until the POST returns, then `GET /runs/{run_id}` every second. `status.files[name]` gives `intake`, `perceive`, `items`, `seconds`; `status.stage` gives the run stage; `status.errors` lists failures.
-- A running count from the partial inventory: "31 items found so far".
+- A running count from the partial inventory: "31 items + 4 boxes found so far". Boxes count too, so a room of small decor reads "4 boxes of small things", not "0 items".
 - **Live question** (decision 11:38). The top open question appears as a card under the progress list as soon as the server raises it, and is answered there with one tap (`POST /answer`). After an answer the next one shows; the rest stay on the review page. `always_show` questions (closed cupboards) come first. The page scrolls to the first card once.
 - **Footer buttons.** "Check list" (to `review.html`) and **"Plan the truck load →"** (straight to `index.html?run_id=…`, skipping review). Both appear as soon as `GET /runs` returns an `inventory`. "Plan the truck load" becomes the main button when `status.stage` is `done`, or after 60 seconds (the speed budget: show what finished, mark the rest pending). Leaving never cancels files still processing.
 - Polling stops when the stage is `done` or `failed`, or the page is hidden, and restarts when it's shown again.

@@ -14,6 +14,11 @@
   // A clip rather than a photo? By MIME type when the browser gives one, else by extension.
   const isVideo = (name, type) => /^video\//.test(type || "") || /\.(mp4|mov|m4v)$/i.test(name || "");
 
+  // Boxes a container's contents are estimated to need: est_boxes is {box_medium: 2, ...}.
+  const boxCount = (container) => Object.values(container.est_boxes || {}).reduce((a, n) => a + n, 0);
+  // ...and across a whole inventory. Small loose things are boxed, not listed as items.
+  const totalBoxes = (inv) => inv.rooms.flatMap((r) => r.containers || []).reduce((a, c) => a + boxCount(c), 0);
+
   function store(kind) {
     try { return window[kind]; } catch (e) { return null; }
   }
@@ -132,6 +137,8 @@
     $,
     esc,
     isVideo,
+    boxCount,
+    totalBoxes,
     link,
     placeholder,
     tileKind,
