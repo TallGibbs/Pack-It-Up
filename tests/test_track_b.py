@@ -37,7 +37,8 @@ def test_b1_catalog_trucks_and_penn_zones() -> None:
         assert catalog.lookup(cid) is not None
 
     trucks = catalog.list_trucks()
-    assert [t["truck_id"] for t in trucks] == ["uhaul_10", "uhaul_15", "uhaul_20", "uhaul_26"]
+    assert [t["truck_id"] for t in trucks] == ["uhaul_van", "uhaul_10", "uhaul_15", "uhaul_20", "uhaul_26"]
+    assert catalog.get_truck("uhaul_van")["dims_in"] == [114.0, 66.0, 56.0]
     assert catalog.get_truck("uhaul_26")["dims_in"] == [314.0, 98.0, 99.0]
 
     zones = catalog.list_penn_zones()
@@ -278,3 +279,42 @@ def test_walk_in_tier_loading_never_steps_on_lower_boxes() -> None:
     res_reach = verify.verify(broken_deep_setback, check_zones=False)
     assert not res_reach["valid"]
     assert "walk_in_access" in res_reach["violation_counts_by_rule"]
+
+
+def test_sparse_redteam_4_boxes_uses_smallest_van_on_floor_and_rejects_jenga_tower() -> None:
+    """Red-team test: 4 boxes must select U-Haul 9 ft Cargo Van (`uhaul_van`), sit flat on `z=0`, and reject 4-high towers."""
+    sparse_inv = {
+        "rooms": [{
+            "room": {"id": "r1", "name": "Closet"},
+            "items": [],
+            "containers": [
+                {"id": "c1", "label": "Shelf", "fullness": "full", "contents": "books & merch", "est_boxes": {"box_medium": 4}},
+            ],
+        }],
+    }
+    plan = solver.solve(sparse_inv)
+    assert plan["score"]["valid"] is True
+    assert plan["score"]["violations"] == []
+    assert len(plan["trucks"]) == 1
+    t0 = plan["trucks"][0]
+    assert t0["truck_id"] == "uhaul_van"
+    assert len(t0["items"]) == 4
+    # Every box sits flat on the floor (`z == 0`), minimizing gravitational potential energy (`pe_ratio == 1.0`)
+    assert all(it["pos_in"][2] == 0.0 for it in t0["items"])
+    assert plan["score"]["pe_ratio"] == 1.0
+
+    # Forcing `uhaul_26` for 4 boxes must FAIL verification with `oversized_truck` (even when boxes are on floor)
+    forced_big = solver.solve(sparse_inv, strategy={"truck_id": "uhaul_26", "downsize_last_truck": False})
+    assert all(it["pos_in"][2] == 0.0 for it in forced_big["trucks"][0]["items"])
+    assert forced_big["score"]["valid"] is False
+    assert "oversized_truck" in forced_big["score"]["violation_counts_by_rule"]
+
+    # Stacking 4 boxes into a 4-high Jenga tower on an open floor must FAIL with `shake_stability`
+    jenga_tower = _base_truck([
+        {"id": f"b{k}", "label": f"box {k}", "pos_in": [0, 40, k * 16], "size_in": [18, 18, 16], "weight_lb": 26, "stackable": "yes", "load_seq": k + 1}
+        for k in range(4)
+    ], dims=[114.0, 66.0, 72.0], max_weight_lb=3670.0)
+    res_jenga = verify.verify(jenga_tower, check_zones=False)
+    assert res_jenga["valid"] is False
+    assert "shake_stability" in res_jenga["violation_counts_by_rule"]
+    assert res_jenga["pe_ratio"] > 3.5

@@ -284,3 +284,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Decision:** The app links to a Usage view for the move you are in (`/app/models.html?run_id=<move>`), and that view shows an estimated cost: the tokens each model reported for the move, times Google's list price for that model. All moves together have the same summary, and the table of every run has a cost column.
 - **Why:** People should see what their use of the app cost. (Chris)
 - **Limits:** It is an estimate at list prices (`backend/analysis/prices.toml`, read from Google's pricing page on Nov 21), not a bill: cached calls cost nothing, failed attempts and Google's discount for repeated input are not counted, and the event key may not be charged at all. Argon's price doubles on Dec 1, 2026; the file holds the price through Nov 30.
+
+## 2026-11-21 15:35 · Auto right-size to 9 ft Cargo Van + Potential Energy & Shake/Topple floor-first physics
+- **Decision:** Add `uhaul_van` (U-Haul 9 ft Cargo Van) and default fleet selection to `auto` (smallest van/truck that fits with 0 violations); keep boxes flat on the floor (`z=0`, minimum gravitational potential energy `U = m*g*z_cm`) whenever cargo fits comfortably on the deck (`<=50%` floor area), enforce `0.45g` braking/pothole slenderness bracing limits (`shake_stability`), and fail verification (`oversized_truck`) if a sparse single-van load is placed in a giant box truck.
+- **Why:** Red-teaming with 4 boxes previously picked a 26-ft truck (`0.7%` fill), stacked all 4 boxes into a 64-in Jenga tower on an empty floor, and passed all checks.
+- **By:** George.
+- **See:** `data/trucks.csv`, `backend/solver.py`, `backend/verify.py`, `frontend/index.html`, `tests/test_track_b.py`

@@ -151,7 +151,7 @@ def _build_managed_agent_prompt(spec: dict[str, Any], inv_summary: dict[str, Any
         "`tallest_upright_in`, estimates how many trucks are needed at ~48% realistic furniture packing density, "
         "and chooses optimal settings for your mandate.\n"
         "2. Output ONLY a single JSON object (no markdown prose after it) with these exact keys:\n"
-        '{"diagnosis": "...", "truck_id": "uhaul_10|uhaul_15|uhaul_20|uhaul_26", '
+        '{"diagnosis": "...", "truck_id": "uhaul_van|uhaul_10|uhaul_15|uhaul_20|uhaul_26", '
         '"packer_engine": "constrained|raw_py3dbp", '
         '"order_mode": "lifo_heavy_first|zone_strict_lifo|heavy_first|volume_first|fragile_last", '
         '"lifo_weight": 0.0-3.0, "downsize_last_truck": true|false, '
