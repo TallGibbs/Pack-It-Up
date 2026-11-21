@@ -41,9 +41,13 @@ def main(argv=None) -> int:
     ap.add_argument("--run-id", help="add to an existing run (multi-room move)")
     ap.add_argument("--until", default="resolve", choices=["intake", "perceive", "merge", "resolve"], help="stop after this stage")
     ap.add_argument("--no-questions", action="store_true", help="skip stage 5 (no decide calls)")
+    ap.add_argument("--include", help="comma-separated file names to use from the folder (default: all)")
     args = ap.parse_args(argv)
 
     files = collect_folder(args.folder)
+    if args.include:
+        wanted = {n.strip().lower() for n in args.include.split(",")}
+        files = [f for f in files if f.name.lower() in wanted]
     if not files:
         print(f"no accepted media in {args.folder}", file=sys.stderr)
         return 1

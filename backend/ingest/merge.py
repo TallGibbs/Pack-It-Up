@@ -231,8 +231,9 @@ def _group_label(gk: str, base: list[dict]) -> str:
     labels = [m["label"] for m in base]
     if len(set(l.lower() for l in labels)) == 1:
         return labels[0]
-    noun = gk.split(":", 1)[-1].replace("_", " ")
-    return f"{noun}s ({', '.join(sorted(set(labels), key=str.lower))})"
+    uniq = sorted({l for l in labels}, key=str.lower)
+    out = ", ".join(uniq)
+    return out if len(out) <= 80 else out[:77] + "..."
 
 
 def merge(run_id: str) -> dict:

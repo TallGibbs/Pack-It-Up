@@ -1,0 +1,227 @@
+{
+  "_comment": "Hand-written fixture for the upload and review pages (?mock=1). Shaped like inventory_v2 from backend/ingest/resolve.py, plus set_by_speech, heard_only and questions as proposed in the planning repo's UPLOAD_UI_SPEC.md. Invented items; no real media. mock_effects is mock-only: what an answer changes.",
+  "schema_version": "inventory_v2",
+  "rooms": [
+    {
+      "room": {"id": "room_a", "name": "Main hall"},
+      "files": ["clip_1.mp4", "photo_1.jpg", "photo_2.jpg"],
+      "items": [
+        {
+          "id": "item_01", "label": "folding banquet table, 6 ft", "catalog_id": "folding_table_6ft",
+          "quantity": 8, "stack_count": 1, "confidence": 0.9, "move_class": "movable",
+          "size": {"dims_in": [72, 30, 2], "size_source": "catalog", "vision_dims_in": [70, 30, 29],
+                   "volume_cuft_each": 2.5, "volume_cuft_total": 20.0, "weight_lb_each": 32, "weight_lb_total": 256,
+                   "weight_source": "catalog", "material": "plastic"},
+          "fragile": false, "must_stay_upright": false, "disassemble": true, "two_person": false, "stackable": "yes",
+          "disposition": "keep", "partially_visible": false, "heard_only": false,
+          "evidence": {"source": "clip_1.mp4", "sha256": "aaaa000000000001", "kind": "video", "timestamp_s": 3.0, "box_2d": [420, 80, 760, 620]},
+          "also_seen_in": ["photo_1.jpg"],
+          "set_by_speech": [{"field": "quantity", "quote": "there are eight of these tables", "source": "clip_1.mp4", "timestamp_s": 2.5}],
+          "notes": ""
+        },
+        {
+          "id": "item_02", "label": "stacking chairs, stack of 10", "catalog_id": "stacking_chair_stack",
+          "quantity": 4, "stack_count": 10, "confidence": 0.72, "move_class": "movable",
+          "size": {"dims_in": [22, 21, 72], "size_source": "catalog", "vision_dims_in": [20, 20, 64],
+                   "volume_cuft_each": 19.25, "volume_cuft_total": 77.0, "weight_lb_each": 95, "weight_lb_total": 380,
+                   "weight_source": "density", "material": "metal"},
+          "fragile": false, "must_stay_upright": true, "disassemble": false, "two_person": true, "stackable": "no",
+          "disposition": "undecided", "partially_visible": true, "heard_only": false,
+          "evidence": {"source": "clip_1.mp4", "sha256": "aaaa000000000001", "kind": "video", "timestamp_s": 7.0, "box_2d": [300, 500, 900, 760]},
+          "also_seen_in": [],
+          "set_by_speech": [{"field": "stackable", "quote": "these chairs stack", "source": "clip_1.mp4", "timestamp_s": 7.2}],
+          "notes": ""
+        },
+        {
+          "id": "item_03", "label": "rust bouclé barrel armchair", "catalog_id": "unknown",
+          "quantity": 3, "stack_count": 1, "confidence": 0.86, "move_class": "movable",
+          "size": {"dims_in": [36, 34, 30], "size_source": "vision_estimate", "vision_dims_in": [36, 34, 30],
+                   "volume_cuft_each": 21.25, "volume_cuft_total": 63.75, "weight_lb_each": 60, "weight_lb_total": 180,
+                   "weight_source": "vision_estimate", "material": "upholstered"},
+          "fragile": false, "must_stay_upright": false, "disassemble": false, "two_person": true, "stackable": "light_only",
+          "disposition": "undecided", "partially_visible": false, "heard_only": false,
+          "evidence": {"source": "photo_1.jpg", "sha256": "aaaa000000000002", "kind": "image", "timestamp_s": null, "box_2d": [610, 520, 960, 700]},
+          "also_seen_in": ["clip_1.mp4@4.0"], "set_by_speech": [], "notes": ""
+        },
+        {
+          "id": "item_04", "label": "long sideboard with stone top", "catalog_id": "unknown",
+          "quantity": 1, "stack_count": 1, "confidence": 0.55, "move_class": "movable",
+          "size": {"dims_in": [84, 20, 32], "size_source": "vision_estimate", "vision_dims_in": [84, 20, 32],
+                   "volume_cuft_each": 31.11, "volume_cuft_total": 31.11, "weight_lb_each": 220, "weight_lb_total": 220,
+                   "weight_source": "density", "material": "stone"},
+          "fragile": true, "must_stay_upright": true, "disassemble": false, "two_person": true, "stackable": "no",
+          "disposition": "undecided", "partially_visible": false, "heard_only": false,
+          "evidence": {"source": "photo_2.jpg", "sha256": "aaaa000000000003", "kind": "image", "timestamp_s": null, "box_2d": [380, 100, 820, 900]},
+          "also_seen_in": [], "set_by_speech": [], "notes": ""
+        },
+        {
+          "id": "item_05", "label": "projector screen on tripod", "catalog_id": "projector_screen",
+          "quantity": 1, "stack_count": 1, "confidence": 0.8, "move_class": "movable",
+          "size": {"dims_in": [72, 6, 6], "size_source": "speech", "vision_dims_in": [60, 6, 6],
+                   "volume_cuft_each": 1.5, "volume_cuft_total": 1.5, "weight_lb_each": 18, "weight_lb_total": 18,
+                   "weight_source": "density", "material": "metal"},
+          "fragile": true, "must_stay_upright": false, "disassemble": false, "two_person": false, "stackable": "no",
+          "disposition": "undecided", "partially_visible": false, "heard_only": false,
+          "evidence": {"source": "clip_1.mp4", "sha256": "aaaa000000000001", "kind": "video", "timestamp_s": 11.0, "box_2d": [100, 300, 700, 500]},
+          "also_seen_in": [],
+          "set_by_speech": [{"field": "size", "quote": "the screen is six feet across", "source": "clip_1.mp4", "timestamp_s": 10.8}],
+          "notes": ""
+        },
+        {
+          "id": "item_06", "label": "potted fiddle-leaf fig", "catalog_id": "plant_large",
+          "quantity": 2, "stack_count": 1, "confidence": 0.9, "move_class": "movable",
+          "size": {"dims_in": [24, 24, 60], "size_source": "catalog", "vision_dims_in": [22, 22, 66],
+                   "volume_cuft_each": 20.0, "volume_cuft_total": 40.0, "weight_lb_each": 40, "weight_lb_total": 80,
+                   "weight_source": "catalog", "material": "mixed"},
+          "fragile": true, "must_stay_upright": true, "disassemble": false, "two_person": false, "stackable": "no",
+          "disposition": "stays", "partially_visible": false, "heard_only": false,
+          "evidence": {"source": "photo_2.jpg", "sha256": "aaaa000000000003", "kind": "image", "timestamp_s": null, "box_2d": [50, 820, 700, 990]},
+          "also_seen_in": [],
+          "set_by_speech": [{"field": "disposition", "quote": "the plants stay here", "source": "clip_1.mp4", "timestamp_s": 13.1}],
+          "notes": ""
+        },
+        {
+          "id": "item_07", "label": "upright piano", "catalog_id": "piano_upright",
+          "quantity": 1, "stack_count": 1, "confidence": 0.5, "move_class": "movable",
+          "size": {"dims_in": [58, 25, 48], "size_source": "catalog", "vision_dims_in": null,
+                   "volume_cuft_each": 40.28, "volume_cuft_total": 40.28, "weight_lb_each": 500, "weight_lb_total": 500,
+                   "weight_source": "catalog", "material": "wood_solid"},
+          "fragile": true, "must_stay_upright": true, "disassemble": false, "two_person": true, "stackable": "no",
+          "disposition": "undecided", "partially_visible": false, "heard_only": true,
+          "evidence": {"source": "clip_1.mp4", "sha256": null, "kind": "video", "timestamp_s": 14.5, "box_2d": null},
+          "also_seen_in": [],
+          "set_by_speech": [{"field": "label", "quote": "there's a piano in the back room", "source": "clip_1.mp4", "timestamp_s": 14.5}],
+          "notes": "heard, not filmed"
+        }
+      ],
+      "containers": [
+        {"id": "room_a_cont_01", "label": "credenza drawers", "kind": "cabinet", "contents": "mixed", "fullness": "not_visible",
+         "size": "large", "est_item_count": 0, "seen_in": ["photo_2.jpg"], "est_boxes": {"box_medium": 1}, "est_volume_cuft": 3.1,
+         "evidence": {"source": "photo_2.jpg", "sha256": "aaaa000000000003", "timestamp_s": null, "box_2d": [500, 150, 800, 850]}},
+        {"id": "room_a_cont_02", "label": "loose decor on open surfaces", "kind": "open_surfaces", "contents": "decor", "fullness": "quarter",
+         "size": "small", "est_item_count": 14, "items": ["vase x3", "book x6", "sculpture x1", "cushion x4"], "fragile": true,
+         "est_boxes": {"box_medium": 2}, "est_volume_cuft": 6.2}
+      ],
+      "fixtures": [{"label": "pendant light", "quantity": 6}, {"label": "built-in shelving", "quantity": 1}, {"label": "espresso bar counter", "quantity": 1}],
+      "left_out": {"fixtures": 8, "personal_belongings": 13, "personal_belonging_kinds": {"laptop": 5, "jacket": 5, "backpack": 3}}
+    },
+    {
+      "room": {"id": "room_b", "name": "Back office"},
+      "files": ["photo_3.jpg"],
+      "items": [
+        {
+          "id": "item_11", "label": "standing desk", "catalog_id": "desk_standing",
+          "quantity": 2, "stack_count": 1, "confidence": 0.84, "move_class": "movable",
+          "size": {"dims_in": [60, 30, 4], "size_source": "catalog", "vision_dims_in": [58, 30, 29],
+                   "volume_cuft_each": 4.17, "volume_cuft_total": 8.33, "weight_lb_each": 70, "weight_lb_total": 140,
+                   "weight_source": "catalog", "material": "wood_composite"},
+          "fragile": false, "must_stay_upright": false, "disassemble": true, "two_person": true, "stackable": "yes",
+          "disposition": "undecided", "partially_visible": false, "heard_only": false,
+          "evidence": {"source": "photo_3.jpg", "sha256": "bbbb000000000001", "kind": "image", "timestamp_s": null, "box_2d": [400, 100, 850, 600]},
+          "also_seen_in": [], "set_by_speech": [], "notes": ""
+        },
+        {
+          "id": "item_12", "label": "office chair", "catalog_id": "office_chair",
+          "quantity": 2, "stack_count": 1, "confidence": 0.9, "move_class": "movable",
+          "size": {"dims_in": [26, 26, 40], "size_source": "catalog", "vision_dims_in": [25, 25, 42],
+                   "volume_cuft_each": 15.65, "volume_cuft_total": 31.3, "weight_lb_each": 35, "weight_lb_total": 70,
+                   "weight_source": "catalog", "material": "mixed"},
+          "fragile": false, "must_stay_upright": false, "disassemble": false, "two_person": false, "stackable": "no",
+          "disposition": "undecided", "partially_visible": false, "heard_only": false,
+          "evidence": {"source": "photo_3.jpg", "sha256": "bbbb000000000001", "kind": "image", "timestamp_s": null, "box_2d": [500, 620, 950, 900]},
+          "also_seen_in": [], "set_by_speech": [], "notes": ""
+        },
+        {
+          "id": "item_13", "label": "whiteboard on wheels", "catalog_id": "whiteboard_mobile",
+          "quantity": 1, "stack_count": 1, "confidence": 0.88, "move_class": "movable",
+          "size": {"dims_in": [72, 24, 75], "size_source": "catalog", "vision_dims_in": [70, 22, 74],
+                   "volume_cuft_each": 75.0, "volume_cuft_total": 75.0, "weight_lb_each": 60, "weight_lb_total": 60,
+                   "weight_source": "density", "material": "metal"},
+          "fragile": false, "must_stay_upright": true, "disassemble": false, "two_person": true, "stackable": "no",
+          "disposition": "undecided", "partially_visible": false, "heard_only": false,
+          "evidence": {"source": "photo_3.jpg", "sha256": "bbbb000000000001", "kind": "image", "timestamp_s": null, "box_2d": [50, 50, 800, 400]},
+          "also_seen_in": [], "set_by_speech": [], "notes": ""
+        }
+      ],
+      "containers": [
+        {"id": "room_b_cont_01", "label": "filing cabinet", "kind": "cabinet", "contents": "papers", "fullness": "full",
+         "size": "medium", "est_item_count": 0, "seen_in": ["photo_3.jpg"], "est_boxes": {"box_small": 3}, "est_volume_cuft": 4.5,
+         "evidence": {"source": "photo_3.jpg", "sha256": "bbbb000000000001", "timestamp_s": null, "box_2d": [300, 420, 900, 600]}}
+      ],
+      "fixtures": [{"label": "wall-mounted TV", "quantity": 1}],
+      "left_out": {"fixtures": 1, "personal_belongings": 2, "personal_belonging_kinds": {"backpack": 1, "coffee cup": 1}}
+    }
+  ],
+  "questions": [
+    {
+      "id": "q_room_a_cont_01_fullness", "kind": "hidden_contents", "room_id": "room_a",
+      "text": "Are the credenza drawers full?", "options": ["empty", "half", "full"],
+      "item_id": null, "container_id": "room_a_cont_01", "volume_at_stake_cuft": 9.0,
+      "status": "open", "answer": null, "answered_by": null, "quote": null,
+      "evidence": {"source": "photo_2.jpg", "sha256": "aaaa000000000003", "timestamp_s": null, "box_2d": [500, 150, 800, 850]},
+      "mock_effects": {
+        "empty": {"container_id": "room_a_cont_01", "changes": {"fullness": "empty", "est_boxes": {}, "est_volume_cuft": 0}},
+        "half": {"container_id": "room_a_cont_01", "changes": {"fullness": "half", "est_boxes": {"box_medium": 2}, "est_volume_cuft": 6.2}},
+        "full": {"container_id": "room_a_cont_01", "changes": {"fullness": "full", "est_boxes": {"box_medium": 4}, "est_volume_cuft": 12.4}}
+      }
+    },
+    {
+      "id": "q_item_02_count", "kind": "count_check", "room_id": "room_a",
+      "text": "How many stacks of chairs are there? Some are hidden behind bags.", "options": ["3", "4", "5", "6"],
+      "item_id": "item_02", "container_id": null, "volume_at_stake_cuft": 21.6,
+      "status": "open", "answer": null, "answered_by": null, "quote": null,
+      "evidence": {"source": "clip_1.mp4", "sha256": "aaaa000000000001", "timestamp_s": 7.0, "box_2d": [300, 500, 900, 760]},
+      "mock_effects": {
+        "3": {"item_id": "item_02", "changes": {"quantity": 3}},
+        "4": {"item_id": "item_02", "changes": {"quantity": 4}},
+        "5": {"item_id": "item_02", "changes": {"quantity": 5}},
+        "6": {"item_id": "item_02", "changes": {"quantity": 6}}
+      }
+    },
+    {
+      "id": "q_item_07_unfilmed", "kind": "unfilmed_area", "room_id": "room_a",
+      "text": "You said “there's a piano in the back room”. Should it come along?", "options": ["yes, pack it", "no, it stays"],
+      "item_id": "item_07", "container_id": null, "volume_at_stake_cuft": 20.1,
+      "status": "open", "answer": null, "answered_by": null, "quote": "there's a piano in the back room",
+      "evidence": {"source": "clip_1.mp4", "sha256": null, "timestamp_s": 14.5, "box_2d": null},
+      "mock_effects": {
+        "yes, pack it": {"item_id": "item_07", "changes": {"disposition": "keep"}},
+        "no, it stays": {"item_id": "item_07", "changes": {"disposition": "stays"}}
+      }
+    },
+    {
+      "id": "q_item_04_identify", "kind": "identify_item", "room_id": "room_a",
+      "text": "What is this?", "options": ["sideboard", "built-in counter (stays)", "something else"],
+      "item_id": "item_04", "container_id": null, "volume_at_stake_cuft": 14.0,
+      "status": "open", "answer": null, "answered_by": null, "quote": null,
+      "evidence": {"source": "photo_2.jpg", "sha256": "aaaa000000000003", "timestamp_s": null, "box_2d": [380, 100, 820, 900]},
+      "mock_effects": {
+        "sideboard": {"item_id": "item_04", "changes": {"catalog_id": "sideboard", "confidence": 0.95}},
+        "built-in counter (stays)": {"item_id": "item_04", "changes": {"remove": true}},
+        "something else": {"item_id": "item_04", "changes": {}}
+      }
+    },
+    {
+      "id": "q_item_03_size", "kind": "size_check", "room_id": "room_a",
+      "text": "Which is closer to the armchair's size?", "options": ["36 × 34 × 30 in", "30 × 30 × 32 in"],
+      "item_id": "item_03", "container_id": null, "volume_at_stake_cuft": 4.6,
+      "status": "answered", "answer": "36 × 34 × 30 in", "answered_by": "decisions_api", "confidence": 0.81, "quote": null,
+      "evidence": {"source": "photo_1.jpg", "sha256": "aaaa000000000002", "timestamp_s": null, "box_2d": [610, 520, 960, 700]}
+    },
+    {
+      "id": "q_item_06_keep", "kind": "include_class", "room_id": "room_a",
+      "text": "Are the potted plants coming?", "options": ["yes", "no, they stay"],
+      "item_id": "item_06", "container_id": null, "volume_at_stake_cuft": 40.0,
+      "status": "answered", "answer": "no, they stay", "answered_by": "speech", "quote": "the plants stay here",
+      "evidence": {"source": "photo_2.jpg", "sha256": "aaaa000000000003", "timestamp_s": null, "box_2d": [50, 820, 700, 990]}
+    },
+    {
+      "id": "q_room_a_personal", "kind": "include_class", "room_id": "room_a",
+      "text": "Leave out the bags, laptops and jackets? They belong to people, not the room.", "options": ["leave them out", "pack them"],
+      "item_id": null, "container_id": null, "volume_at_stake_cuft": 6.0,
+      "status": "open", "answer": null, "answered_by": null, "quote": null,
+      "evidence": {"source": "photo_1.jpg", "sha256": null, "timestamp_s": null, "box_2d": null},
+      "mock_effects": {"leave them out": {}, "pack them": {}}
+    }
+  ]
+}
