@@ -105,3 +105,39 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** The skill carries current SDK usage and model IDs; agents otherwise write code against the deprecated `google-generativeai` SDK or retired models.
 - **By:** Chris.
 - **See:** Pack-It-Up [AGENTS.md](https://github.com/TallGibbs/Pack-It-Up/blob/main/AGENTS.md#gemini-api-skills)
+
+## 2026-11-21 11:38 · Demo question answered on the capture page
+- **Decision:** The top open question appears as a card on the capture page, under the upload progress, as soon as the server raises it, and is answered there. The review page stays but can be skipped: the capture page also links straight to the packing plan.
+- **Why:** The demo gives inventory and one live question 30 seconds (0:20 to 0:50); a page change costs time, and a list screen risks looking like a dashboard.
+- **By:** Chris.
+- **See:** [plan/UPLOAD_UI_SPEC.md](../plan/UPLOAD_UI_SPEC.md)
+
+## 2026-11-21 11:38 · Item choices: Move / Stays / Sell / Toss
+- **Decision:** Each item on the review page offers Move (`keep`), Stays (`stays`), Sell (`sell`) and Toss (`trash`). `donate` is no longer offered; an item already marked donate shows as a badge. Only Move and undecided items go to the truck.
+- **Why:** Fits both the moving-home story and the venue demo, where "stays" is the common case, and four buttons fit a phone row.
+- **By:** Chris.
+
+## 2026-11-21 11:38 · Model-only questions don't go to the user
+- **Decision:** `same_item` and `fixture_check` questions are never shown to the user as open cards. The Decisions API's best guess is applied, and the question shows as answered with a Change link.
+- **Why:** Their text is written for the model ("the last image is a new sighting…") and refers to images the user can't see.
+- **By:** Chris.
+- **See:** `backend/ingest/gaps.py` (ingestion session owns it)
+
+## 2026-11-21 11:38 · Re-solve on "Plan the truck load"
+- **Decision:** Review edits change only the inventory. Tapping "Plan the truck load" opens Track B's page with the run id, and it solves from the latest inventory; no live truck count on the review page.
+- **Why:** No dependency on solver speed or a solve route that isn't defined yet. A judge's change at 2:00 is: edit, then tap the button again.
+- **By:** Chris.
+
+## 2026-11-21 11:38 · API server serves the pages
+- **Decision:** `backend/app.py` mounts `frontend/` as static files at `/app`, so the phone opens `/app/capture.html` on the same port as the API, and one tunnel address covers both. The upload UI session makes the one-line change after telling the ingestion session.
+- **Why:** A tunnel exposes one port; two servers would need two tunnel addresses.
+- **By:** Chris.
+
+## 2026-11-21 11:38 · Handoff contract with Track B
+- **Decision:** "Plan the truck load" opens `frontend/index.html?run_id=<run_id>` (plus `&api=` or `&mock=1` when set). The upload UI session writes the contract into open-questions.md and the session notes for George to confirm; Chris confirms with George in person.
+- **By:** Chris.
+
+## 2026-11-21 11:38 · Phone connection: test LAN now, tunnel as backup
+- **Decision:** Chris opens `http://<laptop IP>:8000/health` on his phone on the venue wifi. If it answers, the demo uses LAN; either way a Cloudflare quick tunnel (`cloudflared`) is installed as a backup, and the README says how to start it.
+- **Why:** The live phone upload is 35% of the score, and venue wifi often blocks device-to-device traffic.
+- **By:** Chris.
