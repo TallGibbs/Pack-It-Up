@@ -141,3 +141,14 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Decision:** Chris opens `http://<laptop IP>:8000/health` on his phone on the venue wifi. If it answers, the demo uses LAN; either way a Cloudflare quick tunnel (`cloudflared`) is installed as a backup, and the README says how to start it.
 - **Why:** The live phone upload is 35% of the score, and venue wifi often blocks device-to-device traffic.
 - **By:** Chris.
+
+## 2026-11-21 11:30 · Closed containers: assume empty, always ask
+- **Decision:** A container whose fullness is `not_visible` (closed doors or drawers) is not sent to the Decisions API. Resolve and box counts treat it as empty, it is flagged "contents unknown, assumed empty" (on the container and on the furniture holding it), and the user is always asked, on top of the five ranked questions.
+- **Why:** Footage can't see inside a closed cabinet; in the 11:09 run the Decisions API guessed "empty" at 0.36 for a sideboard whose contents Chris couldn't see in person either.
+- **By:** Chris.
+- **See:** `backend/ingest/gaps.py` (`hidden_contents`), `backend/ingest/resolve.py`, `eval/grading/malin_decisions_1109.md`.
+
+## 2026-11-21 11:30 · Upholstered seating by seat count
+- **Decision:** The perceive prompt (v3) classifies sofas and chairs by seats (single, two, three, sectional) rather than by names like armchair or loveseat, and asks for extra care counting partly hidden repeated items and the room's edges. Count questions offer up to twice the estimate plus "more" and a typed number.
+- **Why:** Size is what packing needs. In person the Malin lounge has 6 bar stools and 16 work chairs; the pipeline said 5 and 10, and the count question offered at most 12.
+- **By:** Chris.

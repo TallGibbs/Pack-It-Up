@@ -127,6 +127,7 @@ def edit_item(run_id: str, item_id: str, changes: dict) -> dict:
 
 AUTO_APPLY = 0.7       # Decisions API answers at or above this confidence are applied automatically
 MAX_SHOWN = 5          # open questions shown to the user at once
+MODEL_ONLY = {"same_item", "fixture_check"}  # never open cards for the user (Chris, 11:38)
 CONTAINER_CUFT = {"small": 6, "medium": 15, "large": 30}
 FULLNESS = ["empty", "quarter", "half", "three_quarters", "full"]
 
@@ -368,11 +369,15 @@ def build_questions(run_id: str) -> list[dict]:
         r = results.get(q["id"])
         if r and "answer" in r:
             q["model_answer"] = {k: r[k] for k in ("answer", "confidence", "rationale", "via")}
-            if r["confidence"] >= AUTO_APPLY and r["answer"] != "more":  # "more" needs a number from the user
+            # Model-only questions (Chris, 11:38): their text is written for the model and refers to images the
+            # user can't see, so the best guess is always applied and shown as answered with a Change link.
+            model_only = q["kind"] in MODEL_ONLY
+            if (r["confidence"] >= AUTO_APPLY or model_only) and r["answer"] != "more":  # "more" needs a number
                 store_answer(run_id, {"kind": q["kind"], "question_id": q["id"], "answer": r["answer"],
                                       "source": r["via"], "confidence": r["confidence"],
                                       "patch": _patch_for(q, r["answer"])})
-                q.update(status="answered", answer=r["answer"], answered_by=r["via"])
+                q.update(status="answered", answer=r["answer"], answered_by=r["via"],
+                         low_confidence=r["confidence"] < AUTO_APPLY)
                 continue
             q["suggested"] = r["answer"]
         elif r and "error" in r:
