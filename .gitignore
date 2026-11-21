@@ -4,8 +4,12 @@
 !.env.example
 *.key
 
-# Home footage and large media (never commit)
+# Home footage, photos of people, large media (never commit)
 demo_videos/
+media/
+*.jpg
+*.jpeg
+*.heic
 *.mp4
 *.mov
 *.m4v

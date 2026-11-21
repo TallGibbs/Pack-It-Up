@@ -1,0 +1,6 @@
+# Media stays local: never commit photos or clips from here.
+# Git keeps only the folders (.gitkeep) and this file.
+*
+!*/
+!.gitignore
+!.gitkeep
