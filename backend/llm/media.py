@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import io
 import subprocess
+import warnings
 from pathlib import Path
 
 import imageio_ffmpeg
@@ -30,11 +31,13 @@ def sha256_file(path: Path) -> str:
 
 def video_info(path: Path) -> dict:
     """Duration (s), fps, size and codec as reported by ffmpeg."""
-    gen = imageio_ffmpeg.read_frames(str(path))
-    try:
-        meta = next(gen)
-    finally:
-        gen.close()
+    with warnings.catch_warnings():  # rotated phone clips warn about frame size; harmless here
+        warnings.simplefilter("ignore")
+        gen = imageio_ffmpeg.read_frames(str(path))
+        try:
+            meta = next(gen)
+        finally:
+            gen.close()
     return {
         "duration_s": meta.get("duration"),
         "fps": meta.get("fps"),

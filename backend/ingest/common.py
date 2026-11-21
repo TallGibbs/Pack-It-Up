@@ -1,0 +1,60 @@
+"""Run folders and small JSON helpers shared by the ingest stages."""
+from __future__ import annotations
+
+import datetime as dt
+import json
+import os
+import re
+import threading
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+RUNS_DIR = Path(os.environ.get("PACK_RUNS_DIR", ROOT / "runs"))
+
+_status_lock = threading.Lock()
+
+
+def slug(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+    return s or "room_1"
+
+
+def new_run_id(hint: str = "") -> str:
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"{stamp}-{slug(hint)[:24]}" if hint else stamp
+
+
+def run_dir(run_id: str) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9_\-]+", run_id):
+        raise ValueError(f"bad run id {run_id!r}")
+    return RUNS_DIR / run_id
+
+
+def read_json(path: Path, default=None):
+    if not path.exists():
+        return default
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_json(path: Path, data) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + f".{threading.get_ident()}.tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def update_status(rd: Path, **changes) -> dict:
+    """Merge into runs/<id>/status.json. `files={name: {...}}` merges per file."""
+    with _status_lock:
+        st = read_json(rd / "status.json", {"stage": "created", "files": {}, "errors": []})
+        files = changes.pop("files", None)
+        if files:
+            for k, v in files.items():
+                st["files"].setdefault(k, {}).update(v)
+        err = changes.pop("error", None)
+        if err:
+            st["errors"].append(err)
+        st.update(changes)
+        st["updated"] = dt.datetime.now().isoformat(timespec="seconds")
+        write_json(rd / "status.json", st)
+        return st
