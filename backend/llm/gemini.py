@@ -24,6 +24,7 @@ _RES = {"low": "MEDIA_RESOLUTION_LOW", "medium": "MEDIA_RESOLUTION_MEDIUM", "hig
 _client: genai.Client | None = None
 _client_lock = threading.Lock()
 _uploaded: dict[str, types.File] = {}  # sha256 -> active File
+_version_clients: dict = {}  # (api_version, timeout_ms) -> Client, for TTS and video
 _upload_locks: dict[str, threading.Lock] = {}
 
 
@@ -359,9 +360,12 @@ class GeminiProvider:
         if not settings.get("api_version"):
             return _get_client()
         _get_client()  # checks the key is set
-        return genai.Client(api_key=os.environ[key_var()],
-                            http_options={"api_version": settings["api_version"],
-                                          "timeout": int(float(settings.get("timeout_s", 90)) * 1000)})
+        key = (settings["api_version"], int(float(settings.get("timeout_s", 90)) * 1000))
+        with _client_lock:  # keep a reference: an unreferenced Client closes its HTTP pool mid-request
+            if key not in _version_clients:
+                _version_clients[key] = genai.Client(api_key=os.environ[key_var()],
+                                                     http_options={"api_version": key[0], "timeout": key[1]})
+            return _version_clients[key]
 
     def speak(self, text: str, settings: dict) -> tuple[bytes, Usage]:
         """Text to speech: one WAV (24 kHz mono 16-bit). `style` goes in speech_metadata, never in the text."""
