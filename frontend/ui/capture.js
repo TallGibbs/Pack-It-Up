@@ -34,12 +34,32 @@
     input.placeholder = rooms.length ? "Kitchen" : "Living room";
     input.value = "Room " + (rooms.length + 1);
     input.addEventListener("focus", () => { if (/^Room \d+$/.test(input.value)) input.select(); });
-    [$(".cam", el), $(".lib", el)].forEach((inp) =>
-      inp.addEventListener("change", () => { pick(room, Array.from(inp.files || [])); inp.value = ""; }));
+    [$(".cam", el), $(".lib", el)].forEach((inp) => {
+      inp.addEventListener("click", () => setWaiting(room, true));   // the camera or photo picker is opening
+      inp.addEventListener("cancel", () => setWaiting(room, false)); // closed without choosing (Safari 16.4+)
+      inp.addEventListener("change", () => { setWaiting(room, false); pick(room, Array.from(inp.files || [])); inp.value = ""; });
+    });
     rooms.push(room);
     $("#rooms").appendChild(el);
     return room;
   }
+
+  // Between tapping a pick button and the browser's "change" event the page hears nothing, and on a
+  // phone that gap is long: iOS converts each photo to JPEG (and re-encodes clips) before handing it
+  // over, about 5 s for three photos (FAILURES.md 12:45). Show a "getting your files" row meanwhile so
+  // the page doesn't look frozen. Browsers without the "cancel" event never say the picker was closed
+  // empty-handed, so the row also clears itself a minute after the page is back in front.
+  const WAIT_GIVE_UP_MS = 60000;
+  function setWaiting(room, on) {
+    clearTimeout(room.waitTimer);
+    room.waiting = on;
+    render(room);
+  }
+  window.addEventListener("focus", () => rooms.forEach((room) => {
+    if (!room.waiting) return;
+    clearTimeout(room.waitTimer);
+    room.waitTimer = setTimeout(() => setWaiting(room, false), WAIT_GIVE_UP_MS);
+  }));
 
   // A room's name is fixed once it has files: the server files them under that name.
   function lockRoom(room, name) {
@@ -172,6 +192,12 @@
       }
       ul.appendChild(li);
     });
+    if (room.waiting) { // see setWaiting
+      const li = document.createElement("li");
+      li.innerHTML = `<span aria-hidden="true">⏳</span><span class="name">Getting your files from the phone…</span>
+        <span class="state">a few seconds</span><div class="bar busy"><i></i></div>`;
+      ul.appendChild(li);
+    }
   }
 
   function allFinished(run) {
