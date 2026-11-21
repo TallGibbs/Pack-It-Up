@@ -27,6 +27,12 @@ Move an item to [decisions.md](decisions.md) once it is decided, and delete it h
 - **From the 13:10 review, not started:** `?api=` on the real pages; `GET /analysis/runs` lists every move's id to anyone; a move interrupted by an API restart stays "still working" for good; two phones adding to one move can clash on file names; tap targets under 44 px, no visible focus on the two pick buttons, and progress not announced to screen readers. (Track A)
 - **Branches that can be deleted on GitHub:** `feature/review-server-fixes`, `feature/edit-checks`, `feature/box-table`, `feature/belongings-mock`. All four are in `main`. (Chris)
 
+## Left by the phone test session (13:55)
+- **A clip over 95 MB has not been tried on a phone.** The capture page refuses it at the demo address (Cloudflare's 100 MB limit); seen only with stubbed sends in the desktop browser. To check: film about 90 seconds in the Camera app and pick it. Chris chose to skip it. (Chris)
+- **Two files being read at the same moment has not happened on a phone.** The two-phone step used photos the server had seen, so they came back from the model-call cache. Stub tests at 12:15 and a desktop test at 13:10 cover it. To check: a fresh clip on each phone, picked together. (Chris)
+- **A stored answer can show as failed after a fixture answer removes its item** (`answers_applied`, FAILURES.md 13:44). Harmless; `gaps.reapply_answers` could skip it. (Track A)
+- **What sent the one upload with no files at 12:05 is still unknown.** The page can no longer send one. (Track A)
+
 ## Ideas proposed, not decided
 - **Lifting guidance on unload steps:** tags such as "two-person lift" or "over 50 lb", using the catalog's `two_person` flag and weights. About 30 minutes in B8. Suggested as core.
 - **Truck-mode reminder:** one checklist line on the final plan screen telling drivers to use a truck-aware nav setting. About 5 minutes. Check which apps really have a truck mode before naming one.
