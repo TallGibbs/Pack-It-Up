@@ -64,6 +64,7 @@ If the tunnel or wifi fails, open a move from earlier today on the laptop and sa
 ## The QR code for judges
 
 - **Where it points:** `https://packitup.temperedanalytics.com/`. It opens the name page, then capture. Each person who scans gets their own move (decision 12:19).
+- **The image:** [demo_qr.png](demo_qr.png), made at 14:20 with the `qrcode` library. A second library read it back as the address above. Not yet scanned by a phone from a projected slide. If we later want a landing page with two choices, change what the address serves; the image stays the same.
 - **Where it appears:** the opening and closing slides, the video's end card, and a printed sheet on the table. Put it in the slides as a saved image, so it still shows if the wifi drops.
 - **What to tell judges:** three photos or a clip under 20 seconds; each file takes about 30 seconds to read; clips over 95 MB are refused.
 - **A second link for judges who don't want to film:** a finished move opened straight in the review page and the 3D view. Pick one whose photos show no people, because the review page shows thumbnails.
@@ -84,7 +85,7 @@ If the tunnel or wifi fails, open a move from earlier today on the laptop and sa
 2. **A model in Track B (model use, 20%).** Track B makes no model calls. B6 (Neon reads the verifier result and changes the strategy) is the smallest way to show a second Gemini 4 model. George.
 3. **README.** Status still says Track B is being built. Add what the app does now, the results table, and whether `data/trucks.csv`, `penn_zones.csv` and `sample_venue.json` were brought in.
 4. **Tunnel restart** in `run_demo.ps1`.
-5. **Slides and QR image.** Two slides.
+5. **Slides and QR image.** Drafted at 14:25, four slides: cover with the code, how it works, what we measured, try it yourself. Chris has them as a private Claude deck that downloads as PowerPoint or PDF. The baseline line on the "what we measured" slide is a placeholder until the results table exists.
 
 ## Timeline
 
