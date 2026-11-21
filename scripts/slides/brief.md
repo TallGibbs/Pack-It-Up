@@ -58,7 +58,7 @@ This file is the input to the Gemini job `slides` (scripts/slides/build.py). It 
 
 ## Slide order (8 slides)
 
-1. Cover: name, one-line promise, the event, and the QR code large, front and centre.
+1. Cover: a visual summary of the whole app: name and one-line promise, then the four app screens (film, check, plan, models) as a flow with the Gemini model at each step, and the QR code large and prominent as the last step or beside the flow.
 2. How it works: the 7 steps above as a simple flow, naming the model at each step.
 3. Film: the capture page screenshot.
 4. Check the list: the review page screenshots (answers from the Decisions API, and the item list).
