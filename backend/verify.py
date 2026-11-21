@@ -32,6 +32,7 @@ SUPPORT_Z_TOL = 0.25
 DEFAULT_MIN_SUPPORT = 0.75
 DEFAULT_LIGHT_MAX_LB = 30.0
 DEFAULT_BALANCE_BAND = (0.40, 0.60)
+SMALL_MOVE_PIECES = 30  # below this, `zone_distribution` asks for two stocked stores rather than three
 
 
 def _rect_union_area(rects: list[tuple[float, float, float, float]]) -> float:
@@ -354,11 +355,16 @@ def verify_zones(placement: dict) -> tuple[list[dict], dict[str, float]]:
                 item_ids=[iid],
             ))
 
-    # Multi-store distribution check: moving into a single giant hall is disallowed when >= 10 items exist
+    # Multi-store distribution check: moving into a single giant hall is disallowed when >= 10 items exist.
+    # A small capture (one corner of a room) holds too few kinds of things to stock three stores, so
+    # under SMALL_MOVE_PIECES pieces two stores are enough; one store taking over 75% still fails at any
+    # size from 10 pieces up. Before this, two real 14- and 17-piece moves split 50/50 over two stores
+    # came out "not valid" on this rule alone (FAILURES.md 15:17).
     if len(all_truck_items) >= 10 and zone_counts:
         top_zone, top_cnt = max(zone_counts.items(), key=lambda kv: kv[1])
         distinct_zones = sum(1 for c in zone_counts.values() if c > 0)
-        if distinct_zones < 3 or (top_cnt / len(all_truck_items)) > 0.75:
+        min_zones = 3 if len(all_truck_items) >= SMALL_MOVE_PIECES else 2
+        if distinct_zones < min_zones or (top_cnt / len(all_truck_items)) > 0.75:
             violations.append(_violation(
                 "zone_distribution",
                 f"{top_cnt}/{len(all_truck_items)} items ({top_cnt * 100 / len(all_truck_items):.0f}%) routed to {top_zone} "

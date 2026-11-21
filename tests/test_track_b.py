@@ -194,3 +194,33 @@ def test_b4_deliberately_broken_plans_fail_with_named_violations() -> None:
     assert not res["valid"]
     assert "zone_door_clearance" in res["violation_counts_by_rule"]
     assert "zone_distribution" in res["violation_counts_by_rule"]
+
+
+def test_zone_distribution_small_move_needs_two_stores_not_three() -> None:
+    """A one-corner capture cannot stock three stores; one store over 75% still fails (FAILURES.md 15:17)."""
+
+    def placement(n: int, zones: list[str]) -> dict:
+        return {
+            "trucks": [{
+                "truck_id": "uhaul_26",
+                "items": [
+                    {"id": f"it_{k}", "label": "box", "pos_in": [k * 6, 10, 0], "size_in": [5, 5, 5],
+                     "weight_lb": 5, "load_seq": k + 1, "dest_zone": zones[k % len(zones)]}
+                    for k in range(n)
+                ],
+            }],
+        }
+
+    def flagged(p: dict) -> bool:
+        violations, _ = verify.verify_zones(p)
+        return any(v["rule"] == "zone_distribution" for v in violations)
+
+    two = ["penn_bookshop", "penn_cafe"]
+    assert not flagged(placement(14, two))                     # the 14- and 17-piece moves that failed
+    assert not flagged(placement(17, two))
+    assert flagged(placement(verify.SMALL_MOVE_PIECES, two))   # a full-size move still needs three stores
+    assert flagged(placement(14, ["penn_concourse"]))          # everything in one hall still fails
+    lopsided = placement(20, two)
+    for it in lopsided["trucks"][0]["items"][:16]:
+        it["dest_zone"] = "penn_cafe"                          # 16 of 20 = 80% in one store
+    assert flagged(lopsided)
