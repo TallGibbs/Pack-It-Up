@@ -99,3 +99,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **By:** Chris.
 - **Replaces:** 2026-11-21 10:58, shared team memory in the planning repo.
 - **See:** [plan/README.md](../plan/README.md)
+
+## 2026-11-21 11:30 · Agents use Google's gemini-skills
+- **Decision:** Every agent loads Google's public [gemini-skills](https://github.com/google-gemini/gemini-skills) (`gemini-api-dev` first) before writing Gemini API code, for both the hackathon and the product after it. Install steps are in Pack-It-Up's AGENTS.md. Where the skill and our measured settings disagree, `backend/llm/models.toml` and `FAILURES.md` win; for example the skill puts the Decisions API on v1beta, but our keys need v1alpha.
+- **Why:** The skill carries current SDK usage and model IDs; agents otherwise write code against the deprecated `google-generativeai` SDK or retired models.
+- **By:** Chris.
+- **See:** Pack-It-Up [AGENTS.md](https://github.com/TallGibbs/Pack-It-Up/blob/main/AGENTS.md#gemini-api-skills)
