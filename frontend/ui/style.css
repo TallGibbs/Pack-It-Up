@@ -129,6 +129,10 @@ label.field { display: block; font-size: 13px; color: var(--muted); margin-botto
 .q .text { font-weight: 600; }
 .q .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .q .opts .btn { min-height: 44px; flex: 1 1 auto; }
+.q .opts .btn.guess { border-color: var(--accent); flex-direction: column; gap: 0; }
+.q .opts .btn small { font-size: 11px; font-weight: 400; color: var(--muted); }
+.q .opts.free input { flex: 1 1 160px; min-height: 44px; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 .q.answered { background: var(--card); border-color: var(--line); padding: 10px 14px; }
 .q.answered .text { font-weight: 500; font-size: 14px; }
 .kind { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }

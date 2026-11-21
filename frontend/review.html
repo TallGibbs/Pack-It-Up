@@ -49,7 +49,8 @@
   const OUT = new Set(["sell", "donate", "trash", "stays"]);
   const SIZE_SRC = { catalog: "catalog", vision_estimate: "estimate", speech: "you said", category_default: "default" };
   const WT_SRC = { catalog: "catalog", vision_estimate: "estimate", density: "by material", speech: "you said" };
-  const ANSWERED_BY = { decisions_api: "Answered by the Decisions API", speech: "You said", user: "You answered" };
+  const ANSWERED_BY = { decisions_api: "Answered by the Decisions API", generate_json_fallback: "Answered by the model",
+                        speech: "You said", user: "You answered" };
 
   if (MOCK) $("#mock-banner").classList.remove("hidden");
 
@@ -78,19 +79,20 @@
   // ---------- data ----------
   async function load() {
     pollTimer = null;
+    let run = null;
     try {
-      const run = await api.getRun(runId);
-      if (!run.inventory) {
-        $("#sub").textContent = "Still looking at your photos and clips…";
-        partial = true;
-      } else if (!inFlight) {
-        partial = !!run.partial;
-        setInventory(run.inventory);
-      }
+      run = await api.getRun(runId);
       $("#err").classList.add("hidden");
     } catch (e) {
       showError(e.status === 404 ? `No move called ${runId} on this server.` : `Can't reach the server: ${e.message}`);
       if (e.status === 404) return;
+    }
+    if (run && !run.inventory) {
+      $("#sub").textContent = "Still looking at your photos and clips…";
+      partial = true;
+    } else if (run && !inFlight) {
+      partial = !!run.partial;
+      try { setInventory(run.inventory); } catch (e) { console.error(e); showError(`Display error: ${e.message}`); }
     }
     if (partial && !document.hidden) pollTimer = setTimeout(load, 2000);
   }
@@ -169,7 +171,15 @@
   const findContainer = (id) => (inv ? inv.rooms.flatMap((r) => r.containers || []).find((c) => c.id === id) : null);
   const boxCount = (c) => Object.values(c.est_boxes || {}).reduce((a, n) => a + n, 0);
 
+  // Container evidence carries the file name but not its hash; borrow the hash from an item seen in the same file.
+  function withSha(ev) {
+    if (!ev || ev.sha256 || !ev.source || !ev.box_2d || !inv) return ev; // no box: heard-only, keep the mic tile
+    const hit = allItems().find((i) => i.evidence && i.evidence.source === ev.source && i.evidence.sha256);
+    return hit ? { ...ev, sha256: hit.evidence.sha256, kind: ev.kind || hit.evidence.kind } : ev;
+  }
+
   function thumb(ev, label, size = 160) {
+    ev = withSha(ev);
     const ph = window.PIU.placeholder(label, ev && !ev.sha256 ? "audio" : ev && ev.kind);
     const src = api.cropUrl(runId, ev, size, label);
     return `<img class="thumb" loading="lazy" alt="" src="${esc(src)}" onerror="this.onerror=null;this.src='${ph}'">`;
@@ -202,18 +212,40 @@
     });
   }
 
+  // Questions as backend/ingest/gaps.py writes them: options is {key: label} (or a plain list),
+  // or null with free_text; refers_to is an item id, a container label or a room id;
+  // shown marks the top few the server wants the user to see.
+  function qOptions(q) {
+    if (Array.isArray(q.options)) return q.options.map((o) => ({ key: String(o), label: String(o) }));
+    if (q.options && typeof q.options === "object") return Object.entries(q.options).map(([key, label]) => ({ key, label: String(label) }));
+    return [];
+  }
+  const isOpen = (q) => (q.status || "open") === "open";
+
   function questionList() {
     const qs = inv.questions || [];
-    const open = qs.filter((q) => (q.status || "open") === "open" || reopened.has(q.id));
-    const answered = qs.filter((q) => q.status === "answered" && !reopened.has(q.id));
-    return { open: open.slice(0, MAX_QUESTIONS), more: Math.max(0, open.length - MAX_QUESTIONS), answered };
+    const openAll = qs.filter(isOpen);
+    const serverPicks = qs.some((q) => "shown" in q);
+    let open = serverPicks ? openAll.filter((q) => q.shown) : openAll.slice(0, MAX_QUESTIONS);
+    open = open.slice(0, MAX_QUESTIONS);
+    const reopenedQs = qs.filter((q) => !isOpen(q) && reopened.has(q.id));
+    const answered = qs.filter((q) => !isOpen(q) && !reopened.has(q.id));
+    return { open: [...reopenedQs, ...open], more: openAll.length - open.length, answered };
   }
 
-  function questionEvidence(q) {
-    if (q.evidence && (q.evidence.sha256 || q.evidence.box_2d)) return q.evidence;
-    const it = q.item_id && findItem(q.item_id);
-    const c = q.container_id && findContainer(q.container_id);
-    return (it && it.evidence) || (c && c.evidence) || q.evidence;
+  function questionTarget(q) {
+    const ref = q.item_id || q.refers_to;
+    const it = ref && findItem(ref);
+    if (it) return { ev: it.evidence, label: it.label };
+    const c = (q.container_id && findContainer(q.container_id)) ||
+      (inv.rooms.flatMap((r) => r.containers || []).find((x) => x.label === q.refers_to));
+    if (c) return { ev: c.evidence, label: c.label };
+    return { ev: q.evidence, label: q.kind === "include_class" ? "bags" : q.refers_to || q.text };
+  }
+
+  function optLabel(q, key) {
+    const o = qOptions(q).find((x) => x.key === String(key));
+    return o ? o.label : key;
   }
 
   function renderQuestions() {
@@ -223,20 +255,29 @@
     let html = open.length ? `<h2>${open.length === 1 ? "One question" : `${open.length} quick questions`}</h2>` : "";
     open.forEach((q) => {
       const busy = busyQ.has(q.id);
+      const t = questionTarget(q);
+      const opts = qOptions(q);
+      const guess = q.suggested ?? (q.model_answer && q.model_answer.answer);
+      const conf = q.model_answer && q.model_answer.confidence;
+      const body = opts.length
+        ? `<div class="opts">${opts.map((o) =>
+            `<button class="btn${o.key === guess ? " guess" : ""}" type="button" data-opt="${esc(o.key)}" ${busy ? "disabled" : ""}${q.answer === o.key ? ' aria-pressed="true"' : ""}>${esc(o.label)}${
+              o.key === guess ? `<small>best guess${conf != null ? ` · ${Math.round(conf * 100)}%` : ""}</small>` : ""}</button>`).join("")}</div>`
+        : `<form class="opts free" data-free><input type="text" name="a" required placeholder="Type your answer" ${busy ? "disabled" : ""}>
+            <button class="btn primary" ${busy ? "disabled" : ""}>Save</button></form>`;
       html += `<div class="card q" data-q="${esc(q.id)}">
-        <div class="row">${thumb(questionEvidence(q), q.text)}
+        <div class="row">${thumb(t.ev, t.label)}
           <div><div class="kind">${esc((q.kind || "").replace(/_/g, " "))}</div>
-          <div class="text">${esc(q.text)}</div></div></div>
-        <div class="opts">${(q.options || []).map((o) =>
-          `<button class="btn" type="button" data-opt="${esc(o)}" ${busy ? "disabled" : ""}${q.answer === o ? ' aria-pressed="true"' : ""}>${esc(o)}</button>`).join("")}</div>
+          <div class="text clamp" data-clamp>${esc(q.user_text || q.text)}</div></div></div>
+        ${body}
       </div>`;
     });
-    if (more) html += `<p class="small muted">${more} smaller question${more > 1 ? "s" : ""} skipped; the guesses are used.</p>`;
+    if (more > 0) html += `<p class="small muted">${more} smaller question${more > 1 ? "s" : ""} not shown; best guesses used.</p>`;
     answered.forEach((q) => {
       const who = ANSWERED_BY[q.answered_by] || "Answered";
-      const said = q.answered_by === "speech" && q.quote ? `: <q>${esc(q.quote)}</q>` : `: <b>${esc(q.answer)}</b>`;
+      const said = q.answered_by === "speech" && q.quote ? `: <q>${esc(q.quote)}</q>` : `: <b>${esc(optLabel(q, q.answer))}</b>`;
       html += `<div class="card q answered" data-q="${esc(q.id)}">
-        <div class="text">${esc(q.text)}</div>
+        <div class="text clamp" data-clamp>${esc(q.user_text || q.text)}</div>
         <div class="small muted">${esc(who)}${said}
         <button class="btn link" type="button" data-reopen>Change</button></div></div>`;
     });
@@ -244,8 +285,11 @@
     host.querySelectorAll("[data-q]").forEach((card) => {
       const q = (inv.questions || []).find((x) => x.id === card.dataset.q);
       card.querySelectorAll("[data-opt]").forEach((b) => b.addEventListener("click", () => answer(q, b.dataset.opt)));
+      const form = card.querySelector("[data-free]");
+      if (form) form.addEventListener("submit", (e) => { e.preventDefault(); const v = form.a.value.trim(); if (v) answer(q, v); });
       const re = card.querySelector("[data-reopen]");
       if (re) re.addEventListener("click", () => { reopened.add(q.id); renderQuestions(); });
+      card.querySelectorAll("[data-clamp]").forEach((el) => el.addEventListener("click", () => el.classList.toggle("clamp")));
     });
   }
 
@@ -349,7 +393,7 @@
 
   function renderFooter() {
     const t = inv.totals || {};
-    const open = (inv.questions || []).filter((q) => (q.status || "open") === "open").length;
+    const open = (inv.questions || []).filter(isOpen).length;
     const btn = $("#handoff");
     btn.removeAttribute("aria-disabled");
     $("#handoff-note").innerHTML = `<b>${fmt(t.item_count)} items · ${fmt(t.volume_cuft)} cu ft</b>` +

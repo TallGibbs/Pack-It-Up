@@ -131,10 +131,11 @@
           delete q.mock_effects;
           q.id = pre + q.id;
           q.room_id = room.id;
-          if (q.item_id) q.item_id = pre + q.item_id;
-          if (q.container_id) q.container_id = pre + q.container_id;
-          q.evidence = ren(q.evidence);
-          if (q.item_id && !items.some((i) => i.id === q.item_id)) return; // item removed
+          // refers_to is an item id, a container label or the room id, as in backend/ingest/gaps.py
+          if (src.items.some((i) => i.id === q.refers_to)) {
+            q.refers_to = pre + q.refers_to;
+            if (!items.some((i) => i.id === q.refers_to)) return; // item removed
+          } else if (q.refers_to === src.room.id) q.refers_to = room.id;
           if (run.answers[q.id] != null) {
             Object.assign(q, { status: "answered", answer: run.answers[q.id], answered_by: "user" });
           }
@@ -217,12 +218,17 @@
         const src = room && fixture.rooms[room.fixture % fixture.rooms.length];
         const q = src && fixture.questions.find((x) => roomId + "-" + x.id === questionId);
         if (!q) { const e = new Error(`no question ${questionId}`); e.status = 404; throw e; }
-        if (!q.options.includes(answer)) { const e = new Error(`answer must be one of ${q.options.join(", ")}`); e.status = 400; throw e; }
+        answer = String(answer).trim();
+        if (q.options && !(answer in q.options)) { const e = new Error(`answer must be one of ${Object.keys(q.options).join(", ")}`); e.status = 400; throw e; }
+        if (!answer) { const e = new Error("empty answer"); e.status = 400; throw e; }
         run.answers[questionId] = answer;
-        const eff = (q.mock_effects || {})[answer] || {};
+        const effects = q.mock_effects || {};
+        const eff = effects[answer] || effects["*"] || {};
         if (eff.item_id) {
           const id = roomId + "-" + eff.item_id;
-          run.itemEdits[id] = { ...(run.itemEdits[id] || {}), ...eff.changes };
+          const ch = { ...eff.changes };
+          if (ch.label_from_answer) { delete ch.label_from_answer; ch.label = answer; }
+          run.itemEdits[id] = { ...(run.itemEdits[id] || {}), ...ch };
         }
         if (eff.container_id) {
           const id = roomId + "-" + eff.container_id;
