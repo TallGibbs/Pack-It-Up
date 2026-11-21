@@ -44,7 +44,7 @@ BATCH = 100          # rows per INSERT statement
 INTERVAL_S = 60      # background loop period
 _NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-state = {"enabled": False, "last_push": None, "last_error": None, "last_error_at": None,
+state = {"enabled": False, "last_check": None, "last_push": None, "last_error": None, "last_error_at": None,
          "runs_pushed": 0, "pending": None, "target": None}
 _push_lock = threading.Lock()
 _started = False
@@ -142,6 +142,7 @@ def push(force: bool = False) -> dict:
             state["pending"] = len(todo)
             target = f"{cfg['catalog']}.{cfg['schema']}"
             state["target"] = target
+            state["last_check"] = dt.datetime.now().isoformat(timespec="seconds")
             if not todo:
                 return {"pushed": [], "target": target}
             done = []
