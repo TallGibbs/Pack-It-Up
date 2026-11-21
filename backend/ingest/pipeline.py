@@ -13,11 +13,31 @@ from .merge import merge
 from .perceive import perceive_all
 from .resolve import resolve
 
-_run_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
+# Re-entrant, so a route can hold it across "store the edit" and rebuild().
+_run_locks: dict[str, threading.RLock] = defaultdict(threading.RLock)
+
+# Every upload starts its own pipeline thread, so one run can have several at once (room 2
+# uploaded while room 1 is still being perceived). The run is "done" only when the last one ends.
+_active: dict[str, int] = defaultdict(int)
+_active_guard = threading.Lock()
 
 
-def run_lock(run_id: str) -> threading.Lock:
+def run_lock(run_id: str) -> threading.RLock:
     return _run_locks[run_id]
+
+
+def begin_pipeline(run_id: str) -> None:
+    """Count a pipeline as running. Call before intake, so a pipeline that finishes while the
+    new files are still being hashed can't mark the run done."""
+    with _active_guard:
+        _active[run_id] += 1
+
+
+def end_pipeline(run_id: str) -> bool:
+    """Count a pipeline as finished. True when it was the last one on the run."""
+    with _active_guard:
+        _active[run_id] = max(0, _active[run_id] - 1)
+        return _active[run_id] == 0
 
 
 def rebuild(run_id: str, questions: bool = False) -> dict:
@@ -36,14 +56,19 @@ def rebuild(run_id: str, questions: bool = False) -> dict:
         return inv
 
 
-def run_pipeline(run_id: str, room_id: str | None = None, questions: bool = True) -> dict:
+def run_pipeline(run_id: str, room_id: str | None = None, questions: bool = True, counted: bool = False) -> dict:
+    """Perceive, merge, ask, resolve. `counted` means the caller already called begin_pipeline()."""
     rd = run_dir(run_id)
+    if not counted:
+        begin_pipeline(run_id)
     try:
         perceive_all(run_id, room_id, on_file_done=lambda _r: rebuild(run_id))
         update_status(rd, stage="questions" if questions else "resolve")
         inv = rebuild(run_id, questions=questions)
-        update_status(rd, stage="done")
-        return inv
     except Exception as e:
-        update_status(rd, stage="failed", error=f"pipeline: {type(e).__name__}: {e}")
+        # With another pipeline still working, the run isn't over: record the error and let it finish.
+        last = end_pipeline(run_id)
+        update_status(rd, stage="failed" if last else "perceive", error=f"pipeline: {type(e).__name__}: {e}")
         raise
+    update_status(rd, stage="done" if end_pipeline(run_id) else "perceive")
+    return inv

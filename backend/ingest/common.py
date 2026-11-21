@@ -5,7 +5,9 @@ import datetime as dt
 import json
 import os
 import re
+import secrets
 import threading
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,8 +22,11 @@ def slug(text: str) -> str:
 
 
 def new_run_id(hint: str = "") -> str:
+    """Timestamp, room hint, and a random suffix: two phones starting "Room 1" in the same second
+    must not share a run, and with no login the id is all that keeps a run private."""
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    return f"{stamp}-{slug(hint)[:24]}" if hint else stamp
+    token = secrets.token_hex(3)
+    return f"{stamp}-{slug(hint)[:24]}-{token}" if hint else f"{stamp}-{token}"
 
 
 def run_dir(run_id: str) -> Path:
@@ -30,17 +35,29 @@ def run_dir(run_id: str) -> Path:
     return RUNS_DIR / run_id
 
 
+def _retry_locked(fn, tries: int = 40, wait_s: float = 0.025):
+    """Windows refuses to replace a file while another thread has it open (and the reverse), so a
+    page polling GET /runs can collide with the pipeline writing the same file. Wait and try again."""
+    for attempt in range(tries):
+        try:
+            return fn()
+        except PermissionError:
+            if attempt == tries - 1:
+                raise
+            time.sleep(wait_s)
+
+
 def read_json(path: Path, default=None):
     if not path.exists():
         return default
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(_retry_locked(lambda: path.read_text(encoding="utf-8")))
 
 
 def write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + f".{threading.get_ident()}.tmp")
     tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)
+    _retry_locked(lambda: os.replace(tmp, path))
 
 
 def update_status(rd: Path, **changes) -> dict:
