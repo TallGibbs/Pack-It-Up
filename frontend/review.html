@@ -35,6 +35,34 @@
   </div>
 </div>
 
+<dialog id="add-dialog" class="sheet" aria-labelledby="add-title">
+  <form id="add-form">
+    <h2 id="add-title">Add an item <span class="muted" id="add-room-name"></span></h2>
+    <input type="search" id="add-search" placeholder="Search: piano, sofa, desk…" autocomplete="off" enterkeyhint="search" aria-label="Search the item list">
+    <div id="add-list" class="add-list"></div>
+    <div id="add-custom" class="add-custom hidden">
+      <label class="field" for="add-name">What is it?</label>
+      <input type="text" id="add-name" maxlength="80" autocomplete="off">
+      <div class="dims">
+        <label>Length<input type="number" id="add-l" inputmode="decimal" min="1" max="240" step="any"></label>
+        <label>Width<input type="number" id="add-w" inputmode="decimal" min="1" max="240" step="any"></label>
+        <label>Height<input type="number" id="add-h" inputmode="decimal" min="1" max="240" step="any"></label>
+      </div>
+      <p class="small muted">In inches. A rough size is fine.</p>
+    </div>
+    <p class="error hidden" id="add-err"></p>
+    <div class="add-actions">
+      <div class="stepper" role="group" aria-label="How many">
+        <button type="button" id="add-minus" aria-label="One fewer">−</button>
+        <output id="add-qty">1</output>
+        <button type="button" id="add-plus" aria-label="One more">+</button>
+      </div>
+      <button class="btn" type="button" id="add-cancel">Cancel</button>
+      <button class="btn primary" id="add-go" disabled>Add</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="mock/mock-api.js"></script>
 <script src="ui/api.js"></script>
 <script src="ui/questions.js"></script>
@@ -49,7 +77,7 @@
   const MAX_QUESTIONS = 5;
   const OUT = new Set(["sell", "donate", "trash", "stays"]);
   const SEGS = [["keep", "Move"], ["stays", "Stays"], ["sell", "Sell"], ["trash", "Toss"]];
-  const SIZE_SRC = { catalog: "catalog", vision_estimate: "estimate", speech: "you said", category_default: "default" };
+  const SIZE_SRC = { catalog: "catalog", vision_estimate: "estimate", speech: "you said", category_default: "default", user: "you typed" };
   const WT_SRC = { catalog: "catalog", vision_estimate: "estimate", density: "by material", speech: "you said" };
 
   if (MOCK) $("#mock-banner").classList.remove("hidden");
@@ -180,7 +208,8 @@
 
   function thumb(ev, label, size = 160) {
     ev = withSha(ev);
-    const ph = window.PIU.placeholder(label, ev && !ev.sha256 ? "audio" : ev && ev.kind);
+    // no hash: heard on the soundtrack only (mic tile), unless the user added it (initials tile)
+    const ph = window.PIU.placeholder(label, ev && ev.kind !== "user" && !ev.sha256 ? "audio" : ev && ev.kind);
     const src = api.cropUrl(runId, ev, size, label);
     return `<img class="thumb" loading="lazy" alt="" src="${esc(src)}" onerror="this.onerror=null;this.src='${ph}'">`;
   }
@@ -240,6 +269,7 @@
     const d = sz.dims_in || [];
     const dims = d.length === 3 ? `${fmt(d[0])} × ${fmt(d[1])} × ${fmt(d[2])} in` : "size unknown";
     const badges = [];
+    if (it.source === "user_added") badges.push(`<span class="badge heard">added by you</span>`);
     if (it.heard_only) badges.push(`<span class="badge heard">🎙️ heard, not filmed</span>`);
     if (it.partially_visible) badges.push(`<span class="badge">partly hidden</span>`);
     if (it.contents_unknown) badges.push(`<span class="badge">contents unknown, assumed empty</span>`);
@@ -311,6 +341,7 @@
       const t = room.totals || {};
       html += `<div class="room-h"><h2>${esc(room.room.name)}</h2><span>${fmt(t.item_count)} items · ${fmt(t.volume_cuft)} cu ft</span></div>`;
       html += items.map(itemHtml).join("") || `<p class="muted">Nothing found yet.</p>`;
+      html += `<p class="add-row"><button class="btn block" type="button" data-add-room="${esc(room.room.id)}">+ Add an item to ${esc(room.room.name)}</button></p>`;
       const conts = room.containers || [];
       if (conts.length) {
         html += `<div class="card containers"><b>Packed into boxes</b><ul style="padding-left:18px;margin:6px 0 0">` +
@@ -333,7 +364,104 @@
     });
     host.innerHTML = html;
     host.querySelectorAll("[data-item]").forEach(bindItem);
+    host.querySelectorAll("[data-add-room]").forEach((b) => b.addEventListener("click", () =>
+      openAdd(inv.rooms.find((r) => r.room.id === b.dataset.addRoom).room)));
   }
+
+  // ---------- add an item the camera didn't see ----------
+  // The sheet is a <dialog> outside #rooms, so a poll re-rendering the list doesn't disturb it.
+  // The server sizes the item (catalog size, or the typed one) and returns the whole inventory.
+  const add = { room: null, catalog: null, pick: null, qty: 1 }; // pick: a catalog id, "custom", or null
+  const dlg = $("#add-dialog");
+
+  function addError(msg) {
+    $("#add-err").textContent = msg || "";
+    $("#add-err").classList.toggle("hidden", !msg);
+  }
+
+  async function openAdd(room) {
+    Object.assign(add, { room, pick: null, qty: 1 });
+    $("#add-room-name").textContent = `to ${room.name}`;
+    ["#add-search", "#add-name", "#add-l", "#add-w", "#add-h"].forEach((s) => ($(s).value = ""));
+    addError("");
+    renderAdd();
+    dlg.showModal();
+    if (add.catalog) return;
+    try {
+      add.catalog = await api.getCatalog();
+    } catch (e) {
+      add.catalog = [];
+      addError(`Couldn't load the item list (${e.message}). "Not in the list" still works.`);
+    }
+    renderAdd();
+  }
+
+  function renderAdd() {
+    const q = $("#add-search").value.trim().toLowerCase();
+    const row = (id, name, note) => `<button type="button" class="pickrow" data-pick="${esc(id)}" aria-pressed="${add.pick === id}">
+        <span>${esc(name)}</span><small>${esc(note)}</small></button>`;
+    let html = "";
+    if (!add.catalog) {
+      html = `<p class="muted small">Loading the list…</p>`;
+    } else {
+      const hits = add.catalog.filter((c) => !q || `${c.name} ${c.category}`.toLowerCase().includes(q));
+      const byCategory = {};
+      hits.forEach((c) => (byCategory[c.category] = byCategory[c.category] || []).push(c));
+      html = Object.keys(byCategory).sort().map((cat) => `<div class="kind">${esc(cat)}</div>` +
+        byCategory[cat].map((c) => row(c.id, c.name, c.dims_in.map((d) => fmt(d)).join(" × ") + " in")).join("")).join("");
+      if (q && !hits.length) html = `<p class="muted small">Nothing in the list matches “${esc(q)}”.</p>`;
+    }
+    html += row("custom", "Not in the list", "type a name and size");
+    $("#add-list").innerHTML = html;
+    $("#add-list").querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => {
+      add.pick = b.dataset.pick;
+      addError("");
+      renderAdd();
+      if (add.pick === "custom") { if (q && !$("#add-name").value) $("#add-name").value = $("#add-search").value.trim(); $("#add-name").focus(); }
+    }));
+    $("#add-custom").classList.toggle("hidden", add.pick !== "custom");
+    $("#add-qty").textContent = add.qty;
+    const picked = (add.catalog || []).find((c) => c.id === add.pick);
+    $("#add-go").disabled = !add.pick;
+    $("#add-go").textContent = picked ? `Add ${picked.name}` : "Add";
+  }
+
+  async function submitAdd() {
+    if (!add.pick) return;
+    const body = { room: add.room.id, quantity: add.qty };
+    if (add.pick === "custom") {
+      const label = $("#add-name").value.trim();
+      const dims = ["#add-l", "#add-w", "#add-h"].map((s) => Number($(s).value));
+      if (!label || dims.some((d) => !(d > 0 && d <= 240))) {
+        return addError("Give it a name, and a length, width and height in inches (up to 240).");
+      }
+      Object.assign(body, { label, dims_in: dims });
+    } else {
+      body.catalog_id = add.pick;
+    }
+    const before = new Set(allItems().map((i) => i.id));
+    $("#add-go").disabled = true;
+    inFlight++;
+    try {
+      const next = await api.addItem(runId, body);
+      inFlight--;
+      dlg.close();
+      setInventory(next);
+      const fresh = allItems().find((i) => !before.has(i.id));
+      const el = fresh && document.querySelector(`[data-item="${CSS.escape(fresh.id)}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (e) {
+      inFlight--;
+      $("#add-go").disabled = false;
+      addError(`Couldn't add it: ${e.message}`);
+    }
+  }
+
+  $("#add-search").addEventListener("input", renderAdd);
+  $("#add-minus").addEventListener("click", () => { add.qty = Math.max(1, add.qty - 1); renderAdd(); });
+  $("#add-plus").addEventListener("click", () => { add.qty = Math.min(500, add.qty + 1); renderAdd(); });
+  $("#add-cancel").addEventListener("click", () => dlg.close());
+  $("#add-form").addEventListener("submit", (e) => { e.preventDefault(); submitAdd(); });
 
   function renderFooter() {
     const t = inv.totals || {};

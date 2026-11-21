@@ -59,6 +59,41 @@
   const MOVING = (d) => d === "keep" || d === "undecided";
   const r1 = (x) => Math.round(x * 10) / 10;
 
+  // A slice of data/item_catalog.csv (same ids, names and sizes), enough to try "Add an item".
+  const CATALOG = [
+    { id: "sofa_3seat", name: "Sofa (3-seat)", category: "living", dims_in: [84, 36, 34] },
+    { id: "armchair", name: "Armchair", category: "living", dims_in: [36, 36, 36] },
+    { id: "tv_55", name: "TV 50-59 in", category: "living", dims_in: [50, 6, 30] },
+    { id: "bookshelf_tall", name: "Bookshelf (tall)", category: "living", dims_in: [32, 12, 72] },
+    { id: "mattress_queen", name: "Mattress (queen)", category: "bedroom", dims_in: [80, 60, 10] },
+    { id: "dresser_wide", name: "Dresser (wide)", category: "bedroom", dims_in: [60, 18, 34] },
+    { id: "dining_table_6", name: "Dining table (6-seat)", category: "dining", dims_in: [72, 38, 30] },
+    { id: "refrigerator", name: "Refrigerator", category: "kitchen", dims_in: [36, 32, 70] },
+    { id: "desk", name: "Desk", category: "office", dims_in: [60, 30, 30] },
+    { id: "bicycle", name: "Bicycle", category: "garage", dims_in: [68, 24, 42] },
+    { id: "piano_upright", name: "Upright piano", category: "specialty", dims_in: [58, 25, 48] },
+    { id: "treadmill", name: "Treadmill", category: "specialty", dims_in: [72, 34, 56] },
+  ];
+  const MOCK_DENSITY = 7; // lb per cubic foot, resolve.py's "mixed"
+
+  // An item added on the review page, in the shape resolve.py gives one (source "user_added").
+  function addedItem(a) {
+    const [l, w, h] = a.dims_in;
+    const each = Math.round((l * w * h) / 1728 * 100) / 100;
+    const lb = r1(each * MOCK_DENSITY);
+    return {
+      id: a.id, label: a.label, catalog_id: a.catalog_id, quantity: a.quantity, stack_count: 1, confidence: 1,
+      move_class: "movable",
+      size: { dims_in: [Math.max(l, w), Math.min(l, w), h], size_source: a.catalog_id === "unknown" ? "user" : "catalog",
+              volume_cuft_each: each, volume_cuft_total: Math.round(each * a.quantity * 100) / 100,
+              weight_lb_each: lb, weight_lb_total: r1(lb * a.quantity), weight_source: "density", material: "mixed" },
+      fragile: false, must_stay_upright: false, disassemble: false, two_person: lb > 50, stackable: "no",
+      disposition: "keep", partially_visible: false, heard_only: false,
+      evidence: { source: null, sha256: null, kind: "user", timestamp_s: null, box_2d: null },
+      also_seen_in: [], set_by_speech: [], notes: "added on the review screen", source: "user_added",
+    };
+  }
+
   function build(run, now) {
     const fx = fixture;
     const status = { stage: "created", files: {}, errors: [], perceive_failed: [] };
@@ -99,6 +134,11 @@
         const ch = run.itemEdits[it.id];
         if (ch && ch.remove) return;
         if (ch) applyItemChanges(it, ch);
+        items.push(it);
+      });
+      (run.added || []).filter((a) => a.room === room.id).forEach((a) => {
+        const it = addedItem(a);
+        if (run.itemEdits[it.id]) applyItemChanges(it, run.itemEdits[it.id]);
         items.push(it);
       });
       const containers = frac < 1 ? [] : src.containers.map((c0) => {
@@ -251,7 +291,28 @@
         return build(run, Date.now()).inventory;
       });
     },
-    cropUrl: (runId, ev, size, label) => window.PIU.placeholder(label, ev && !ev.sha256 ? "audio" : ev && ev.kind),
+    async getCatalog() { return clone(CATALOG); },
+    async addItem(runId, body) {
+      await sleep(250);
+      const fail = (status, msg) => { const e = new Error(msg); e.status = status; throw e; };
+      return withRun(runId, (run) => {
+        if (!run.rooms.some((r) => r.id === body.room)) fail(404, `no room '${body.room}' in this run's inventory yet`);
+        const row = CATALOG.find((c) => c.id === body.catalog_id);
+        if (body.catalog_id && body.catalog_id !== "unknown" && !row) fail(400, `no catalog item '${body.catalog_id}'`);
+        if (!Number.isInteger(body.quantity) || body.quantity < 1 || body.quantity > 500) fail(400, "quantity must be a whole number from 1 to 500");
+        const label = String(body.label || (row && row.name) || "").trim().slice(0, 80);
+        const dims = row ? row.dims_in : body.dims_in;
+        if (!row && !label) fail(400, "an item that isn't in the catalog needs a label");
+        if (!row && !(Array.isArray(dims) && dims.length === 3 && dims.every((d) => typeof d === "number" && d > 0 && d <= 240)))
+          fail(400, "an item that isn't in the catalog needs dims_in: [length, width, height] in inches");
+        run.added = run.added || [];
+        const n = run.added.filter((a) => a.room === body.room).length + 1;
+        run.added.push({ room: body.room, id: `${body.room}_added_${String(n).padStart(2, "0")}`,
+                         catalog_id: row ? row.id : "unknown", label, quantity: body.quantity, dims_in: dims });
+        return build(run, Date.now()).inventory;
+      });
+    },
+    cropUrl: (runId, ev, size, label) => window.PIU.placeholder(label, ev && ev.kind !== "user" && !ev.sha256 ? "audio" : ev && ev.kind),
     reset() { save({ runs: {} }); },
   };
 })();

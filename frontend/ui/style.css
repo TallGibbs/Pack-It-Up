@@ -75,7 +75,7 @@ p { margin: 6px 0; }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: .5; pointer-events: none; }
 .btn.link { border: 0; background: none; color: var(--accent); min-height: 32px; padding: 4px 0; font-weight: 500; }
 
-input[type="text"] {
+input[type="text"], input[type="search"], input[type="number"] {
   width: 100%; min-height: 48px; padding: 10px 12px;
   border: 1px solid var(--line); border-radius: 10px;
   background: var(--bg); color: var(--ink); font: inherit; font-size: 17px; /* 16px+ stops iOS zoom */
@@ -179,6 +179,30 @@ body.capture { padding-bottom: 150px; }
 .containers { font-size: 14px; }
 .containers li { margin: 4px 0; }
 .leftout { font-size: 13px; color: var(--muted); }
+
+/* Review: "Add an item" sheet */
+.sheet {
+  width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--card); color: var(--ink); padding: 16px;
+}
+.sheet::backdrop { background: rgba(0, 0, 0, .45); }
+.sheet h2 { margin-top: 0; }
+.add-list { max-height: 38vh; overflow-y: auto; margin: 10px 0; border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px; }
+.add-list .kind { margin: 8px 4px 2px; }
+.pickrow {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  width: 100%; min-height: 44px; padding: 8px 10px; border: 0; border-radius: 8px;
+  background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+}
+.pickrow small { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pickrow[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.pickrow[aria-pressed="true"] small { color: inherit; }
+.add-custom .dims { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.add-custom .dims label { font-size: 13px; color: var(--muted); }
+.add-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.add-actions .btn.primary { flex: 1; min-width: 0; }
+.add-row { margin: 8px 0 0; }
 
 #qr-box { display: none; }
 @media (min-width: 900px) and (hover: hover) {

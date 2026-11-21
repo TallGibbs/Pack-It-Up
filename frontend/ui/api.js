@@ -74,6 +74,10 @@
       json("POST", `/answer/${encodeURIComponent(runId)}`, { question_id: questionId, answer }),
     patchItem: (runId, itemId, changes) =>
       json("PATCH", `/inventory/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}`, changes),
+    // item: {room, catalog_id, quantity} or, for something not in the catalog, {room, label, dims_in: [L, W, H], quantity}
+    addItem: (runId, item) => json("POST", `/inventory/${encodeURIComponent(runId)}/items`, item),
+    // [{id, name, category, dims_in}]: what "Add an item" offers
+    getCatalog: () => json("GET", "/catalog").then((r) => r.items),
     cropUrl(runId, ev, size, label) {
       if (!ev || !ev.sha256) return placeholder(label, ev && ev.kind);
       const q = new URLSearchParams({ size: String(size || 160) });
