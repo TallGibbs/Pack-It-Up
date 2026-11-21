@@ -305,3 +305,55 @@ class GeminiProvider:
                 if part.inline_data and part.inline_data.data:
                     return part.inline_data.data, _usage(resp)
         raise ProviderError("no image in response")
+
+    # ---------- speech and video (submission video build, plan/VIDEO_SCRIPT.md) ----------
+    def _client_for(self, settings: dict) -> genai.Client:
+        """A client on the job's api_version (TTS and video use the Interactions API on v1beta)."""
+        if not settings.get("api_version"):
+            return _get_client()
+        _get_client()  # checks the key is set
+        return genai.Client(api_key=os.environ[key_var()],
+                            http_options={"api_version": settings["api_version"],
+                                          "timeout": int(float(settings.get("timeout_s", 90)) * 1000)})
+
+    def speak(self, text: str, settings: dict) -> tuple[bytes, Usage]:
+        """Text to speech: one WAV (24 kHz mono 16-bit). `style` goes in speech_metadata, never in the text."""
+        content = {"type": "text", "text": text}
+        if settings.get("style"):
+            content["annotations"] = [{"type": "speech_metadata", "style": settings["style"]}]
+        try:
+            r = self._client_for(settings).interactions.create(
+                model=self.model, input=[{"type": "user_input", "content": [content]}],
+                response_format={"type": "audio"},
+                generation_config={"speech_config": [{"voice": settings.get("voice", "Charon")}]},
+                store=False)
+        except Exception as e:  # noqa: BLE001 - surface every SDK error the same way
+            raise ProviderError(f"speak: {e}") from e
+        audio = getattr(r, "output_audio", None)
+        if not audio or not audio.data:
+            raise ProviderError("speak: no audio in response")
+        data = audio.data if isinstance(audio.data, bytes) else base64.b64decode(audio.data)
+        return data, Usage()
+
+    def generate_video(self, prompt: str, settings: dict) -> tuple[bytes, Usage]:
+        """Text to video (Gemini Omni Flash): returns MP4 bytes."""
+        fmt = {"type": "video", "delivery": "uri", "aspect_ratio": settings.get("aspect_ratio", "16:9")}
+        if settings.get("duration_s"):
+            fmt["duration"] = f"{int(settings['duration_s'])}s"
+        if settings.get("resolution"):
+            fmt["resolution"] = settings["resolution"]
+        client = self._client_for(settings)
+        try:
+            r = client.interactions.create(model=self.model, input=[{"type": "text", "text": prompt}],
+                                           response_format=fmt)
+            out = getattr(r, "output_video", None)
+            if not out or not getattr(out, "uri", None):
+                raise ProviderError(f"generate_video: no video in response (status {getattr(r, 'status', '?')})")
+            data = client.files.download(file=out.uri)
+        except ProviderError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise ProviderError(f"generate_video: {e}") from e
+        u = getattr(r, "usage", None)
+        return data, Usage(tokens_in=getattr(u, "total_input_tokens", None),
+                           tokens_out=getattr(u, "total_output_tokens", None))

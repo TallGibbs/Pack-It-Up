@@ -1,0 +1,112 @@
+{
+  "_about": "The 60 s submission video, shot by shot (plan/VIDEO_SCRIPT.md). build.py reads this. Times in seconds; lines are spoken verbatim by the narrate job.",
+  "base": "http://127.0.0.1:8000",
+  "run_id": "20261121-133201-gibbs-ee2a93",
+  "fps": 30,
+  "length_s": 60,
+  "open_prompt": "Continuous, unbroken shot, no scene cuts: cardboard moving boxes and a wrapped armchair slide neatly into the cargo space of a white box truck, seen from the open rear door, warm afternoon light, calm and tidy. No people, no hands, no faces, no text, no logos. No dialogue.",
+  "captures": {
+    "capture": {
+      "url": "/app/capture.html?run_id={run}&who=Demo", "view": "phone", "mode": "record", "fit": "speed",
+      "steps": [
+        {"js": "__v.sleep(900)"},
+        {"js": "__v.scrollTo(document.documentElement.scrollHeight, 5200)"},
+        {"js": "__v.sleep(800)"}
+      ],
+      "expect": [{"text": "52 items + 16 boxes"}]
+    },
+    "answers": {
+      "url": "/app/review.html?run_id={run}&who=Demo", "view": "phone", "mode": "record", "fit": "speed",
+      "steps": [
+        {"js": "__v.sleep(700)"},
+        {"js": "__v.clickText('answered · see or change')"},
+        {"js": "__v.sleep(900)"},
+        {"js": "__v.scrollToText('Answered by the Decisions API', 220, 2600)"},
+        {"js": "__v.sleep(1800)"},
+        {"js": "__v.scrollBy(260, 1400)"},
+        {"js": "__v.sleep(900)"}
+      ],
+      "expect": [{"text": "Answered by the Decisions API"}]
+    },
+    "items": {
+      "url": "/app/review.html?run_id={run}&who=Demo", "view": "phone", "mode": "record", "fit": "speed",
+      "steps": [
+        {"js": "__v.scrollToText('Room 1', 120, 1)"},
+        {"js": "__v.sleep(500)"},
+        {"js": "__v.scrollToText('added by you', 260, 3600)"},
+        {"js": "__v.sleep(1000)"}
+      ],
+      "expect": [{"text": "added by you"}]
+    },
+    "load3d": {
+      "url": "/app/index.html?run_id={run}&who=Demo", "view": "desktop", "mode": "record", "fit": "speed", "wait_ms": 7000,
+      "steps": [
+        {"js": "__v.click('#dir-load')"},
+        {"js": "__v.sleep(600)"},
+        {"js": "__v.click('#btn-play')"},
+        {"js": "__v.sleep(500)"},
+        {"js": "__v.waitFor(() => /^Step (\\d+) \\/ \\1$/.test(document.querySelector('#step-readout').textContent.trim()) && document.querySelector('#btn-play').textContent.includes('Play'), 20000)"},
+        {"js": "__v.sleep(800)"}
+      ],
+      "expect": [{"selector": "#verdict-headline", "text": "2 × U-Haul 26 ft"}, {"selector": "#verdict-headline", "text": "0 rule violations"}]
+    },
+    "neon": {
+      "url": "/app/index.html?run_id={run}&who=Demo", "view": "desktop", "mode": "record", "fit": "head_tail", "head_s": 1.6, "wait_ms": 7000,
+      "model_steps": [
+        {"js": "__v.sleep(600)"},
+        {"js": "__v.click('#btn-plan')"},
+        {"js": "__v.waitFor(() => !document.querySelector('#planner-rounds').classList.contains('hidden') || /Couldn't plan/.test(document.querySelector('#planner-status').textContent), 120000)"},
+        {"js": "__v.sleep(3000)"}
+      ],
+      "dry_steps": [
+        {"js": "__v.sleep(4000)"}
+      ],
+      "read": {"headline": "#verdict-headline", "status": "#planner-status"},
+      "expect": [{"selector": "#verdict-headline", "text": "1 × U-Haul 26 ft", "else": "alt"}, {"selector": "#verdict-headline", "text": "0 rule violations", "else": "alt"}]
+    },
+    "models": {
+      "url": "/app/models.html?run_id={run}&who=Demo", "view": "desktop", "mode": "still", "wait_ms": 4000,
+      "expect": [{"text": "gemini-4-hydrogen"}]
+    },
+    "card_title": {"card": "title", "mode": "still"},
+    "card_results": {"card": "results", "mode": "still"},
+    "card_end": {"card": "end", "mode": "still"}
+  },
+  "views": {
+    "phone": {"width": 390, "height": 844, "dsf": 2, "mobile": true},
+    "desktop": {"width": 1280, "height": 720, "dsf": 1.5, "mobile": false},
+    "card": {"width": 1920, "height": 1080, "dsf": 1, "mobile": false}
+  },
+  "cards": {
+    "title": {"title": "Pack It Up", "sub": "Film your rooms. Get a checked truck plan.", "small": "Gemini 4 NYC hackathon · Nov 21, 2026"},
+    "results": {"title": "Plans with no rule broken", "rows": [["Ours", "13 of 14"], ["Stock py3dbp packer", "3 of 14"]], "small": "One per set of footage: 14 sets filmed today, mostly venue rooms, not homes. Same checker for both. Source: eval/RESULTS.md"},
+    "end": {"title": "Pack It Up", "lines": ["packitup.temperedanalytics.com", "github.com/TallGibbs/Pack-It-Up"], "qr": "plan/demo_qr.png", "small": "Built at the Gemini 4 NYC hackathon, Nov 21, 2026 · Narration: Gemini text-to-speech · Opening clip: generated video"}
+  },
+  "shots": [
+    {"id": "S1", "start": 0, "end": 6, "layout": "full", "label": "",
+     "parts": [{"source": "generated", "dur": 4, "tag": "Generated video · Gemini Omni 1.2 Flash"}, {"capture": "card_title", "dur": 2}],
+     "line": "Moving yourself? Most people guess the truck size. We count."},
+    {"id": "S2", "start": 6, "end": 14, "layout": "phone", "label": "1 · Film", "sub": "Photos and clips per room",
+     "parts": [{"capture": "capture", "dur": 8}],
+     "line": "Film each room on your phone. Gemini 4 Hydrogen lists every item, with size, weight and handling."},
+    {"id": "S3", "start": 14, "end": 23, "layout": "phone", "label": "2 · Check", "sub": "Gemini Decisions API answers",
+     "parts": [{"capture": "answers", "dur": 9}],
+     "line": "The Gemini Decisions API settles what the footage leaves unclear, and asks you only when it isn't sure."},
+    {"id": "S4", "start": 23, "end": 29, "layout": "phone", "label": "2 · Check", "sub": "Fix counts, stays, sell, toss",
+     "parts": [{"capture": "items", "dur": 6}],
+     "line": "Check the list: fix counts, mark what stays, add what's missing."},
+    {"id": "S5", "start": 29, "end": 37, "layout": "desktop", "label": "3 · Pack",
+     "parts": [{"capture": "load3d", "dur": 8}],
+     "line": "A 3D solver packs the trucks. A checker tests every piece: support, stacking, fragile, balance."},
+    {"id": "S6", "start": 37, "end": 46, "layout": "desktop", "label": "3 · Pack",
+     "parts": [{"capture": "neon", "dur": 9}],
+     "line": "Gemini 4 Neon reads the checker's result and changes the plan. Here, two trucks become one, with no rule broken.",
+     "alt_line": "Gemini 4 Neon reads the checker's result and changes the solver settings to raise the score."},
+    {"id": "S7", "start": 46, "end": 55, "layout": "desktop", "label": "",
+     "parts": [{"capture": "models", "dur": 3}, {"capture": "card_results", "dur": 6}],
+     "line": "On fourteen sets of footage, mostly venue rooms, thirteen of our plans broke no rule. A stock packer: three."},
+    {"id": "S8", "start": 55, "end": 60, "layout": "full", "label": "",
+     "parts": [{"capture": "card_end", "dur": 5}],
+     "line": "Built today with Gemini. Try it on your phone."}
+  ]
+}

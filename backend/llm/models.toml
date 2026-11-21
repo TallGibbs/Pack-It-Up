@@ -74,3 +74,21 @@ thinking = "low"
 
 [jobs.image]
 model = "gemini:gemini-nano-banana-2.1"  # illustrative Penn Station arrival render
+
+# Submission video build (scripts/video/build.py, plan/VIDEO_SCRIPT.md). Not used by the app.
+
+[jobs.narrate]
+model = "gemini:gemini-3.8-flash-tts"     # one narration clip per shot; tested 15:10 (24 words, 9.84 s)
+api_version = "v1beta"
+voice = "Charon"
+style = "warm, calm and clear, like a friend explaining a project; unhurried"
+retries = 1
+
+[jobs.video_open]
+model = "gemini:gemini-omni-1.2-flash"    # 4 s generated opening, labelled "generated video" on screen
+api_version = "v1beta"
+duration_s = 4
+resolution = "1080p"
+aspect_ratio = "16:9"
+timeout_s = 600
+retries = 0

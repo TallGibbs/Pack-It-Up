@@ -467,6 +467,22 @@ class Job:
                             self.provider.generate_image(p, m, self.settings)), label=label)
         return base64.b64decode(b64)
 
+    def speak(self, text: str, label: str | None = None) -> bytes:
+        """Narration: WAV bytes for `text`, with the job's voice and style. Cached by text, voice and style."""
+        import base64
+        b64 = self._run("speech", text, [], "",
+                        lambda p, m: (lambda r: (base64.b64encode(r[0]).decode(), r[1]))(
+                            self.provider.speak(p, self.settings)), label=label)
+        return base64.b64decode(b64)
+
+    def generate_video(self, prompt: str, label: str | None = None) -> bytes:
+        """Generated video (MP4 bytes) for `prompt`, with the job's duration, resolution and aspect ratio."""
+        import base64
+        b64 = self._run("video", prompt, [], "",
+                        lambda p, m: (lambda r: (base64.b64encode(r[0]).decode(), r[1]))(
+                            self.provider.generate_video(p, self.settings)), label=label)
+        return base64.b64decode(b64)
+
 
 def media_from_path(path: Path | str, sha256: str | None = None, start_s=None, end_s=None) -> Media:
     """Build a Media from a file on disk (kind and mime from the extension)."""
