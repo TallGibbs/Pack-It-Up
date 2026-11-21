@@ -220,3 +220,10 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Limits:** George has not been asked about work he hasn't pushed. Track B makes no model calls yet (B6, B7 and B9 are not built). George's files are as they were on `track-b`.
 - **By:** Chris, on the join study session's recommendation.
 - **See:** commit 5d3ce65, FAILURES.md 13:55 row
+
+## 2026-11-21 14:14 · Neon planner loop (B6) merged into `main`
+- **Decision:** The planner loop is merged and live: `backend/planner.py`, job `plan` = `gemini-4-neon`, `POST /plan`, and "Plan with Neon" on `frontend/index.html`. The model proposes solver settings; `verify.py` scores every round and the best round with no violations is kept.
+- **Why:** Track B made no model calls, and the event plan says the planning model is never cut. On move 133201 the loop goes from 91.5 on two 26 ft trucks to 95.2 on one.
+- **Limits:** Built from Chris's session in George's files (`pack_api.py`, `index.html`); George has not reviewed it. The gain comes mostly from `allow_all_rotations`. See FAILURES.md 14:10 rows.
+- **By:** Chris (go-ahead to merge and restart).
+- **See:** commits f250ff9 to f7d50d9, open-questions.md "After the planner loop"
