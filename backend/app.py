@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.commerce_api import router as commerce_router
 from backend.ingest.api import router as ingest_router
+from backend.judge_api import router as judge_router
 from backend.pack_api import router as pack_router
 from backend.route_api import router as route_router
 
@@ -21,6 +22,7 @@ app.include_router(ingest_router)
 app.include_router(pack_router)
 app.include_router(commerce_router)
 app.include_router(route_router)
+app.include_router(judge_router)
 
 
 @app.get("/health")
