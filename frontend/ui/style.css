@@ -149,6 +149,7 @@ label.field { display: block; font-size: 13px; color: var(--muted); margin-botto
 .badge.heard { background: var(--quote); color: var(--ink); border-color: transparent; }
 .said { grid-column: 1 / -1; background: var(--quote); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
 .said + .said { margin-top: -2px; }
+.said-inline { background: var(--quote); border-radius: 6px; padding: 1px 6px; font-size: 13px; }
 .said q { font-style: italic; }
 .controls { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; }
 .item.out { opacity: .55; }

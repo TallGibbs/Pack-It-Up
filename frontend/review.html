@@ -293,6 +293,12 @@
     });
   }
 
+  // One sentence can set several fields ("the shelf is full of books": contents and fullness); show it once.
+  function uniqQuotes(list) {
+    const seen = new Set();
+    return (list || []).filter((x) => x && x.quote && !seen.has(x.quote) && seen.add(x.quote));
+  }
+
   function itemHtml(it) {
     const qty = pendingQty[it.id] ?? it.quantity;
     const sz = it.size || {};
@@ -306,11 +312,12 @@
     if (it.two_person) badges.push(`<span class="badge">two-person lift</span>`);
     if (it.must_stay_upright) badges.push(`<span class="badge">keep upright</span>`);
     if (it.disassemble) badges.push(`<span class="badge">take apart</span>`);
-    const said = (it.set_by_speech || []).map((s) =>
+    const said = uniqQuotes(it.set_by_speech).map((s) =>
       `<div class="said">You said <q>${esc(s.quote)}</q> <span class="muted">· ${esc(mmss(s.timestamp_s))} in ${esc(s.source)}</span></div>`).join("");
     const disp = it.disposition || "undecided";
     const segs = ["keep", "sell", "donate", "trash"];
-    if (!segs.includes(disp) && disp !== "undecided") segs.push(disp);
+    // "stays" (left behind, from speech) and any other server value show as a badge; tapping a segment overrides it
+    if (!segs.includes(disp) && disp !== "undecided") badges.unshift(`<span class="badge heard">${disp === "stays" ? "stays behind" : esc(disp)}</span>`);
     const seg = segs.map((s) => `<button type="button" data-disp="${s}" aria-pressed="${disp === s}"
         class="${disp === "undecided" && s === "keep" ? "implied" : ""}">${s[0].toUpperCase() + s.slice(1)}</button>`).join("");
     const st = rowState[it.id];
@@ -373,9 +380,10 @@
         html += `<div class="card containers"><b>Packed into boxes</b><ul style="padding-left:18px;margin:6px 0 0">` +
           conts.map((c) => {
             const n = boxCount(c);
-            const what = c.items ? c.items.join(", ") : c.contents;
+            const what = c.items && c.items.length ? c.items.join(", ") : c.contents;
             const full = c.fullness === "not_visible" ? "contents not visible" : c.fullness;
-            return `<li>${esc(c.label)}: ${esc(what)}, ${esc(full)}${n ? ` · <b>about ${n} box${n > 1 ? "es" : ""}</b>` : ""}</li>`;
+            const said = uniqQuotes(c.set_by_speech).map((x) => ` <span class="said-inline">you said <q>${esc(x.quote)}</q></span>`).join("");
+            return `<li>${esc(c.label)}: ${esc([what, full].filter(Boolean).join(", "))}${n ? ` · <b>about ${n} box${n > 1 ? "es" : ""}</b>` : ""}${said}</li>`;
           }).join("") + `</ul></div>`;
       }
       const lo = room.left_out || {};
