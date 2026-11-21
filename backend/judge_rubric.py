@@ -169,17 +169,18 @@ COACH_SCHEMA: dict[str, Any] = {
 }
 
 PRESENTER_CARDS: dict[str, Any] = {
+    "vibe": "Intimate & in-the-room: we've all shared these tables, chairs, and backpacks since 9 AM — talk with the room like two friends helping pack our shared space.",
     "phone_page": "/app/pitch.html",
     "markdown_notes": "plan/PITCH_NOTES.md",
     "chris": [
-        "0:00–0:12 Hook (Part 1): Rented a truck TOO BIG -> open floor gaps -> things slid around & broke.",
-        "0:25–0:55 Live Capture: Film judging room + say 'these chairs stack, plants stay' -> Hydrogen extracts items/speech -> answer 1 Decision 1 card -> tap 'Plan the truck load'.",
-        "2:25–2:45 Proof It Works: Single-call LLM baseline overlaps/floats boxes vs our 0-violation solver + Malin hand-count + FAILURES.md fixes.",
+        "0:00–0:13 Welcome In: 'We've all lived in this space together since 9 AM.' Last move: guessed TOO BIG on the truck -> empty floor -> listened to my things slide & break.",
+        "0:28–0:58 Walk Our Space: Film room + say 'these chairs stack, plants stay' -> Hydrogen spots furniture & leaves out everyone's laptops/jackets/backpacks -> 1 Decision 1 card -> 'Plan the truck load'.",
+        "2:25–2:45 What This Room Taught Us: Single-call baseline floats/overlaps vs our 0-violation plan; mirrors, bags & closed cabinets here fooled pass 1 -> now closed cabinets assume empty & ask honestly.",
     ],
     "george": [
-        "0:12–0:25 Hook (Part 2): Short hop from West New York, NJ -> Upper East Side — a smaller right-sized truck makes tight NYC streets & turns way easier; moving this room into 6 NY Penn Station stores.",
-        "0:55–1:55 3D Fleet & Antigravity Sandboxes: Downsized U-Haul (snug so nothing slides, compact for NYC) + 0-violation physics verifier + Antigravity Managed Agents (`antigravity-preview-09-2026`) & Neon + 6-store LIFO dock order + offline QR label + Nano Banana arrival.",
-        "1:55–2:25 & 2:45–3:00 Judge What-If + Antigravity Close: Add piano / 10-ft truck live -> Move Plan Judge (Decision 1 -> Neon); close with 'Built in Google Antigravity today (parallel Carbon worktrees + Docs MCP), powered by Antigravity Managed Agents + Hydrogen + Neon + Decision 1'.",
+        "0:13–0:28 Shared NYC Move: Tiny hop from West New York, NJ -> Upper East Side — a smaller truck makes tight city streets way easier. 'Let's pack this exact room we're sitting in and move us 10 min north to Penn Station.'",
+        "0:58–1:55 Snug Truck, Real Corners: Smallest U-Haul that fits (snug so nothing slides, nimble for NYC) + 0-violation care checks + Antigravity Managed Agents & Neon + 6 Penn Station corners in LIFO order + offline QR scan.",
+        "1:55–2:25 & 2:45–3:00 Invite Judge + Warm Close: 'Pick something in this room to change' -> Move Plan Judge (Decision 1 -> Neon); close with 'Downloaded Google Antigravity this morning just to build this here with all of you — getting everything in this space safely to the next one.'",
     ],
 }
 

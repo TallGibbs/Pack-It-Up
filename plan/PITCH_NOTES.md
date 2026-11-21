@@ -1,66 +1,61 @@
-# 3-Minute Live Pitch & 5:00 PM Prep Cue Cards (Phone-Sized)
+# 3-Minute Intimate Pitch & 5:00 PM Prep Cue Cards (Phone-Sized)
 
-Open on phone during rehearsal or judging: `/app/pitch.html` (or read below).
-**Format:** 3:00 live demo + 2:00 Q&A. **Rule:** Live unrehearsed input only — lead with the 3D truck & Penn Station load plan, never slides or a dashboard.
+Open on phone: `/app/pitch.html` (`?who=george` or `?who=chris`).
+**Vibe:** Warm, unhurried, conversational. Everyone in the room — builders, mentors, judges — has been sharing these exact tables, chairs, and backpacks since 9:00 AM. Talk *with* the room like two friends helping everyone pack up our shared space.
 
 ---
 
 ## 👤 CHRIS — Glanceable Phone Card
 
-### 1. Opening Hook (`0:00 – 0:12`)
-- **My move story:** Rented a truck **too big** → open floor space → **things slid & broke**.
-- Bedroom calculators guess blind; nobody checks how cargo actually braces.
-- *(Pass to George for his WNY → UES tight-truck half of the hook.)*
+### 1. Welcome Into the Room (`0:00 – 0:13`)
+- *"Look around — we've all been living in this space together since nine this morning."*
+- **My move story:** Guessed **too big** on the truck → empty floor space → **listened to my things slide around and break** on the drive.
+- *(Look to George.)*
 
-### 2. Live Phone Capture (`0:25 – 0:55`)
-- Film / pick **live judging-room clip** on `packitup.temperedanalytics.com`.
-- **Talk while filming:** *"these chairs stack"*, *"the plants stay"*.
-- Point out **Gemini 4 Hydrogen** extracting items + sizes + **spoken quotes** in parallel.
-- Answer **1 live Decisions API card** (`gemini-decision-1` auto-settled the high-confidence ones in ~200 ms, 0 output tokens).
-- Tap **"Plan the truck load →"** *(hand to George)*.
+### 2. Walk Our Space (`0:28 – 0:58`)
+- Upload live clip of the room around us; talk naturally: *"these chairs stack, the plants stay here."*
+- **Hydrogen** spots the furniture — and **leaves out everyone's laptops, jackets & backpacks** *(because they belong to the people in this room, not the move)*.
+- Tap **1 quick Decision 1 question** (it quietly settled the high-confidence ones in ~200 ms) → tap **"Plan the truck load →"**.
 
-### 3. Proof & Honest Failure (`2:25 – 2:45`)
-- **Baseline vs Ours:** Single-call LLM plan overlaps/floats items; our solver + verifier = **0 rule violations**.
-- **Unprepared eval:** Hand-counted Malin lounge + logged real fixes in `FAILURES.md` (closed cabinets assumed empty & asked; open-frame weight fix).
+### 3. Honest Craft (`2:25 – 2:45`)
+- **Single-call baseline** floats and overlaps furniture; our checked plan lands at **0 violations**.
+- **What this building taught us today:** Mirrors, chairs tucked behind our bags, and closed cabinets fooled pass 1 — so closed cabinets now assume empty and ask you honestly instead of guessing.
 
 ---
 
 ## 👤 GEORGE — Glanceable Phone Card
 
-### 1. Opening Hook (`0:12 – 0:25`)
-- **My move story:** Super short drive (**West New York, NJ → Upper East Side**) — a **smaller, right-sized truck** makes tight NYC streets & turns way easier to maneuver.
-- **Too big** = broken stuff + stuck in NYC traffic; **too small** = items left on the curb.
-- **Live test:** Moving **this hackathon room** into **6 storefronts at NY Penn Station**.
+### 1. Our Shared NYC Move (`0:13 – 0:28`)
+- **My move story:** Just a tiny hop across the river — **West New York, NJ to the Upper East Side** — and with a **smaller right-sized truck**, maneuvering tight NYC streets and turns would've been ten times easier.
+- *"So instead of a canned video, let's pack up **this exact room we're all sitting in** — and move us ten minutes up the street into NY Penn Station."*
 
-### 2. 3D Fleet, Physics & Penn Station (`0:55 – 1:55`)
-- **Right-sized U-Haul fleet** (`10 / 15 / 20 / 26 ft` downsizing): snug load so nothing slides, compact enough for NYC streets.
-- **Physics Verifier (`verify.py`):** `0 violations` — `>=75%` base support, 0 overlaps, upright/on-edge rules, fragile top-protection, `40–60%` left-right CoG balance.
-- **Antigravity Managed Agents (`antigravity-preview-09-2026`) + Neon:** Compete in parallel Google-hosted Linux sandboxes to repair violations.
-- **Penn Station 6-Store LIFO Unload:** Stop 1 (*Merch Kiosk*) loaded last by rear door → Stop 6 (*Concourse*) loaded first by cab, all clearing store doorways.
-- **Outputs:** Scan **offline QR box label** (holds full manifest, no wifi needed) + **Nano Banana 2.1** arrival visual *(badged illustrative)*.
+### 2. Snug Truck, Real Corners (`0:58 – 1:55`)
+- **Smallest U-Haul that fits (`26 → 20 → 15 → 10 ft`):** Snug so nothing slides like Chris's move, nimble enough for Manhattan blocks like mine.
+- **Care checks (`0 violations`):** `>=75%` base support, balanced left-to-right weight, nothing heavy crushing fragile pieces.
+- **Antigravity Managed Agents + Neon:** Test packing strategies in parallel sandboxes until everything fits safely.
+- **At Penn Station:** Our room's chairs, tables & shelves stock **6 real corners** (café, bookshop, lounge, concourse) in exact back-to-front unload order + **offline QR box scan** + warm arrival preview.
 
-### 3. Judge "What-If" + Antigravity Close (`1:55 – 2:25` & `2:45 – 3:00`)
-- **At `1:55`:** Ask judge to **add a piano** or **force a 10-ft truck** → 1-tap re-solve → **Move Plan Judge (`gemini-decision-1`)** gates safety/rubrics & escalates to **Neon**.
-- **At `2:45` ("Built in Antigravity, powered by Antigravity"):**
-  - *"Downloaded **Google Antigravity** this morning just for this — ran parallel **Gemini 4 Carbon** worktrees with the live Gemini Docs MCP."*
-  - **Hydrogen** watches/hears · **Neon + Antigravity Managed Agents** pack in sandboxes · **Nano Banana 2.1** previews · **Decision 1** gates & judges.
+### 3. Invite a Judge In + Warm Close (`1:55 – 2:25` & `2:45 – 3:00`)
+- **At `1:55` (Bring a judge into the move):** Gesture to the room — *"Pick something right here: leave a table behind, bring an upright piano, or try a 10-ft van?"* → 1-tap re-solve → **Move Plan Judge (`Decision 1 → Neon`)** checks if it holds up.
+- **At `2:45` (Warm Antigravity close):**
+  - *"I actually downloaded **Google Antigravity** this morning just to build this here in this room with all of you."*
+  - **Hydrogen** listens as you walk · **Antigravity Agents + Neon** pack with care · **Decision 1** double-checks the load — getting everything in this space safely to the next one.
 
 ---
 
 ## ⚡ 2-Minute Q&A Quick Hits
 
-- **How did 2 people build all this since 10:30 AM?** George downloaded **Google Antigravity** at kickoff, connected `gemini-skills` (`gemini-api-dev`) + the live Gemini Docs MCP server, and ran 5 parallel **Gemini 4 Carbon** git worktrees coordinated through `memory/sessions.md` (visible in git!).
-- **What was built today vs brought in?** All code written after 10:30 AM (see public git commits); `item_catalog.csv` & Penn Station reference photos disclosed under *Brought in* in `README.md`.
-- **Why not one model call?** Hydrogen is fast/parallel on video+audio; `gemini-decision-1` gives calibrated probabilities in ~200 ms with 0 output tokens; Neon reasons over 3D verifier violations. Single-call LLM baseline fails physics checks.
-- **Is the arrival image the plan?** No — the 3D coordinates & verifier math are the plan; Nano Banana is clearly badged illustrative.
-- **Non-box items (lamps, bikes, tables)?** Modeled as oriented bounding cuboids with `must_stay_upright`, `load_on_edge`, `disassemble`, and `light_only` stacking rules.
+- **How did two of you build all this since 10:30 AM?** Downloaded **Google Antigravity** at kickoff, wired `gemini-skills` + live Gemini Docs MCP, and coordinated 5 parallel **Gemini 4 Carbon** git worktrees via `memory/sessions.md`.
+- **What was built today vs brought in?** Every line of code written after 10:30 AM (in git); starter item sizes & Penn Station reference photos openly listed under *Brought in* in `README.md`.
+- **Why multiple models?** Hydrogen watches & hears fast; Decision 1 answers yes/no & rubrics in ~200 ms (0 output tokens); Neon + Antigravity Agents reason through 3D packing fixes.
+- **Is the arrival image the plan?** No — the 3D coordinates & physics verifier are the real plan; Nano Banana is clearly badged as an illustrative preview.
 
 ---
 
 ## 🕔 Pre-5:00 PM Submission Checklist
 
-- [ ] **4:15 PM:** Record **1-minute demo video** (screen + voiceover, showing only features built today).
-- [ ] **4:35 PM:** Open video link in an **incognito window** to confirm public access.
-- [ ] **4:40 PM:** Confirm GitHub repo is **public**, `.env` & raw photos/videos are **not committed**, and **both Chris & George** are listed on the submission form.
-- [ ] **4:45 PM:** Run **two full 3:00 timed rehearsals** on a fresh room clip using `/app/pitch.html`.
+- [ ] **4:15 PM:** Record **1-minute video** (warm, conversational voiceover; today's code only).
+- [ ] **4:35 PM:** Check video link in an **incognito window**.
+- [ ] **4:40 PM:** Confirm repo is **public**, no `.env` or raw media committed, and **both Chris & George** are added on the submission page.
+- [ ] **4:45 PM:** Run **two relaxed 3:00 run-throughs** at conversational pace with `/app/pitch.html`.
 - [ ] **4:55 PM:** Submit before **5:00 PM** sharp.
