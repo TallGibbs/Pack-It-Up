@@ -13,6 +13,13 @@
 
   if (MOCK) $("#mock-banner").classList.remove("hidden");
 
+  // Nobody films before saying who they are (start.html: a name, no password). The run id rides
+  // along, so a link to a move still lands on that move after signing in.
+  const who = window.PIU.who();
+  if (!who) { location.replace(link("start.html", { run_id: params.get("run_id") })); return; }
+  $("#who").textContent = who;
+  $("#who-change").href = link("start.html", { run_id: params.get("run_id"), change: 1 });
+
   // One move is one run on the server. The run id is kept in the address (?run_id=), so a reload
   // comes back to the same move; see "coming back to a move" below.
   let runId = null;
@@ -149,7 +156,7 @@
       const res = await api.upload(job.rows.map((r) => r.file), job.room.name, runId, (p) => {
         job.rows.forEach((r) => (r.pct = p));
         render(job.room);
-      });
+      }, who);
       adoptRun(res.run_id);
       const skipped = new Set((res.skipped || []).map((s) => (typeof s === "string" ? s : s.name)));
       // The reply's `files` lists what the room now holds. A file in neither list was dropped without a

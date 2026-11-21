@@ -10,6 +10,7 @@ The phone pages for Track A: film or pick photos and clips, watch them being pro
 
 | File | What it does |
 |---|---|
+| `start.html` + `ui/start.js` | Sign in with a name, no password. The name is kept in the browser (`PIU.who()`), sent with uploads as `who`, stored in the run's `manifest.json` and used in the run id. `capture.html` sends anyone without a name here first |
 | `capture.html` + `ui/capture.js` | Room cards, upload queue, per-file progress, the top open question, coming back to a move, footer links to review and the plan |
 | `review.html` + `ui/review.js` | Totals bar, question cards, item list with quantity and Move / Stays / Sell / Toss, "Add an item", handoff button |
 | `ui/api.js` | `window.PIU`: the API client (real server or mock) and everything both pages share: `$`, `esc`, `isVideo`, `thumbHtml`, page links, the last-run memory |

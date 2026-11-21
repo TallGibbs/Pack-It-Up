@@ -52,6 +52,10 @@ p { margin: 6px 0; }
 
 .steps { font-size: 13px; color: var(--muted); margin-top: 14px; }
 .steps b { color: var(--ink); }
+.steps .who { float: right; }
+.steps .who a { color: var(--accent); }
+.signin .btn { margin-top: 12px; }
+.signin .small { margin-top: 10px; }
 .mock-banner { background: var(--quote); font-size: 13px; padding: 6px 16px; text-align: center; }
 
 .card {

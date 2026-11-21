@@ -192,7 +192,7 @@
     status.updated = new Date(now).toISOString().slice(0, 19);
 
     const roomList = run.rooms.map((r) => ({ id: r.id, name: r.name })); // as GET /runs: every room, in upload order
-    if (!rooms.length) return { run_id: run.id, rooms: roomList, status };
+    if (!rooms.length) return { run_id: run.id, who: run.who || null, rooms: roomList, status };
     const sum = (k) => r1(rooms.reduce((a, r) => a + r.totals[k], 0));
     const inventory = {
       schema_version: "inventory_v2", run_id: run.id, generated: status.updated, rooms,
@@ -200,7 +200,7 @@
                 boxed_volume_cuft: sum("boxed_volume_cuft") },
       questions, answers_applied: [],
     };
-    return { run_id: run.id, rooms: roomList, status, inventory, partial: status.stage !== "done",
+    return { run_id: run.id, who: run.who || null, rooms: roomList, status, inventory, partial: status.stage !== "done",
              questions: questions.filter((q) => q.status === "open") };
   }
 
@@ -229,7 +229,7 @@
 
   window.PIU_MOCK = {
     DEMO_RUN,
-    async upload(files, room, runId, onProgress) {
+    async upload(files, room, runId, onProgress, who) {
       await getFixture();
       const total = files.reduce((a, f) => a + (f.size || 0), 0);
       const ms = Math.min(4000, 600 + total / 4e4); // pretend: about 40 MB/s, capped at 4 s
@@ -242,6 +242,7 @@
       const state = load();
       const id = runId || "mock-" + Date.now().toString(36);
       const run = state.runs[id] || (state.runs[id] = newRun(id));
+      if (who && !run.who) run.who = who; // as the server: the first name given stays with the move
       const rid = slug(room);
       let r = run.rooms.find((x) => x.id === rid);
       if (!r) run.rooms.push((r = { id: rid, name: room, fixture: run.rooms.length, files: [] }));

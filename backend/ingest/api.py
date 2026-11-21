@@ -1,6 +1,6 @@
 """Track A HTTP routes. Mounted by backend/app.py.
 
-POST /upload                          multipart files + room (+ run_id to add to that run) -> {run_id}
+POST /upload                          multipart files + room (+ run_id to add to that run, + who: the signed-in name) -> {run_id}
 GET  /runs/{run_id}                   rooms, stage status per file, then inventory and questions
 GET  /inventory/{run_id}              inventory.json
 POST /answer/{run_id}                 {question_id, answer} -> updated inventory
@@ -25,7 +25,7 @@ from backend import catalog
 from backend.llm import media as mu
 
 from . import gaps
-from .common import new_run_id, read_json, run_dir, slug
+from .common import new_run_id, read_json, run_dir, slug, write_json
 from .intake import ACCEPTED, intake
 from .pipeline import begin_pipeline, end_pipeline, rebuild, run_lock, run_pipeline
 
@@ -49,8 +49,12 @@ def _rd(run_id: str) -> Path:
 # A plain `def`, not `async def`: copying, hashing and audio extraction block, and FastAPI runs a
 # plain route in a worker thread, so one phone's large clip doesn't freeze everyone else's polling.
 @router.post("/upload")
-def upload(files: list[UploadFile] = File(...), room: str = Form("room_1"), run_id: str | None = Form(None)):
-    run_id = run_id or new_run_id(room)
+def upload(files: list[UploadFile] = File(...), room: str = Form("room_1"), run_id: str | None = Form(None),
+           who: str | None = Form(None)):
+    # `who` is the name typed on the sign-in page (no password). It names a new run's folder and is
+    # kept in manifest.json, so a person's moves can be found for analysis.
+    who = " ".join((who or "").split())[:40]
+    run_id = run_id or new_run_id(who or room)
     try:
         rd = run_dir(run_id)
     except ValueError:
@@ -74,6 +78,9 @@ def upload(files: list[UploadFile] = File(...), room: str = Form("room_1"), run_
             if not paths:
                 raise HTTPException(400, f"no accepted media; accepted types: {sorted(ACCEPTED)}")
             manifest = intake(paths, room, run_id, names)
+            if who and not manifest.get("who"):  # the first name given stays with the move
+                manifest["who"] = who
+                write_json(rd / "manifest.json", manifest)
     except BaseException:
         end_pipeline(run_id)
         raise
@@ -88,7 +95,7 @@ def run_status(run_id: str):
     status = read_json(rd / "status.json", {})
     manifest = read_json(rd / "manifest.json") or {}
     # rooms: [{id, name}] in upload order, so a page can rebuild its room cards before any inventory exists
-    out = {"run_id": run_id, "rooms": manifest.get("rooms", []), "status": status}
+    out = {"run_id": run_id, "who": manifest.get("who"), "rooms": manifest.get("rooms", []), "status": status}
     inv = read_json(rd / "inventory.json")
     if inv is not None:
         out["inventory"] = inv

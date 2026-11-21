@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<title>Pack It Up · Sign in</title>
+<link rel="stylesheet" href="ui/style.css?v=3">
+</head>
+<body>
+<main class="signin">
+  <h1>Pack It Up</h1>
+  <p class="muted">Film your rooms, check the list, get a truck plan.</p>
+  <form id="signin" class="card">
+    <label class="field" for="name">Your name, or a name for this move</label>
+    <input type="text" id="name" maxlength="40" autocomplete="given-name" enterkeyhint="go" placeholder="Sam, or Elm Street flat" required>
+    <button class="btn primary block">Start</button>
+    <p class="small muted">No password. The name is saved with your move so we can find it again; other people at the event can see it.</p>
+  </form>
+</main>
+<script src="mock/mock-api.js?v=3"></script>
+<script src="ui/api.js?v=3"></script>
+<script src="ui/start.js?v=3"></script>
+</body>
+</html>

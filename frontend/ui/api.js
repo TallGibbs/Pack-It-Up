@@ -34,6 +34,12 @@
   // The last move this browser was in. Mock runs are kept apart: they don't exist on the server.
   const RUN_KEY = "piu_last_run" + (MOCK ? "_mock" : "");
 
+  // "Signed in" is only a name typed on start.html and kept in this browser: no password, no account.
+  // It is sent with uploads so a move can be found by name later (models page, run folder name).
+  // ?who= is the fallback for a browser that won't save anything (private mode).
+  const WHO_KEY = "piu_who";
+  const cleanWho = (s) => String(s || "").replace(/\s+/g, " ").trim().slice(0, 40);
+
   // Link to another page, keeping ?mock and ?api.
   function link(page, extra) {
     const q = new URLSearchParams();
@@ -80,7 +86,7 @@
 
   const real = {
     // POST /upload with XHR, because fetch has no upload progress.
-    upload(files, room, runId, onProgress) {
+    upload(files, room, runId, onProgress, who) {
       return new Promise((resolve, reject) => {
         files = (files || []).filter(Boolean);
         if (!files.length) return reject(new Error("No file to send. Choose it again.")); // never a request with no files (FAILURES.md 12:05)
@@ -88,6 +94,7 @@
         files.forEach((f) => fd.append("files", f, f.name));
         fd.append("room", room);
         if (runId) fd.append("run_id", runId);
+        if (who) fd.append("who", who);
         const xhr = new XMLHttpRequest();
         xhr.open("POST", API_BASE + "/upload");
         xhr.upload.onprogress = (e) => e.lengthComputable && onProgress && onProgress(e.loaded / e.total);
@@ -171,6 +178,8 @@
     rememberRun: (id) => remember(RUN_KEY, id),
     lastRun: () => recall(RUN_KEY),
     forgetRun: () => forget(RUN_KEY),
+    who: () => cleanWho(recall(WHO_KEY) || params.get("who")),
+    setWho: (name) => remember(WHO_KEY, cleanWho(name)),
     api: MOCK ? window.PIU_MOCK : real,
   };
   if (MOCK && !window.PIU_MOCK) console.error("?mock=1 needs mock/mock-api.js loaded before ui/api.js");

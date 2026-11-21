@@ -104,6 +104,8 @@ def _load_run(con: sqlite3.Connection, run_id: str, rd: Path, sig: str) -> None:
     labels = {it.get("id"): it.get("label") for room in inv.get("rooms", []) for it in room.get("items", [])}
     labels.update({c.get("id"): c.get("label") for room in inv.get("rooms", []) for c in room.get("containers", [])})
     rooms = ", ".join(r.get("name", r.get("id", "")) for r in manifest.get("rooms", []))
+    if manifest.get("who"):  # the sign-in name leads, so the models page and the Databricks copy show whose move it is
+        rooms = f"{manifest['who']}: {rooms}"
     con.execute("INSERT INTO runs (run_id, created, rooms, n_files, stage, items, volume_cuft, weight_lb, sig, archived) "
                 "VALUES (?,?,?,?,?,?,?,?,?,0)",
                 (run_id, manifest.get("created"), rooms, len(manifest.get("files", [])), status.get("stage"),
