@@ -92,3 +92,16 @@ resolution = "1080p"
 aspect_ratio = "16:9"
 timeout_s = 600
 retries = 0
+
+[jobs.slides]
+model = "gemini:gemini-4-carbon"          # judging slide deck, HTML (scripts/slides/build.py); demo outputs are made by Gemini (AGENTS.md)
+thinking = "high"
+media_resolution = "medium"
+timeout_s = 600
+retries = 1
+
+[jobs.video_script]
+model = "gemini:gemini-4-carbon"          # the video's narration lines and title/results/end cards (scripts/video/build.py --write-script)
+thinking = "high"
+timeout_s = 600
+retries = 1

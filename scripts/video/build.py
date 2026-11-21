@@ -1,5 +1,6 @@
 """Builds the 60 s submission video from scripts/video/shots.json (plan: plan/VIDEO_SCRIPT.md).
 
+    .venv\\Scripts\\python.exe -m scripts.video.build --write-script   # Gemini writes the lines and cards (script.json)
     .venv\\Scripts\\python.exe -m scripts.video.build            # the real build: narration, opening, capture, MP4
     .venv\\Scripts\\python.exe -m scripts.video.build --dry      # no model calls: silent narration, no Neon click, no opening
     options: --skip-capture (reuse the last capture), --narration-only, --force (render even if a page check fails)
@@ -107,28 +108,112 @@ def narrate(shot: dict, line: str, name: str, dry: bool) -> dict:
 
 
 # ---------------------------------------------------------------- cards and overlays
-def card_html(kind: str, c: dict) -> str:
-    base = """<!doctype html><meta charset="utf-8"><style>
-      html,body{margin:0;width:1920px;height:1080px;font-family:'Segoe UI',Arial,sans-serif;color:#181c23;
-        background:radial-gradient(circle at 30% 20%,#ffffff 0,#eef1f5 55%,#e3e8ef 100%)}
-      .wrap{position:absolute;inset:0 0 150px 0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
-      h1{font-size:150px;font-weight:700;margin:0;letter-spacing:-2px} h2{font-size:64px;font-weight:600;margin:0 0 40px}
-      .sub{font-size:52px;color:#2b5fd9;margin-top:18px} .small{font-size:30px;color:#606874;margin-top:36px;max-width:1500px}
-      table{font-size:60px;border-collapse:collapse} td{padding:14px 40px} td.n{font-weight:700;text-align:right}
-      tr.us td{color:#1f7a45} .row{display:flex;gap:90px;align-items:center} .lines div{font-size:52px;margin:14px 0;text-align:left}
-      img{width:330px;height:330px;image-rendering:pixelated;border:14px solid #fff;border-radius:18px}
-    </style>"""
-    if kind == "title":
-        body = f'<div class="wrap"><h1>{c["title"]}</h1><div class="sub">{c["sub"]}</div><div class="small">{c["small"]}</div></div>'
-    elif kind == "results":
-        rows = "".join(f'<tr class="{"us" if i == 0 else ""}"><td>{a}</td><td class="n">{b}</td></tr>' for i, (a, b) in enumerate(c["rows"]))
-        body = f'<div class="wrap"><h2>{c["title"]}</h2><table>{rows}</table><div class="small">{c["small"]}</div></div>'
-    else:
-        qr = (ROOT / c["qr"]).as_uri()
-        lines = "".join(f"<div>{x}</div>" for x in c["lines"])
-        body = (f'<div class="wrap"><h1 style="font-size:110px;margin-bottom:40px">{c["title"]}</h1>'
-                f'<div class="row"><img src="{qr}"><div class="lines">{lines}</div></div><div class="small">{c["small"]}</div></div>')
-    return base + body
+SCRIPT = HERE / "script.json"
+FACTS = ROOT / "scripts" / "slides" / "brief.md"
+_ONES = ("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen "
+         "seventeen eighteen nineteen").split()
+_TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90}
+
+
+def numbers_in(text: str) -> set[str]:
+    """Digits and spelled-out numbers (up to ninety-nine) in a piece of text, as digit strings."""
+    found = set(re.findall(r"\d+(?:\.\d+)?", text))
+    pat = (r"\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[- ](one|two|three|four|five|six|seven|eight|nine))?\b"
+           r"|\b(" + "|".join(_ONES) + r")\b")
+    for m in re.finditer(pat, text.lower()):
+        if m.group(1):
+            found.add(str(_TENS[m.group(1)] + (_ONES.index(m.group(2)) if m.group(2) else 0)))
+        else:
+            found.add(str(_ONES.index(m.group(3))))
+    return found
+
+
+def visible_text(doc: str) -> str:
+    import html as htmllib
+    doc = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", doc)
+    return htmllib.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"(?s)<!--.*?-->", " ", doc)))
+
+
+def check_script(sc: dict, spec: dict, facts: str) -> list[str]:
+    errs = []
+    allowed = numbers_in(facts) | {str(n) for n in range(0, 9)}
+    budgets = {s["id"]: s["words_max"] for s in spec["shots"]} | {"S6_alt": 16}
+    lines = sc.get("lines") or {}
+    cards = sc.get("cards") or {}
+    for sid, mx in budgets.items():
+        line = lines.get(sid, "")
+        n = len(line.split())
+        if not line:
+            errs.append(f"line {sid} is missing")
+        elif n > mx:
+            errs.append(f"line {sid} has {n} words, the limit is {mx}")
+        bad = sorted(numbers_in(line) - allowed)
+        if bad:
+            errs.append(f"line {sid} has numbers not in the facts: {bad}")
+    if "venue" not in lines.get("S7", "").lower():
+        errs.append("line S7 must say the footage is mostly venue rooms")
+    for kind in ("title", "results", "end"):
+        doc = cards.get(kind, "")
+        if not re.match(r"(?is)\s*<!doctype html", doc):
+            errs.append(f"card {kind} must be a complete HTML page starting with <!doctype html>")
+            continue
+        for src in re.findall(r'(?i)<img[^>]+src="([^"]+)"', doc):
+            if src != "qr.png" or kind != "end":
+                errs.append(f"card {kind} uses image {src!r}; only qr.png, on the end card")
+        if re.search(r"(?i)<script[^>]+src=", doc):
+            errs.append(f"card {kind} loads an external script")
+        for url in re.findall(r'(?i)(?:href|src)="(https?://[^"]+)"', doc):
+            if not re.match(r"https://fonts\.(googleapis|gstatic)\.com(/|$)", url):
+                errs.append(f"card {kind} loads {url!r}")
+        bad = sorted(numbers_in(visible_text(doc)) - allowed - {"1920", "1080"})
+        if bad:
+            errs.append(f"card {kind} has numbers not in the facts: {bad}")
+    if 'src="qr.png"' not in cards.get("end", ""):
+        errs.append("the end card must show qr.png")
+    return errs
+
+
+_KEYS = ["S1", "S2", "S3", "S4", "S5", "S6", "S6_alt", "S7", "S8"]
+SCRIPT_SCHEMA = {
+    "type": "object", "required": ["lines", "cards"],
+    "properties": {
+        "lines": {"type": "object", "required": _KEYS, "properties": {k: {"type": "string"} for k in _KEYS}},
+        "cards": {"type": "object", "required": ["title", "results", "end"],
+                  "properties": {k: {"type": "string", "description": "complete HTML page, 1920x1080"}
+                                 for k in ["title", "results", "end"]}},
+    },
+}
+
+
+def write_script(spec: dict, fresh: bool) -> None:
+    """Gemini writes the narration lines and the three cards; checked, then saved to script.json."""
+    sys.path.insert(0, str(ROOT))
+    from backend.llm import for_job
+    facts = FACTS.read_text(encoding="utf-8")
+    prompt = ("You write the narration and the text cards for a 60-second hackathon demo video. Follow the brief "
+              "exactly; use only facts and numbers from the facts file. Return JSON: `lines` (S1..S8 and S6_alt, each "
+              "one spoken line) and `cards` (title, results, end: each a complete HTML page).\n\n# Brief\n\n"
+              + (HERE / "brief.md").read_text(encoding="utf-8") + "\n\n# Facts\n\n" + facts)
+    job = for_job("video_script")
+    pv = "video_script_v1" + (time.strftime("_%H%M%S") if fresh else "")
+    for attempt in (1, 2):
+        log(f"script: {job} (attempt {attempt})")
+        sc = job.generate_json(prompt, schema=SCRIPT_SCHEMA, prompt_version=pv, label="video script")
+        errs = check_script(sc, spec, facts)
+        if not errs:
+            out = {"_made_by": f"{job.spec} (job video_script) on {time.strftime('%Y-%m-%d %H:%M')} from "
+                               "scripts/video/brief.md and scripts/slides/brief.md. Do not edit by hand: run "
+                               "python -m scripts.video.build --write-script.", **sc}
+            SCRIPT.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            for k, v in sc["lines"].items():
+                print(f"  {k} ({len(v.split())} words): {v}")
+            log(f"wrote {SCRIPT}")
+            return
+        log("script check failed: " + " | ".join(errs))
+        prompt += ("\n\n# Your previous answer failed these checks; fix them and answer again\n\n"
+                   + "\n".join(f"- {e}" for e in errs))
+        pv += "_retry"
+    sys.exit("the script failed its checks twice")
 
 
 def shot_overlay(shot: dict, caption: str, path: Path) -> None:
@@ -182,7 +267,8 @@ def run_capture(spec: dict, dry: bool) -> dict:
     for cid, c in spec["captures"].items():
         if "card" in c:
             html = cards / f"{c['card']}.html"
-            html.write_text(card_html(c["card"], spec["cards"][c["card"]]), encoding="utf-8")
+            html.write_text(spec["_script"]["cards"][c["card"]], encoding="utf-8")
+            shutil.copy(ROOT / "plan" / "demo_qr.png", cards / "qr.png")
             url, view = html.as_uri(), spec["views"]["card"]
         else:
             url, view = spec["base"] + c["url"].replace("{run}", spec["run_id"]), spec["views"][c["view"]]
@@ -303,9 +389,24 @@ def main() -> None:
     ap.add_argument("--skip-capture", action="store_true")
     ap.add_argument("--narration-only", action="store_true")
     ap.add_argument("--force", action="store_true", help="render even if a page check fails")
+    ap.add_argument("--write-script", action="store_true", help="have Gemini write the lines and cards (script.json), then stop")
+    ap.add_argument("--fresh", action="store_true", help="with --write-script: ask the model again instead of using the cache")
     a = ap.parse_args()
     spec = json.loads((HERE / "shots.json").read_text(encoding="utf-8"))
     shots = spec["shots"]
+    if a.write_script:
+        write_script(spec, a.fresh)
+        return
+    if not SCRIPT.exists():
+        sys.exit("no script.json yet: run python -m scripts.video.build --write-script first (Gemini writes it)")
+    spec["_script"] = json.loads(SCRIPT.read_text(encoding="utf-8"))
+    errs = check_script(spec["_script"], spec, FACTS.read_text(encoding="utf-8"))
+    if errs:
+        sys.exit("script.json fails its checks: " + " | ".join(errs))
+    for s_ in shots:
+        s_["line"] = spec["_script"]["lines"][s_["id"]]
+        if s_.get("alt"):
+            s_["alt_line"] = spec["_script"]["lines"][s_["alt"]]
     assert abs(shots[-1]["end"] - spec["length_s"]) < 1e-6 and all(
         abs(sum(p["dur"] for p in s["parts"]) - (s["end"] - s["start"])) < 1e-6 for s in shots), "shot times don't add up"
     BUILD.mkdir(parents=True, exist_ok=True)

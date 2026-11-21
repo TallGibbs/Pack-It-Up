@@ -36,3 +36,6 @@ runs/
 
 # Model-use history database (backend/analysis); holds labels and question text from real footage
 .history/
+
+# Slide deck screenshots: captured from the running app by scripts/slides/build.py, never committed
+frontend/slides/shots/

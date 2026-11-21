@@ -25,6 +25,23 @@ Change files outside your track only when the user asks, and say so in the commi
 - **The inventory contract** is the resolved `inventory.json` from `backend/ingest/` (each item has a `size` block). Track B reads sizes and weights from it rather than from the catalog.
 - **Log failures.** One line in `FAILURES.md` for each thing that breaks: input, what went wrong, what we changed.
 
+## Demo and presentation outputs are made by Gemini
+
+Anything a judge or viewer sees that is not the app itself is made by a Gemini model through `backend/llm/`, not written or designed by the coding agent (decision 2026-11-21 15:40). That covers the slide deck, the demo video's narration, its title, results and end cards, any generated imagery, and the copy on them.
+
+- **How:** put the facts in a brief (a Markdown file next to the build script), add or reuse a job in `backend/llm/models.toml`, and have a script call `for_job("<job>")`. The agent writes the brief, the prompt and the script, never the finished copy or design. To change the output, change the brief or the prompt and run the script again; don't hand-edit the result.
+- **Facts:** the brief holds only facts from the repo (numbers from `eval/RESULTS.md` with their caveats). The build script checks that every number in the output is in the brief, and fails if not.
+- **Real app shots stay real:** screenshots and screen recordings of the running app are captures, not generated images. Generated imagery is labelled as generated where it appears.
+- **Record it:** the output says which model made it (a header comment, an end-card line, or the video description).
+- **Existing outputs:**
+
+| Output | Built by | Job(s) | Where it lands |
+|---|---|---|---|
+| Judging slide deck | `python -m scripts.slides.build` | `slides` (Gemini 4 Carbon) | `frontend/slides/index.html`, served at `/app/slides/`; screenshots in `frontend/slides/shots/` (git-ignored); review PNGs and PDF in `.cache/slides/` |
+| 1-minute demo video | `python -m scripts.video.build` | `narrate` (Gemini TTS), `video_open` (Gemini Omni 1.2 Flash) | `.cache/video/out/` (git-ignored); plan in `plan/VIDEO_SCRIPT.md` |
+
+Claude Code sessions: the `gemini-outputs` skill in `.claude/skills/` has the step-by-step.
+
 ## Gemini API skills
 
 Before writing or changing any Gemini API code (in practice, anything in `backend/llm/`), load Google's public skills from [google-gemini/gemini-skills](https://github.com/google-gemini/gemini-skills) (Apache-2.0):

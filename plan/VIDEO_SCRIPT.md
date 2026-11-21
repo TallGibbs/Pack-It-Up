@@ -6,6 +6,8 @@ Written at 15:05 on Nov 21. Chris answered the decisions at 15:14 (section 7, de
 
 **The move it shows:** move `20261121-133201` (two venue rooms filmed today: 52 items, 16 boxes; one clip and one photo per room). Neon takes it from two 26 ft trucks (score 91.5) to one (95.2) with no rule broken ([eval/RESULTS.md](../eval/RESULTS.md), table 2). The build uses the move as it is, with `who=Demo` on the phone pages; the 3D page and the models page still print its id and name (D6).
 
+> **Changed at 15:45 (decision 15:45): the narration lines and the title, results and end cards are now written by Gemini 4 Carbon**, not by the coding agent. `python -m scripts.video.build --write-script` sends `scripts/video/brief.md` (what each shot shows, what its line covers, word limits) and the facts in `scripts/slides/brief.md`, checks word counts and numbers, and saves `scripts/video/script.json`. The lines in the table below were the first draft and are no longer used; the shots, times and word limits still are. The results numbers changed too: `eval/RESULTS.md` was rebuilt at 15:31 (16 of 16 against 3 of 16, after one checker rule was relaxed for small moves).
+
 ## 1. Shot list, exactly 60 seconds
 
 Frame: 1920×1080, 30 fps. Phone shots sit on the left two thirds in a plain phone outline, with a step label to the right ("1 Film", "2 Check", "3 Pack"). Desktop shots fill the top 1920×956; the bottom band holds the captions. Captions are the narration words, one line at a time.

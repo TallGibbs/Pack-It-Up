@@ -297,3 +297,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Limits:** $15 is a guess; real shipping is only known at checkout. A store stays when it is the only one in the kit offering a line within $15.
 - **By:** Chris. Track B files (George's), changed at Chris's request.
 - **See:** commit 12aa644, FAILURES.md 15:41 row
+
+## 2026-11-21 15:40 · Demo and presentation outputs are made by Gemini
+- **Decision:** The slide deck, the demo video's narration lines and cards, and any other output judges see that is not the app itself are made by a Gemini model through `backend/llm/` from a brief of facts, not written or designed by the coding agent. The Claude-made judging deck is replaced by `frontend/slides/index.html` (Gemini 4 Carbon, `python -m scripts.slides.build`, served at `/app/slides/`). App screenshots and recordings stay real captures.
+- **Why:** Chris: the deck had a distinctly "Claude" look; this is a Gemini-built product.
+- **By:** Chris.
+- **See:** `AGENTS.md` "Demo and presentation outputs are made by Gemini", `.claude/skills/gemini-outputs/SKILL.md`, `scripts/slides/`, `scripts/video/brief.md`
