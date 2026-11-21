@@ -6,6 +6,7 @@ Routes:
   GET  /trucks             Available U-Haul trucks and Penn Station store zones
   POST /solve              {run_id?, inventory?, strategy?, extra_items?} -> placement JSON
   GET  /solve/{run_id}     Convenience GET solve for a run_id (or 'sample_venue' / 'mock-demo')
+  POST /plan               Same body as /solve; the planner loop (backend/planner.py) -> best plan + "planner" rounds
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend import catalog, solver
+from backend import catalog, planner, solver
 from backend.ingest.common import read_json, run_dir, write_json
 
 router = APIRouter(tags=["pack"])
@@ -121,24 +122,19 @@ def get_trucks_and_zones() -> dict[str, Any]:
     }
 
 
-@router.post("/solve")
-def post_solve(body: dict[str, Any] | None = None) -> dict[str, Any]:
-    payload = body or {}
-    strategy = dict(payload.get("strategy") or {})
+def _inventory_from_body(payload: dict[str, Any]) -> tuple[str, dict[str, Any], list[dict[str, Any]]]:
+    """-> (run id, inventory with any what-if items added, the what-if items)."""
     extra_items = list(payload.get("extra_items") or [])
-
     if isinstance(payload.get("inventory"), dict):
         inv = payload["inventory"]
         rid = str(payload.get("run_id") or inv.get("run_id") or "inline")
     else:
         rid, inv = _load_inventory_for_run(payload.get("run_id"))
+    return rid, _inject_extra_items(inv, extra_items), extra_items
 
-    inv_to_solve = _inject_extra_items(inv, extra_items)
-    try:
-        plan = solver.solve(inv_to_solve, strategy=strategy)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
 
+def _finish_plan(plan: dict[str, Any], rid: str, inv_to_solve: dict[str, Any], extra_items: list) -> dict[str, Any]:
+    """Add run id and rooms, and save placement.json for a real run (not for a what-if)."""
     plan["run_id"] = rid
     plan["rooms"] = [
         {
@@ -157,6 +153,57 @@ def post_solve(body: dict[str, Any] | None = None) -> dict[str, Any]:
         except Exception:
             pass
 
+    return plan
+
+
+@router.post("/solve")
+def post_solve(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload = body or {}
+    strategy = dict(payload.get("strategy") or {})
+    rid, inv_to_solve, extra_items = _inventory_from_body(payload)
+    try:
+        plan = solver.solve(inv_to_solve, strategy=strategy)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return _finish_plan(plan, rid, inv_to_solve, extra_items)
+
+
+@router.post("/plan")
+def post_plan(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The planner loop (B6): solve, let the `plan` model change the settings, solve again, keep the best.
+
+    Same body as /solve, plus optional `max_rounds` (default 3 solver runs). The reply is the winning
+    plan in /solve's shape with one more key, `planner`: the rounds, which one won, the model, and a
+    note if the model could not be reached (the plan is then the plain solve).
+    """
+    payload = body or {}
+    strategy = dict(payload.get("strategy") or {})
+    rid, inv_to_solve, extra_items = _inventory_from_body(payload)
+
+    rd = None
+    if rid not in ("inline", "sample_venue", "mock-demo"):
+        try:
+            rd = run_dir(rid) if run_dir(rid).exists() else None
+        except ValueError:
+            rd = None
+
+    try:
+        out = planner.plan_with_model(
+            inv_to_solve, strategy,
+            max_rounds=int(payload.get("max_rounds") or planner.MAX_ROUNDS),
+            run_dir=rd,  # model calls for a real run go in its calls.jsonl, like Track A's
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+    plan = out.pop("plan")
+    plan["planner"] = out
+    plan = _finish_plan(plan, rid, inv_to_solve, extra_items)
+    if rd is not None and not extra_items:
+        try:
+            write_json(rd / "planner.json", {"run_id": rid, **out})
+        except Exception:
+            pass
     return plan
 
 
