@@ -15,7 +15,7 @@ In progress. Track A (ingestion: photos and clips to a resolved inventory with s
 - **Brought in:**
   - Penn Station reference photos and clips (`data/NYPenn/`), taken by the team before kickoff. Used as the move destination; not committed.
   - `data/item_catalog.csv`: starting item sizes and handling flags, drafted in the planning repo before kickoff and brought in at the event.
-  - Python libraries (see `requirements.txt`): `google-genai` (Apache-2.0), `fastapi` (MIT), `uvicorn` (BSD-3-Clause), `python-multipart` (Apache-2.0), `jsonschema` (MIT), `Pillow` (MIT-CMU), `pillow-heif` (BSD-3-Clause), `imageio-ffmpeg` (BSD-2-Clause; ships an ffmpeg binary under its own licence), `python-dotenv` (BSD-3-Clause), `databricks-sql-connector` (Apache-2.0; only for the optional Databricks copy of the model-use history, which stores data and runs no model).
+  - Python libraries (see `requirements.txt`): `google-genai` (Apache-2.0), `fastapi` (MIT), `uvicorn` (BSD-3-Clause), `python-multipart` (Apache-2.0), `jsonschema` (MIT), `Pillow` (MIT-CMU), `pillow-heif` (BSD-3-Clause), `imageio-ffmpeg` (BSD-2-Clause; ships an ffmpeg binary under its own licence), `python-dotenv` (BSD-3-Clause), `databricks-sql-connector` (Apache-2.0; only for the optional Databricks copy of the model-use history, which stores data and runs no model), `py3dbp` (MIT; bin and item modelling and the baseline packer in `backend/solver.py`). The 3D page loads `three.js` 0.160 (MIT) from the jsDelivr CDN.
 
 ## Layout
 
