@@ -303,3 +303,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Chris: the deck had a distinctly "Claude" look; this is a Gemini-built product.
 - **By:** Chris.
 - **See:** `AGENTS.md` "Demo and presentation outputs are made by Gemini", `.claude/skills/gemini-outputs/SKILL.md`, `scripts/slides/`, `scripts/video/brief.md`
+
+## 2026-11-21 15:53 · Results table, slides and video numbers stay as they are while testing goes on
+- **Decision:** `eval/RESULTS.md`, the slide brief and the video script are not refreshed for now. They are rebuilt once, after the solver stops changing.
+- **Why:** The solver and checker changed at 15:34, 15:39 and 15:46 (tier-by-tier loading, a 9 ft cargo van, two new rules), and each change moves the scores and truck choices. A rebuild started at 15:45 was out of date before it finished.
+- **By:** Chris.
+- **See:** open-questions.md, 'Left by the whole-repo review session (15:55)'
