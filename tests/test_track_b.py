@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from backend import catalog, expand, solver, verify
+from backend import catalog, expand, labels, solver, verify
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -288,3 +288,28 @@ def test_sparse_redteam_4_boxes_uses_smallest_van_on_floor_and_rejects_jenga_tow
     assert res_jenga["valid"] is False
     assert "shake_stability" in res_jenga["violation_counts_by_rule"]
     assert res_jenga["pe_ratio"] > 3.5
+
+
+def test_b10_real_qr_labels_and_svg_png() -> None:
+    """Verify real ISO/IEC 18004 QR matrices, top-flap descriptors, SVG paths, and PNG output."""
+    mock_inv = json.loads((ROOT / "frontend" / "mock" / "inventory.json").read_text(encoding="utf-8"))
+    plan = solver.solve(mock_inv)
+    box_labels = labels.extract_box_labels(plan)
+    assert len(box_labels) >= 5
+    first = box_labels[0]
+    assert first["placement_surface"] == "top"
+    assert "PACK-IT-UP | BOX:" in first["qr_payload"]
+    assert "MOUNT:TOP-FLAPS" in first["qr_payload"]
+    assert first["qr_svg"].startswith("<svg ")
+
+    mat = labels.encode_qr_matrix(first["qr_payload"])
+    n = len(mat)
+    assert (n - 17) % 4 == 0 and n >= 29
+    # Verify 7x7 finder corners at (0,0), (0,n-7), (n-7,0) and dark module at (n-8, 8)
+    for r0, c0 in ((0, 0), (0, n - 7), (n - 7, 0)):
+        assert mat[r0][c0] and mat[r0 + 6][c0 + 6] and mat[r0 + 3][c0 + 3]
+        assert not mat[r0 + 1][c0 + 1]
+    assert mat[n - 8][8] is True
+
+    png = labels.render_qr_png(first["qr_payload"], scale=6, border=4)
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
