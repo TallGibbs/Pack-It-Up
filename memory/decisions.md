@@ -208,3 +208,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **By:** George.
 - **Replaces:** The `orior_curated_stays` UI default in `2026-11-21 13:58 · Integrate on-site Malin × Orior (Ireland) & Cinema Rental (Adorama / ARRI) domain rules`.
 - **See:** `backend/pack_api.py`, `frontend/ui/commerce.js`, `plan/PITCH_NOTES.md`, `frontend/pitch.html`
+
+## 2026-11-21 14:55 · Walk-in tier-by-tier truck loading (never step on first-level boxes)
+- **Decision:** Truck and room packing sequences must build vertical columns/tiers from the cab wall (`x=0`) toward the rear door (`x=L`) while movers stand on bare empty truck floor, and elevated items (`z>0`) must stay within 24 inches of their supporting stack's door-facing front (`walk_in_access` rule in `backend/verify.py`), rather than packing the entire floor in-to-out before loading upper levels.
+- **Why:** Filling the entire truck floor before loading level 2 forces movers to walk on top of first-level cardboard boxes to reach the front of the truck.
+- **By:** George.
+- **See:** `backend/solver.py`, `backend/verify.py`, `frontend/index.html`, `tests/test_track_b.py`
