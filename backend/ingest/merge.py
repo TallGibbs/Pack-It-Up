@@ -19,7 +19,7 @@ from collections import defaultdict
 
 from backend import catalog
 
-from .common import read_json, run_dir, update_status, write_json
+from .common import read_json, run_dir, slug, update_status, write_json
 from .perceive import parse_ref
 from .schemas import DISPOSITIONS
 
@@ -86,6 +86,17 @@ def canon_key(label: str) -> str:
 
 def group_key(it: dict) -> str:
     return it["catalog_id"] if it["catalog_id"] != "unknown" else f"unknown:{canon_key(it['label'])}"
+
+
+def item_id_for(rid: str, gk: str, taken=()) -> str:
+    """An item's id comes from its group, not from its place in the list. Edits, answers and question
+    ids are stored by item id, and a second photo of the room adds groups: with numbered ids
+    (room_item_07) every later item was renumbered and a "Toss" moved to another item (FAILURES.md 13:10)."""
+    base = f"{rid}_{slug(gk)}"
+    out, n = base, 2
+    while out in taken:  # two group keys that slug the same; not seen, but ids must be unique
+        out, n = f"{base}_{n}", n + 1
+    return out
 
 
 def colours(label: str) -> set[str]:
@@ -197,10 +208,15 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
         members = [m for ms in by_file.values() for m in ms]
         best = max(members, key=lambda m: (not m["partially_visible"], m["confidence"]))
         first = next(it for p, it in entries if p["file"] == best["file"] and it["label"] == best["label"])
-        item_id = f"{rid}_item_{len(items) + 1:02d}"
+        item_id = item_id_for(rid, gk, {i["id"] for i in items})
         labels = sorted({m["label"] for m in base}, key=str.lower)
         item = {
             "id": item_id,
+            # Runs made before ids came from the group stored their edits under the numbered id; gaps._find_item
+            # still accepts it. alias_ids: the ids of unknown groups folded into this one, so an edit made
+            # before the fold follows the item.
+            "legacy_id": f"{rid}_item_{len(items) + 1:02d}",
+            "alias_ids": sorted({item_id_for(rid, it["_folded_from"]) for _, it in entries if it.get("_folded_from")}),
             "group_key": gk,
             "label": best["label"] if len(base) == 1 else _group_label(gk, base),
             "catalog_id": first["catalog_id"],
@@ -271,7 +287,7 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
             apply_container_fact(c, f)
         elif f["kind"] == "unfilmed_item" and not any(i["heard_only"] for i in items):
             label = (f.get("label") or f.get("value") or "item mentioned").strip()
-            items.append(_heard_item(rid, len(items) + 1, label, f))
+            items.append(_heard_item(rid, len(items) + 1, label, f, {i["id"] for i in items}))
         else:
             uncertain.append({"file": f["source"], "text": f"Narrator said: \"{f['quote']}\" (not applied)",
                               "spoken": True})
@@ -323,6 +339,7 @@ def _fold_unknown_groups(groups: dict) -> None:
                     it["notes"] = (it.get("notes", "") + f" Folded from unknown into {ck} (shared: "
                                    f"{', '.join(sorted(mine & theirs))}).").strip()
                     it["catalog_id"] = ck
+                    it["_folded_from"] = gk
                     groups[ck].append((p, it))
                 for _, it in groups[ck]:  # other files didn't recognise the catalog pick: let resolve doubt it
                     it["catalog_doubtful"] = True
@@ -381,9 +398,11 @@ def apply_container_fact(c: dict, f: dict) -> None:
         rec.append(_speech_record("fullness", f["fullness"], f))
 
 
-def _heard_item(rid: str, n: int, label: str, f: dict) -> dict:
+def _heard_item(rid: str, n: int, label: str, f: dict, taken=()) -> dict:
     """A heard-only line built from a fact alone, when the model named the item but listed none."""
-    return {"id": f"{rid}_item_{n:02d}", "group_key": "heard:" + canon_key(label), "label": label,
+    gk = "heard:" + canon_key(label)
+    return {"id": item_id_for(rid, gk, taken), "legacy_id": f"{rid}_item_{n:02d}", "alias_ids": [],
+            "group_key": gk, "label": label,
             "catalog_id": f.get("catalog_id") if catalog.get(f.get("catalog_id") or "") else "unknown",
             "quantity": int(f.get("count") or 1), "stack_count": 1, "confidence": 0.6, "move_class": "movable",
             "material": "mixed", "est_dims_in": [], "est_weight_lb": 0, "fragile": False, "must_stay_upright": False,
@@ -404,7 +423,8 @@ def _group_label(gk: str, base: list[dict]) -> str:
     return out if len(out) <= 80 else out[:77] + "..."
 
 
-def merge(run_id: str) -> dict:
+def build_merged(run_id: str) -> dict:
+    """What the files alone say, in memory: no answers applied, nothing written."""
     rd = run_dir(run_id)
     manifest = read_json(rd / "manifest.json")
     perc = [read_json(p) for p in sorted((rd / "perception").glob("*.json"))]
@@ -413,8 +433,12 @@ def merge(run_id: str) -> dict:
         ps = [p for p in perc if p["room_id"] == room["id"]]
         if ps:
             rooms.append(merge_room(ps, room))
-    # Answers and edits are re-applied afterwards by gaps.reapply_answers().
-    merged = {"run_id": run_id, "rooms": rooms, "answers_applied": []}
+    return {"run_id": run_id, "rooms": rooms, "answers_applied": []}
+
+
+def merge(run_id: str) -> dict:
+    rd = run_dir(run_id)
+    merged = build_merged(run_id)  # answers and edits are re-applied afterwards by gaps.reapply_answers()
     write_json(rd / "merged.json", merged)
     update_status(rd, stage="merge_done")
     return merged

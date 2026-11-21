@@ -16,16 +16,23 @@ from backend.llm import LLMError, Media, for_job
 from backend.llm import media as mu
 
 from .common import read_json, run_dir, write_json
-from .merge import canon_key
+from .resolve import CONTAINER_CUFT, resolve_room
+from .merge import build_merged, canon_key
 
 EDITABLE = {"quantity", "disposition", "catalog_id", "label"}
 DISPOSITIONS = {"keep", "sell", "donate", "trash", "stays", "undecided"}
 
 
 def _find_item(merged: dict, item_id: str) -> tuple[dict, dict] | tuple[None, None]:
+    """The item with this id. Failing that, the item that used to have it: the numbered id of a run made
+    before ids came from the group (legacy_id), or the id of an unknown group since folded into it."""
     for room in merged["rooms"]:
         for it in room["items"]:
             if it["id"] == item_id:
+                return room, it
+    for room in merged["rooms"]:
+        for it in room["items"]:
+            if it.get("legacy_id") == item_id or item_id in it.get("alias_ids", ()):
                 return room, it
     return None, None
 
@@ -59,8 +66,14 @@ def _apply(merged: dict, ans: dict) -> str | None:
         if it is None:
             return f"no item {patch['item_id']}"
         m = patch["member"]
-        new_id = f"{it['id']}_b{sum(1 for x in room['items'] if x['id'].startswith(it['id'] + '_b')) + 1}"
-        room["items"].append({**it, "id": new_id, "label": m["label"], "quantity": m["quantity"],
+        # The piece's id comes from the sighting it was split off for, so it stays the same whatever
+        # other answers exist, and the same sighting can't be split off twice.
+        new_id = f"{it['id']}_b{hashlib.sha256((m['file'] + '|' + m['label']).encode()).hexdigest()[:6]}"
+        if any(x["id"] == new_id for x in room["items"]):
+            return None
+        n_split = sum(1 for x in room["items"] if x["id"].startswith(it["id"] + "_b")) + 1
+        room["items"].append({**it, "id": new_id, "legacy_id": f"{it.get('legacy_id', it['id'])}_b{n_split}",
+                              "alias_ids": [], "label": m["label"], "quantity": m["quantity"],
                               "confidence": m["confidence"], "est_dims_in": m["est_dims_in"] or it["est_dims_in"],
                               "evidence": {"source": m["file"], "sha256": m["sha256"], "kind": m["kind"],
                                            "timestamp_s": m["evidence"].get("timestamp_s"),
@@ -88,19 +101,47 @@ def _apply(merged: dict, ans: dict) -> str | None:
     return None
 
 
+def latest_per_question(answers: list[dict]) -> dict[str, dict]:
+    """question_id -> the last answer stored for it. An answer can be changed ("Change" on the review
+    page, or the model asked again after a new photo); only the last one counts."""
+    return {a["question_id"]: a for a in answers if a.get("question_id")}
+
+
 def reapply_answers(run_id: str) -> int:
     rd = run_dir(run_id)
     answers = read_json(rd / "answers.json", {"answers": []})["answers"]
     merged = read_json(rd / "merged.json")
     if not answers or merged is None:
         return 0
+    # Every answer used to be applied in order, so "built in" followed by "free-standing" left the item
+    # removed, and "different" twice added two pieces (FAILURES.md 13:10). Edits and added items have
+    # no question_id and all still apply, in order.
+    latest = latest_per_question(answers)
     applied = []
     for ans in answers:
+        qid = ans.get("question_id")
+        if qid and latest[qid] is not ans:
+            applied.append({"id": ans["id"], "kind": ans["kind"], "ok": True, "replaced_by": latest[qid]["id"]})
+            continue
         err = _apply(merged, ans)
         applied.append({"id": ans["id"], "kind": ans["kind"], "ok": err is None, **({"error": err} if err else {})})
     merged["answers_applied"] = applied
     write_json(rd / "merged.json", merged)
     return len(applied)
+
+
+def _without_model_answers(run_id: str) -> tuple[dict, dict]:
+    """-> (inventory rooms, merged) as the files plus the person's own answers and edits give them: the
+    model's stored answers are left out. In memory only; build_questions judges those answers against it."""
+    answers = read_json(run_dir(run_id) / "answers.json", {"answers": []})["answers"]
+    latest = latest_per_question(answers)
+    merged = build_merged(run_id)
+    for ans in answers:
+        qid = ans.get("question_id")
+        if qid and (latest[qid] is not ans or ans.get("source") != "user"):
+            continue
+        _apply(merged, ans)
+    return {"rooms": [resolve_room(r) for r in merged["rooms"]]}, merged
 
 
 def store_answer(run_id: str, ans: dict) -> dict:
@@ -189,7 +230,6 @@ def _added_item(ans: dict) -> dict:
 AUTO_APPLY = 0.7       # Decisions API answers at or above this confidence are applied automatically
 MAX_SHOWN = 5          # open questions shown to the user at once
 MODEL_ONLY = {"same_item", "fixture_check"}  # never open cards for the user (Chris, 11:38)
-CONTAINER_CUFT = {"small": 6, "medium": 15, "large": 30}
 FULLNESS = ["empty", "quarter", "half", "three_quarters", "full"]
 
 
@@ -350,9 +390,14 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
             said[it["id"]] = it.get("set_by_speech", [])
         for c in room["containers"]:
             said[c["label"]] = c.get("set_by_speech", [])
+    counts = {it["id"]: it.get("per_file_counts", {}) for room in inv["rooms"] for it in room["items"]}
     for q in qs:
         q["media"] = [m for m in q["media"] if m is not None]
         q["rank_score"] = round(q["volume_at_stake"] * (1 - q["confidence"]), 2)
+        # What a model's answer to this question rests on: the footage shown and, for a count, each
+        # file's count. build_questions asks again when it changes.
+        q["basis"] = _qid(q["kind"], *sorted(m.cache_token() for m in q["media"]),
+                          sorted(counts.get(q["refers_to"], {}).items()) if q["kind"] == "count_check" else "")
         fields = SPEECH_ANSWERS.get(q["kind"])
         if fields:
             rec = next((r for r in said.get(q["refers_to"], []) if r["field"].split(".")[0] in fields), None)
@@ -401,9 +446,27 @@ def build_questions(run_id: str) -> list[dict]:
     inv, merged = read_json(rd / "inventory.json"), read_json(rd / "merged.json")
     manifest = read_json(rd / "manifest.json")
     files_by_name = {f["name"]: f for f in manifest["files"]}
-    answered = {a.get("question_id"): a for a in read_json(rd / "answers.json", {"answers": []})["answers"]}
+    answered = {k: a for k, a in latest_per_question(read_json(rd / "answers.json", {"answers": []})["answers"]).items()
+                if a.get("source") != "superseded"}
     old = {q["id"]: q for q in read_json(rd / "questions.json", {"questions": []})["questions"]}
+
+    # Item ids now stay put when another photo of the room arrives, so a question keeps its id and its
+    # stored answer. A person's answer stands. A model's answer stands only while the question is still
+    # raised by the same footage: "4 chairs" from photo 1 must not pin the count once photo 2 shows 6.
+    # So when the model has answered anything, raise the questions again from what the files and the
+    # person's own answers and edits say, without the model's earlier answers (in memory; no file changes),
+    # and withdraw each model answer whose question is gone or now rests on different footage. A withdrawn
+    # answer gets a stored "superseded" entry, so reapply_answers stops applying it, and is asked again below.
+    by_model = [k for k, a in answered.items() if a.get("source") != "user"]
+    if by_model:
+        inv, merged = _without_model_answers(run_id)
     qs = _candidates(rd, inv, merged, files_by_name)
+    basis = {q["id"]: q["basis"] for q in qs}
+    for qid in by_model:
+        if answered[qid].get("basis") != basis.get(qid):  # also true for answers stored before `basis` existed
+            store_answer(run_id, {"kind": answered[qid]["kind"], "question_id": qid, "answer": None,
+                                  "source": "superseded", "patch": {"op": "none"}})
+            del answered[qid]
 
     to_ask = [q for q in qs if q["id"] not in answered and "speech" not in q
               and q["ask"].startswith("decisions_api") and q["media"]]
@@ -442,7 +505,7 @@ def build_questions(run_id: str) -> list[dict]:
             model_only = q["kind"] in MODEL_ONLY
             if (r["confidence"] >= AUTO_APPLY or model_only) and r["answer"] != "more":  # "more" needs a number
                 store_answer(run_id, {"kind": q["kind"], "question_id": q["id"], "answer": r["answer"],
-                                      "source": r["via"], "confidence": r["confidence"],
+                                      "source": r["via"], "confidence": r["confidence"], "basis": q["basis"],
                                       "patch": _patch_for(q, r["answer"])})
                 q.update(status="answered", answer=r["answer"], answered_by=r["via"],
                          low_confidence=r["confidence"] < AUTO_APPLY)
@@ -461,7 +524,8 @@ def build_questions(run_id: str) -> list[dict]:
             q["shown"] = True
     for q in qs:  # keep any earlier question that no longer triggers but was answered
         old.pop(q["id"], None)
-    kept = [q for q in old.values() if q.get("status") == "answered"]
+    kept = [q for q in old.values() if q.get("status") == "answered"
+            and (q["id"] in answered or q.get("answered_by") == "speech")]  # not one whose answer was withdrawn
     pub = [_public(q) for q in qs] + kept
     pub.sort(key=lambda q: (q["status"] != "open", not q.get("shown", False), -q.get("rank_score", 0)))
     write_json(rd / "questions.json", {"run_id": run_id, "questions": pub,

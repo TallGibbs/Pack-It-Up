@@ -8,6 +8,7 @@ specs (catalog flags win). Writes runs/<run_id>/inventory.json, the contract Tra
 from __future__ import annotations
 
 import datetime as dt
+import math
 
 from backend import catalog
 
@@ -38,6 +39,19 @@ CATEGORY_DEFAULT_DIMS = {
 GENERIC_DEFAULT_DIMS = [24, 24, 24]
 
 BOX_CUFT = 3.0  # box_medium, for open_surfaces estimates
+# Boxes for what a cabinet, shelf or closet holds: the space inside for the model's size class, times
+# how full it is. Rough on purpose; the review page says "about N boxes". (Until 13:10 on Nov 21 only
+# the loose-decor line had an estimate, so a full bookshelf added no boxes: FAILURES.md.)
+CONTAINER_CUFT = {"small": 6, "medium": 15, "large": 30}
+# ...smaller for kinds that hold less than a shelf or a run of cabinets (small, medium, large), larger for closets.
+KIND_CUFT = {"bathroom_cabinet": (1, 2, 4), "desk": (2, 4, 6), "dresser_drawers": (4, 8, 14),
+             "toy_storage": (4, 8, 15), "other": (4, 10, 20), "closet": (10, 20, 40)}
+INSIDE_SHARE = 0.6  # a container can't hold more than this share of the furniture it is part of
+FULLNESS_FRACTION = {"empty": 0.0, "quarter": 0.25, "half": 0.5, "three_quarters": 0.75, "full": 1.0}
+# Catalog box each kind of contents goes in: books are heavy, so small boxes; anything else, medium.
+BOX_FOR_CONTENTS = {"books": "box_small", "papers_office": "box_small", "tools": "box_small",
+                    "dishes_glassware": "box_dish_pack", "clothes_hanging": "box_wardrobe",
+                    "pots_pans": "box_large", "linens": "box_large", "toys": "box_large"}
 NOT_ON_TRUCK = ("trash", "sell", "donate", "stays")  # "stays": the narrator said it is not moving
 PACK_FACTOR = 2.0  # loose items take about twice their own volume once boxed and padded
 
@@ -172,7 +186,30 @@ def resolve_item(item: dict) -> dict:
     return out
 
 
-def _containers(room: dict) -> list[dict]:
+def _box_cuft(box_id: str) -> float:
+    row = catalog.get(box_id)
+    return row["length_in"] * row["width_in"] * row["height_in"] / 1728 if row else BOX_CUFT
+
+
+def container_boxes(c: dict, furniture_cuft: float | None = None) -> tuple[float, dict]:
+    """-> (cubic feet of contents, {catalog box id: count}) for a merged container. Nothing when it is
+    empty or closed. furniture_cuft: the size of the listed item this container is part of, if any
+    (a 3-drawer organizer that is 0.7 cu ft overall can't hold a "small" container's 4)."""
+    contents, size, fullness = c["contents"], c["size"], c["fullness"]
+    i = ["small", "medium", "large"].index(size) if size in ("small", "medium", "large") else 1
+    space = KIND_CUFT[c["kind"]][i] if c.get("kind") in KIND_CUFT else list(CONTAINER_CUFT.values())[i]
+    if furniture_cuft:
+        space = min(space, furniture_cuft * INSIDE_SHARE)
+    vol = space * FULLNESS_FRACTION.get(fullness, 0.0)
+    if vol <= 0:
+        return 0.0, {}
+    box = BOX_FOR_CONTENTS.get(contents, "box_medium")
+    return round(vol, 1), {box: max(1, math.ceil(vol / _box_cuft(box)))}
+
+
+def _containers(room: dict, furniture: dict[str, float] | None = None) -> list[dict]:
+    """furniture: canonical noun -> cubic feet of the largest listed item with that noun."""
+    from .merge import canon_key
     rid = room["id"]
     out = []
     open_count = 0
@@ -183,7 +220,9 @@ def _containers(room: dict) -> list[dict]:
         # Closed doors: contents unknown. Assume empty for box counts and flag it (Chris, Nov 21);
         # the user is always asked (gaps.py hidden_contents).
         unknown = c["fullness"] == "not_visible"
+        vol, boxes = container_boxes(c, (furniture or {}).get(canon_key(c["label"])))  # closed: counted as empty
         out.append({"id": f"{rid}_cont_{len(out) + 1:02d}", "label": c["label"], "kind": c["kind"],
+                    "est_volume_cuft": vol, "est_boxes": boxes,
                     "contents": c["contents"], "fullness": "empty" if unknown else c["fullness"], "size": c["size"],
                     "contents_unknown": unknown, "observed_fullness": c["fullness"],
                     **({"note": "contents unknown, assumed empty"} if unknown else {}),
@@ -208,9 +247,13 @@ def _containers(room: dict) -> list[dict]:
 
 def resolve_room(room: dict) -> dict:
     items = [resolve_item(it) for it in room["items"] if it.get("disposition") != "removed"]
-    containers = _containers(room)
-    # Flag the piece of furniture that holds a closed container ("credenza sideboard" <- "credenza sideboard drawers").
     from .merge import canon_key
+    furniture: dict[str, float] = {}
+    for it in items:
+        k = canon_key(it["label"])
+        furniture[k] = max(furniture.get(k, 0), it["size"]["volume_cuft_each"])
+    containers = _containers(room, furniture)
+    # Flag the piece of furniture that holds a closed container ("credenza sideboard" <- "credenza sideboard drawers").
     closed = {canon_key(c["label"]) for c in containers if c.get("contents_unknown")}
     for it in items:
         if closed and canon_key(it["label"]) in closed:
@@ -258,6 +301,13 @@ def resolve(run_id: str) -> dict:
                 c["evidence"].setdefault("sha256", f["sha256"])
                 c["evidence"].setdefault("kind", f["kind"])
     questions = read_json(rd / "questions.json", {}).get("questions", [])
+    # A question stored before item ids came from the group refers to a numbered id (room_item_07).
+    # Point it at the item's id today so the review page finds its picture; questions.json is left alone.
+    was = {old: it["id"] for r in merged["rooms"] for it in r["items"]
+           for old in [it.get("legacy_id"), *it.get("alias_ids", [])] if old}
+    now = {it["id"] for r in merged["rooms"] for it in r["items"]}
+    questions = [{**q, "refers_to": was[q["refers_to"]]} if q.get("refers_to") in was and q["refers_to"] not in now
+                 else q for q in questions]
     inv = {
         "schema_version": "inventory_v2",
         "run_id": run_id,
