@@ -260,3 +260,10 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **By:** George.
 - **Replaces:** The `orior_curated_stays` UI default in `2026-11-21 13:58 · Integrate on-site Malin × Orior (Ireland) & Cinema Rental (Adorama / ARRI) domain rules`.
 - **See:** `backend/pack_api.py`, `frontend/ui/commerce.js`, `plan/PITCH_NOTES.md`, `frontend/pitch.html`
+
+## 2026-11-21 15:11 · Both Neon controls stay; the arena loop is `POST /arena/plan`
+- **Decision:** The page keeps both Neon controls. "Plan with Neon" in the What-If card keeps `POST /plan` (`planner.plan_with_model`); the arena card's "Neon Loop (3 Rounds)" moves to `POST /arena/plan` (`planner.run_neon_loop`). No method and path may be declared twice; `tests/test_planner.py` checks it.
+- **Why:** After George's join both routers declared `POST /plan`, the pack route answered, and the arena button got a reply it could not read. A separate path was the smallest change that makes both work.
+- **Limits:** George has not been asked. His route, widget and route test were changed from Chris's session. The two loops still pick different plans for the same inventory (FAILURES.md 15:11).
+- **By:** Chris (go-ahead to fix and restart).
+- **See:** commit de14707, FAILURES.md 15:01 and 15:11 rows
