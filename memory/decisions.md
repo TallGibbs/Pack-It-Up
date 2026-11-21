@@ -337,3 +337,8 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 ## 2026-11-21 16:16 · Merged branches deleted
 - **Decision:** Delete `feature/sign-in` (local and GitHub), `track-b-planner` (GitHub), the local `claude/recursing-chatterjee-0c606b`, and the `sign-in` and `recursing-chatterjee-0c606b` worktrees. All their commits were on `main`; `track-b` stays because George still pushes to it.
 - **By:** Chris.
+
+## 2026-11-21 16:30 · One branch for final testing: `track-b` deleted
+- **Decision:** `main` is the only branch. `origin/track-b` (tip 9e3ae29) was deleted; every commit on it was already in `main`. This replaces the 16:16 entry's "`track-b` stays". George pulls `main` and pushes there from now on.
+- **Why:** Chris wanted all parallel work on one branch before final testing.
+- **By:** Chris.
