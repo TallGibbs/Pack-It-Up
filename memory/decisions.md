@@ -176,3 +176,10 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Moving into one giant open hall is trivial; filling constrained storefronts with doorway limits and LIFO dock-stop ordering creates real packing and routing trade-offs that showcase Gemini 4 planning and verification.
 - **By:** George.
 - **Replaces:** The "placing items inside Penn Station is out of scope" clause of `2026-11-21 ~09:45 · Demo: move this hackathon to Penn Station`.
+
+## 2026-11-21 12:08 · Include Shopify `shop.dev` Commerce Bonus Track in Track B output
+- **Decision:** Track B's output must include the Shopify Commerce Bonus Track (`shop.dev` / `https://mcp.shop.com` UCP MCP): automatically compute the Move Supply Kit (exact moving box counts by size plus tape, bubble wrap, moving blankets, stretch wrap, mattress bags, and lifting straps from physics flags), discover & verify real Shopify merchant offers with `gemini-decision-1` + `gemini-4-neon`, consolidate into live multi-item Shopify carts & Shop Pay checkouts (`continue_url`), surface Haul-vs-Replace / Sell comps, and embed an interactive Shopping Agent.
+- **Why:** Turns the computed packing plan into an immediately actionable move purchase and enters the open Shopify Build with Commerce bonus prize track.
+- **By:** George.
+- **Replaces:** `plan/EVENT_DAY_PLAN.md` "Optional: Shopify bonus track — Only if we are ahead at 3:00 PM".
+- **See:** `backend/commerce.py`, `backend/commerce_api.py`, `frontend/ui/commerce.js`, `frontend/shop.html`, `frontend/index.html`

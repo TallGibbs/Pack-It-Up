@@ -40,4 +40,12 @@ thinking = "low"
 model = "gemini:gemini-4-hydrogen"    # generic enum generate_json, used when the Decisions API call fails
 thinking = "low"
 
-# Track B adds plan, baseline and image.
+# Track B adds plan, shop, baseline and image.
+
+[jobs.plan]
+model = "gemini:gemini-4-neon"
+thinking = "low"
+
+[jobs.shop]
+model = "gemini:gemini-4-neon"        # Shopify shop.dev Shopping Agent (tier/bundle planning & Q&A)
+thinking = "low"

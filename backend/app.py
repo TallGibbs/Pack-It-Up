@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from backend.commerce_api import router as commerce_router
 from backend.ingest.api import router as ingest_router
 from backend.pack_api import router as pack_router
 
@@ -17,6 +18,7 @@ app = FastAPI(title="Pack It Up")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(ingest_router)
 app.include_router(pack_router)
+app.include_router(commerce_router)
 
 
 @app.get("/health")

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5a31f4">
+<title>Pack It Up · Buy Moving Boxes &amp; Shopping Agent (Shop.dev)</title>
+<link rel="stylesheet" href="ui/style.css">
+<style>
+  body.shop-standalone { padding-bottom: 64px; }
+  .shop-wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  .topbar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 10px; padding-top: 12px;
+  }
+  .topbar .steps { margin: 0; }
+  .topbar .steps a { color: var(--muted); text-decoration: none; }
+  .topbar .steps a:hover { color: var(--accent); text-decoration: underline; }
+  .shop-grid {
+    display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 14px; align-items: start;
+  }
+  @media (min-width: 900px) {
+    .shop-grid { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr); }
+  }
+  .panel-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px;
+  }
+  .panel-card h2 {
+    margin: 0 0 10px; font-size: 16.5px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .discover-results { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .discover-card {
+    display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center;
+    padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+  }
+  .discover-card img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; background: var(--card); }
+</style>
+</head>
+<body class="shop-standalone">
+<div id="mock-banner" class="mock-banner hidden">Mock mode: calling live Shopify Catalog MCP (mcp.shop.com) directly from your browser.</div>
+
+<div class="shop-wrap">
+  <div class="topbar">
+    <p class="steps">
+      <a id="nav-capture" href="capture.html">1 Film</a> ·
+      <a id="nav-review" href="review.html">2 Check</a> ·
+      <a id="nav-pack" href="index.html">3 Pack &amp; Unload</a> ·
+      <b>4 Buy Boxes &amp; Supplies</b>
+    </p>
+    <div style="display:flex;gap:8px;align-items:center">
+      <a id="btn-back-3d" class="btn" style="min-height:36px;padding:6px 12px;font-size:13px" href="index.html">← Back to 3D Truck Plan</a>
+    </div>
+  </div>
+
+  <header style="margin-top:14px">
+    <h1 style="margin:0;font-size:23px">Move Supply Kit &amp; Shopping Agent</h1>
+    <p class="muted small" style="margin-top:4px">
+      Powered by <b>Shopify shop.dev (`mcp.shop.com`)</b> + <b>Gemini 4 Neon</b> + <b>Gemini Decision 1</b> — exact boxes, protection supplies, consolidated carts &amp; Shop Pay checkouts built from your room footage.
+    </p>
+  </header>
+
+  <div class="shop-grid">
+    <!-- Left: Move Supply Kit + Multi-Merchant Carts + Shopping Agent -->
+    <section class="panel-card">
+      <div id="kit-mount"></div>
+    </section>
+
+    <!-- Right: Direct Shop.dev Global Catalog Product Discovery -->
+    <aside class="panel-card">
+      <h2>
+        <span>🔍 Discover on Shopify Catalog</span>
+        <span class="badge">1B+ Products</span>
+      </h2>
+      <p class="small muted" style="margin-bottom:10px">
+        Search millions of Shopify merchants live via `mcp.shop.com/search_catalog` — moving gear, box cutters, label pouches, furniture sliders, or destination room essentials.
+      </p>
+      <form id="discover-form" style="display:flex;gap:6px">
+        <input type="text" id="discover-q" value="heavy duty furniture sliders moving" placeholder="Search Shopify Catalog…" style="min-height:40px;font-size:14px">
+        <button type="submit" class="btn primary" style="min-height:40px;padding:6px 14px;font-size:13.5px" id="discover-btn">Search</button>
+      </form>
+      <div class="shop-chips" style="margin-top:8px">
+        <button type="button" class="shop-chip" data-dq="clear adhesive QR shipping label pouches">🏷️ QR label pouches</button>
+        <button type="button" class="shop-chip" data-dq="retractable box cutter utility knife moving">🔪 Box cutters</button>
+        <button type="button" class="shop-chip" data-dq="furniture sliders hardwood floors moving">🛋️ Furniture sliders</button>
+        <button type="button" class="shop-chip" data-dq="wardrobe moving boxes with metal hanging bar">👔 Wardrobe boxes</button>
+      </div>
+      <div class="discover-results" id="discover-results">
+        <p class="small muted">Searching live Shopify Catalog…</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="mock/mock-api.js"></script>
+<script src="ui/api.js"></script>
+<script src="ui/commerce.js"></script>
+<script>
+(function () {
+  "use strict";
+  const { MOCK, API_BASE, params, link, lastRun, placeholder } = window.PIU;
+  const { mountCommerceWidget, callShopMcpDirect, fmtUsd, esc, safeUrl } = window.PIU_COMMERCE;
+
+  if (MOCK) document.getElementById("mock-banner").classList.remove("hidden");
+  const runId = params.get("run_id") || lastRun() || "sample_venue";
+
+  document.getElementById("nav-capture").href = link("capture.html", { run_id: runId });
+  document.getElementById("nav-review").href = link("review.html", { run_id: runId });
+  document.getElementById("nav-pack").href = link("index.html", { run_id: runId });
+  document.getElementById("btn-back-3d").href = link("index.html", { run_id: runId });
+
+  mountCommerceWidget(document.getElementById("kit-mount"), {
+    runId,
+    fullPage: true,
+    autoFetch: true,
+  });
+
+  async function runCatalogSearch(query) {
+    const q = String(query || "").trim();
+    if (!q) return;
+    const host = document.getElementById("discover-results");
+    const btn = document.getElementById("discover-btn");
+    btn.disabled = true;
+    host.innerHTML = `<p class="small muted">Searching Shopify global catalog for "${esc(q)}"…</p>`;
+
+    try {
+      let offers = [];
+      if (!MOCK) {
+        const res = await fetch(`${API_BASE}/commerce/search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q, postal_code: "10001", limit: 6 }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          offers = data.offers || [];
+        }
+      }
+      if (!offers.length) {
+        const sc = await callShopMcpDirect("search_catalog", {
+          catalog: {
+            query: q,
+            context: { address_country: "US", address_region: "NY", postal_code: "10001", currency: "USD" },
+            filters: { ships_to: { country: "US", region: "NY", postal_code: "10001" } },
+            pagination: { limit: 6 },
+          },
+        });
+        for (const p of sc.products || []) {
+          const v = (p.variants || [])[0];
+          if (!v || !v.price?.amount) continue;
+          const img = (p.media && p.media[0] && (p.media[0].preview?.url || p.media[0].url)) || "";
+          offers.push({
+            title: p.title,
+            price_cents: v.price.amount,
+            seller_name: v.seller?.name || v.seller?.domain || "Shopify Store",
+            product_url: v.url,
+            checkout_url: v.checkout_url || v.url,
+            image_url: img,
+          });
+        }
+      }
+
+      if (!offers.length) {
+        host.innerHTML = `<p class="small muted">No in-stock offers matched "${esc(q)}".</p>`;
+        return;
+      }
+
+      host.innerHTML = offers.map((o) => `
+        <div class="discover-card">
+          <img src="${esc(o.image_url ? safeUrl(o.image_url) : placeholder(o.title))}" alt="${esc(o.title)}" loading="lazy">
+          <div>
+            <div style="font-size:13px;font-weight:700;line-height:1.25">
+              <a href="${esc(safeUrl(o.product_url))}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">${esc(o.title.slice(0, 72))}</a>
+            </div>
+            <div class="small muted">${esc(o.seller_name)} · ${fmtUsd(o.price_cents)}</div>
+          </div>
+          <a class="shop-pay-btn" href="${esc(safeUrl(o.checkout_url || o.product_url))}" target="_blank" rel="noopener noreferrer">
+            Buy ${fmtUsd(o.price_cents)} ↗
+          </a>
+        </div>
+      `).join("");
+    } catch (err) {
+      host.innerHTML = `<p class="error small">Catalog search error: ${esc(err.message)}</p>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById("discover-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    runCatalogSearch(document.getElementById("discover-q").value);
+  });
+  document.querySelectorAll("[data-dq]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.getElementById("discover-q").value = chip.dataset.dq;
+      runCatalogSearch(chip.dataset.dq);
+    });
+  });
+
+  runCatalogSearch(document.getElementById("discover-q").value);
+})();
+</script>
+</body>
+</html>

@@ -35,8 +35,10 @@ Every model call goes through `backend/llm/` and is set per job in [backend/llm/
 | Job | Model | What it does |
 |---|---|---|
 | `perceive` | Gemini 4 Hydrogen (`gemini-4-hydrogen`) | One call per photo or clip: items, catalog match, size estimate, material, handling flags, fixtures and personal belongings |
-| `decide` | Gemini Decisions API (`gemini-decision-1`, api_version `v1alpha`) | Calibrated answers to gap questions: same item seen twice, catalog vs measured size, counts, built-in vs free-standing |
+| `decide` | Gemini Decisions API (`gemini-decision-1`, api_version `v1alpha`) | Calibrated answers to gap questions: same item seen twice, catalog vs measured size, counts, built-in vs free-standing, and Shopify moving-supply spec verification |
 | `decide_fallback` | Gemini 4 Hydrogen | Enum-constrained JSON answer if a Decisions API call fails |
+| `plan` | Gemini 4 Neon (`gemini-4-neon`) | Reads verifier violations and revises 3D packing strategy |
+| `shop` | Gemini 4 Neon (`gemini-4-neon`) | **Bonus Track (Shopify `shop.dev`):** Move Supply Kit & conversational Shopping Agent over live `https://mcp.shop.com` (`search_catalog`, `ask_business`, `create_cart`, `create_checkout`) |
 
 ## Setup
 
