@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<title>Pack It Up · Film your rooms</title>
+<link rel="stylesheet" href="ui/style.css">
+</head>
+<body>
+<div id="mock-banner" class="mock-banner hidden">Mock mode: nothing leaves this phone. Pick any photos or clips.</div>
+<main>
+  <p class="steps"><b>1 Film</b> · 2 Check · 3 Pack</p>
+  <h1>Film your rooms</h1>
+  <p class="muted">Photos or short clips of each room. We list what's there, then plan the truck.</p>
+
+  <div id="rooms"></div>
+
+  <button id="add-room" class="btn block" type="button">+ Add another room</button>
+
+  <p class="small muted" style="margin-top:14px">
+    Tips: pan slowly, 10 to 30 seconds per clip. Get a door or a person in shot for scale.
+    Open cupboards you want packed.
+  </p>
+
+  <div id="qr-box" class="card">
+    <h2 style="margin-top:0">Open on your phone</h2>
+    <div class="qr" id="qr"></div>
+    <p class="small muted" id="qr-url"></p>
+  </div>
+
+  <p class="small"><button id="new-move" class="btn link hidden" type="button">Start a new move</button></p>
+</main>
+
+<div class="footer hidden" id="footer">
+  <div class="inner">
+    <div class="grow" id="found"><b>Looking…</b>Items appear as each file finishes</div>
+    <a class="btn" id="review-btn" href="#">Review →</a>
+  </div>
+</div>
+
+<template id="room-tpl">
+  <section class="card room">
+    <label class="field">Room name</label>
+    <input type="text" class="room-name" autocomplete="off" enterkeyhint="done">
+    <div class="pick">
+      <label class="btn primary">
+        <span>Film or photograph</span><small>opens the camera</small>
+        <input class="sr-only cam" type="file" accept="image/*,video/*" capture="environment">
+      </label>
+      <label class="btn">
+        <span>Choose files</span><small>several at once</small>
+        <input class="sr-only lib" type="file" accept="image/*,video/*" multiple>
+      </label>
+    </div>
+    <p class="hint">🎙️ Talk while you film: <i>“these chairs stack”</i>, <i>“the cabinet's full of books”</i>, <i>“the sofa stays”</i>. We'll hear it.</p>
+    <p class="warn hidden size-warn"></p>
+    <ul class="files"></ul>
+  </section>
+</template>
+
+<script src="mock/mock-api.js"></script>
+<script src="ui/api.js"></script>
+<script>
+(function () {
+  "use strict";
+  const { api, link, MOCK } = window.PIU;
+  const $ = (s, el = document) => el.querySelector(s);
+  const ACCEPT_EXT = /\.(jpe?g|png|heic|heif|webp|mp4|mov|m4v)$/i;
+  const TUNNEL = /trycloudflare\.com$/i.test(location.hostname);
+  const WARN_MB = TUNNEL ? 90 : 200;
+
+  if (MOCK) $("#mock-banner").classList.remove("hidden");
+
+  let runId = null;
+  let firstSentAt = 0;
+  const rooms = [];          // {el, name, locked, files: [row]}
+  const usedNames = new Set();
+  const queue = [];
+  let uploading = false;
+  let pollTimer = null;
+  let lastRun = null;
+
+  // ---------- rooms ----------
+  function addRoom() {
+    const el = $("#room-tpl").content.firstElementChild.cloneNode(true);
+    const room = { el, name: "", locked: false, files: [] };
+    const input = $(".room-name", el);
+    input.placeholder = rooms.length ? "Kitchen" : "Living room";
+    input.value = "Room " + (rooms.length + 1);
+    input.addEventListener("focus", () => { if (/^Room \d+$/.test(input.value)) input.select(); });
+    [$(".cam", el), $(".lib", el)].forEach((inp) =>
+      inp.addEventListener("change", () => { pick(room, Array.from(inp.files || [])); inp.value = ""; }));
+    rooms.push(room);
+    $("#rooms").appendChild(el);
+    return room;
+  }
+
+  function roomName(room) {
+    if (room.locked) return room.name;
+    let name = $(".room-name", room.el).value.trim() || "Room " + (rooms.indexOf(room) + 1);
+    const taken = rooms.filter((r) => r !== room && r.locked).map((r) => r.name.toLowerCase());
+    let n = 2, base = name;
+    while (taken.includes(name.toLowerCase())) name = `${base} ${n++}`;
+    return name;
+  }
+
+  // iPhone camera captures are all called image.jpg; the server keys files by name, so make each unique.
+  function uniqueName(name) {
+    if (!usedNames.has(name.toLowerCase())) { usedNames.add(name.toLowerCase()); return name; }
+    const dot = name.lastIndexOf(".");
+    const stem = dot > 0 ? name.slice(0, dot) : name, ext = dot > 0 ? name.slice(dot) : "";
+    let i = 2;
+    while (usedNames.has(`${stem}_${i}${ext}`.toLowerCase())) i++;
+    usedNames.add(`${stem}_${i}${ext}`.toLowerCase());
+    return `${stem}_${i}${ext}`;
+  }
+
+  function pick(room, files) {
+    if (!files.length) return;
+    const ok = files.filter((f) => /^(image|video)\//.test(f.type) || ACCEPT_EXT.test(f.name));
+    const warn = $(".size-warn", room.el);
+    const msgs = [];
+    if (ok.length < files.length) msgs.push(`${files.length - ok.length} file(s) skipped: only photos and videos.`);
+    const big = ok.filter((f) => f.size > WARN_MB * 1e6);
+    if (big.length) msgs.push(`${big.map((f) => f.name).join(", ")} ${big.length > 1 ? "are" : "is"} over ${WARN_MB} MB and may be slow` +
+      (TUNNEL ? " or rejected by the tunnel (100 MB limit). Shorter clips work better." : ". Shorter clips work better."));
+    warn.textContent = msgs.join(" ");
+    warn.classList.toggle("hidden", !msgs.length);
+    if (!ok.length) return;
+
+    room.name = roomName(room);
+    room.locked = true;
+    const nameInput = $(".room-name", room.el);
+    nameInput.value = room.name;
+    nameInput.readOnly = true;
+
+    const batch = ok.map((f) => {
+      const name = uniqueName(f.name || "upload");
+      const file = name === f.name ? f : new File([f], name, { type: f.type, lastModified: f.lastModified });
+      const row = { name, file, kind: /^video\//.test(f.type) || /\.(mp4|mov|m4v)$/i.test(name) ? "video" : "image",
+                    phase: "queued", pct: 0, server: null, err: "" };
+      room.files.push(row);
+      return row;
+    });
+    queue.push({ room, rows: batch });
+    render(room);
+    pump();
+  }
+
+  // ---------- uploads: one at a time, so every upload after the first carries the run_id ----------
+  async function pump() {
+    if (uploading || !queue.length) return;
+    uploading = true;
+    const job = queue.shift();
+    job.rows.forEach((r) => { r.phase = "uploading"; r.pct = 0; r.err = ""; });
+    render(job.room);
+    try {
+      const res = await api.upload(job.rows.map((r) => r.file), job.room.name, runId, (p) => {
+        job.rows.forEach((r) => (r.pct = p));
+        render(job.room);
+      });
+      runId = res.run_id;
+      window.PIU.rememberRun(runId);
+      const skipped = new Set((res.skipped || []).map((s) => (typeof s === "string" ? s : s.name)));
+      job.rows.forEach((r) => {
+        r.phase = skipped.has(r.name) ? "failed" : "sent";
+        if (r.phase === "failed") r.err = "server skipped this file";
+      });
+      if (!firstSentAt) firstSentAt = Date.now();
+      $("#footer").classList.remove("hidden");
+      $("#new-move").classList.remove("hidden");
+      startPolling();
+    } catch (e) {
+      job.rows.forEach((r) => { r.phase = "failed"; r.err = e.message; });
+    }
+    render(job.room);
+    uploading = false;
+    pump();
+  }
+
+  function retry(room, row) {
+    row.phase = "queued";
+    queue.push({ room, rows: [row] });
+    render(room);
+    pump();
+  }
+
+  // ---------- progress ----------
+  function rowState(r) {
+    if (r.phase === "queued") return { text: "waiting", cls: "" , bar: 0 };
+    if (r.phase === "uploading") return { text: `uploading ${Math.round(r.pct * 100)}%`, cls: "", bar: r.pct };
+    if (r.phase === "failed") return { text: r.err || "failed", cls: "failed" };
+    const s = r.server || {};
+    if (s.perceive === "done") return { text: `done · ${s.items ?? "?"} items${s.seconds != null ? ` · ${Math.round(s.seconds)} s` : ""}`, cls: "done" };
+    if (s.perceive === "failed") return { text: "couldn't read this file" + (s.error ? `: ${s.error.slice(0, 80)}` : ""), cls: "failed" };
+    if (s.perceive === "running") return { text: r.kind === "video" ? "watching and listening…" : "looking…", cls: "", busy: true };
+    if (s.intake === "done") return { text: "received, queued", cls: "", busy: true };
+    return { text: "received", cls: "", busy: true };
+  }
+
+  function render(room) {
+    const ul = $(".files", room.el);
+    ul.innerHTML = "";
+    room.files.forEach((r) => {
+      const st = rowState(r);
+      const li = document.createElement("li");
+      li.innerHTML = `<span aria-hidden="true">${r.kind === "video" ? "🎥" : "📷"}</span>
+        <span class="name"></span><span class="state ${st.cls}"></span>`;
+      $(".name", li).textContent = r.name;
+      $(".state", li).textContent = st.text;
+      if (r.phase === "failed") {
+        const b = document.createElement("button");
+        b.className = "btn link"; b.type = "button"; b.textContent = "Retry";
+        b.style.gridColumn = "2 / 4"; b.style.justifySelf = "end";
+        b.onclick = () => retry(room, r);
+        li.appendChild(b);
+      } else if (r.phase === "uploading" || st.busy) {
+        const bar = document.createElement("div");
+        bar.className = "bar" + (st.busy ? " busy" : "");
+        bar.innerHTML = "<i></i>";
+        if (!st.busy) bar.firstChild.style.width = Math.round((st.bar || 0) * 100) + "%";
+        li.appendChild(bar);
+      }
+      ul.appendChild(li);
+    });
+  }
+
+  function allFinished(run) {
+    const rows = rooms.flatMap((r) => r.files);
+    if (queue.length || uploading) return false;
+    const pending = rows.some((r) => r.phase === "sent" && !["done", "failed"].includes((r.server || {}).perceive));
+    const stage = run && run.status && run.status.stage;
+    return !pending && (stage === "done" || stage === "failed");
+  }
+
+  async function poll() {
+    pollTimer = null;
+    if (!runId || document.hidden) return;
+    try {
+      const run = await api.getRun(runId);
+      lastRun = run;
+      const files = (run.status && run.status.files) || {};
+      rooms.forEach((room) => {
+        room.files.forEach((r) => { if (r.phase === "sent") r.server = files[r.name] || r.server; });
+        render(room);
+      });
+      updateFooter(run);
+      if (allFinished(run)) return; // stop until the next upload
+    } catch (e) {
+      $("#found").innerHTML = `<b>Can't reach the server</b><span class="error"></span>`;
+      $("#found .error").textContent = e.message;
+    }
+    pollTimer = setTimeout(poll, 1000);
+  }
+
+  function startPolling() {
+    if (!pollTimer) pollTimer = setTimeout(poll, 300);
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && runId) startPolling(); });
+
+  function updateFooter(run) {
+    const btn = $("#review-btn");
+    const inv = run.inventory;
+    const done = allFinished(run);
+    btn.href = link("review.html", { run_id: runId });
+    if (!inv) {
+      $("#found").innerHTML = "<b>Looking…</b>Items appear as each file finishes";
+      btn.setAttribute("aria-disabled", "true");
+      btn.textContent = "Review →";
+      btn.classList.remove("primary");
+      return;
+    }
+    const n = inv.totals.item_count;
+    const nRooms = inv.rooms.length;
+    btn.removeAttribute("aria-disabled");
+    btn.textContent = `Review ${n} items →`;
+    const slow = firstSentAt && Date.now() - firstSentAt > 60000;
+    btn.classList.toggle("primary", done || slow);
+    const failed = Object.values(run.status.files || {}).filter((f) => f.perceive === "failed").length;
+    const head = done ? `${n} items in ${nRooms} room${nRooms > 1 ? "s" : ""}` : `${n} items found so far`;
+    const sub = done ? (failed ? `${failed} file(s) couldn't be read` : "Ready to check")
+                     : slow ? "Still working; you can review what's ready" : "Still looking…";
+    $("#found").innerHTML = "<b></b><span></span>";
+    $("#found b").textContent = head;
+    $("#found span").textContent = sub;
+  }
+
+  // ---------- QR code for opening this page on a phone (laptop only) ----------
+  function setupQr() {
+    if (!matchMedia("(min-width: 900px) and (hover: hover)").matches) return;
+    const url = location.href;
+    $("#qr-url").textContent = url;
+    if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+      $("#qr").outerHTML = `<p class="small">This page is open on <b>localhost</b>, which a phone can't reach. Open it with the laptop's LAN address or the tunnel address to get a QR code.</p>`;
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    s.onload = () => new window.QRCode($("#qr"), { text: url, width: 320, height: 320, correctLevel: window.QRCode.CorrectLevel.M });
+    s.onerror = () => ($("#qr").outerHTML = "<p class='small muted'>QR library didn't load (offline?). Type the address below on the phone.</p>");
+    document.head.appendChild(s);
+  }
+
+  $("#add-room").addEventListener("click", () => {
+    const r = addRoom();
+    const input = $(".room-name", r.el);
+    input.focus();
+    input.select();
+  });
+  $("#new-move").addEventListener("click", () => {
+    if (!confirm("Start a new move? This page forgets the current one (the server keeps it).")) return;
+    location.href = link("capture.html");
+  });
+
+  addRoom();
+  setupQr();
+})();
+</script>
+</body>
+</html>

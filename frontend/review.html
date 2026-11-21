@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<title>Pack It Up · Check the list</title>
+<link rel="stylesheet" href="ui/style.css">
+</head>
+<body>
+<div id="mock-banner" class="mock-banner hidden">Mock mode: invented items, no server.</div>
+<div class="totals" id="totals" aria-live="polite">
+  <div class="inner">
+    <div><span class="n" id="t-items">–</span><span class="u">items</span></div>
+    <div><span class="n" id="t-vol">–</span><span class="u">cu ft</span></div>
+    <div><span class="n" id="t-wt">–</span><span class="u">lb</span></div>
+    <div><span class="n" id="t-boxes">–</span><span class="u">boxes</span></div>
+  </div>
+</div>
+<main>
+  <p class="steps">1 Film · <b>2 Check</b> · 3 Pack</p>
+  <h1>Check the list</h1>
+  <p class="muted" id="sub">Loading…</p>
+  <p class="error hidden" id="err"></p>
+
+  <section id="questions"></section>
+  <section id="rooms"></section>
+  <p class="small"><a id="add-more" class="btn link" href="capture.html">+ Film another room</a></p>
+</main>
+
+<div class="footer">
+  <div class="inner">
+    <div class="grow" id="handoff-note"><b>Next: the truck</b>Edits carry over</div>
+    <a class="btn primary" id="handoff" href="#" aria-disabled="true">Plan the truck load →</a>
+  </div>
+</div>
+
+<script src="mock/mock-api.js"></script>
+<script src="ui/api.js"></script>
+<script>
+(function () {
+  "use strict";
+  const { api, link, MOCK, params } = window.PIU;
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (n, d = 0) => (n == null ? "–" : Number(n).toLocaleString(undefined, { maximumFractionDigits: d }));
+  const mmss = (t) => (t == null ? "" : `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, "0")}`);
+  const MAX_QUESTIONS = 5;
+  const OUT = new Set(["sell", "donate", "trash", "stays"]);
+  const SIZE_SRC = { catalog: "catalog", vision_estimate: "estimate", speech: "you said", category_default: "default" };
+  const WT_SRC = { catalog: "catalog", vision_estimate: "estimate", density: "by material", speech: "you said" };
+  const ANSWERED_BY = { decisions_api: "Answered by the Decisions API", speech: "You said", user: "You answered" };
+
+  if (MOCK) $("#mock-banner").classList.remove("hidden");
+
+  const runId = params.get("run_id") || (MOCK ? window.PIU_MOCK.DEMO_RUN : window.PIU.lastRun());
+  let inv = null;
+  let partial = false;
+  const pendingQty = {};    // itemId -> qty shown while the PATCH is debounced or in flight
+  const qtyTimers = {};
+  const rowState = {};      // itemId -> "saving" | {error, retry}
+  const reopened = new Set();
+  const busyQ = new Set();
+  let inFlight = 0;
+  let pollTimer = null;
+  let lastTotals = {};
+
+  $("#add-more").href = link("capture.html");
+
+  if (!runId) {
+    $("#sub").textContent = "No move yet.";
+    $("#rooms").innerHTML = `<p><a class="btn primary" href="${esc(link("capture.html"))}">Film your rooms first</a></p>`;
+    return;
+  }
+  window.PIU.rememberRun(runId);
+  $("#handoff").href = link("index.html", { run_id: runId });
+
+  // ---------- data ----------
+  async function load() {
+    pollTimer = null;
+    try {
+      const run = await api.getRun(runId);
+      if (!run.inventory) {
+        $("#sub").textContent = "Still looking at your photos and clips…";
+        partial = true;
+      } else if (!inFlight) {
+        partial = !!run.partial;
+        setInventory(run.inventory);
+      }
+      $("#err").classList.add("hidden");
+    } catch (e) {
+      showError(e.status === 404 ? `No move called ${runId} on this server.` : `Can't reach the server: ${e.message}`);
+      if (e.status === 404) return;
+    }
+    if (partial && !document.hidden) pollTimer = setTimeout(load, 2000);
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && partial && !pollTimer) load(); });
+
+  function setInventory(next) {
+    inv = next;
+    render();
+  }
+
+  function showError(msg) {
+    const el = $("#err");
+    el.textContent = msg;
+    el.classList.remove("hidden");
+  }
+
+  async function send(itemId, changes) {
+    rowState[itemId] = "saving";
+    renderItem(itemId);
+    inFlight++;
+    try {
+      const next = await api.patchItem(runId, itemId, changes);
+      delete rowState[itemId];
+      if ("quantity" in changes && pendingQty[itemId] === changes.quantity) delete pendingQty[itemId];
+      inFlight--;
+      setInventory(next);
+    } catch (e) {
+      inFlight--;
+      delete pendingQty[itemId];
+      rowState[itemId] = { error: e.message, retry: () => send(itemId, changes) };
+      render();
+    }
+  }
+
+  function stepQty(itemId, delta) {
+    const it = findItem(itemId);
+    if (!it) return;
+    const cur = pendingQty[itemId] ?? it.quantity;
+    const next = Math.max(0, cur + delta);
+    if (next === cur) return;
+    pendingQty[itemId] = next;
+    renderItem(itemId);
+    clearTimeout(qtyTimers[itemId]);
+    qtyTimers[itemId] = setTimeout(() => send(itemId, { quantity: next }), 400);
+  }
+
+  function setDisposition(itemId, d) {
+    const it = findItem(itemId);
+    if (!it || it.disposition === d) return;
+    it.disposition = d; // optimistic; the server's reply replaces it
+    renderItem(itemId);
+    send(itemId, { disposition: d });
+  }
+
+  async function answer(q, value) {
+    busyQ.add(q.id);
+    renderQuestions();
+    inFlight++;
+    try {
+      const next = await api.answer(runId, q.id, value);
+      reopened.delete(q.id);
+      busyQ.delete(q.id);
+      inFlight--;
+      setInventory(next);
+    } catch (e) {
+      busyQ.delete(q.id);
+      inFlight--;
+      renderQuestions();
+      showError(`Couldn't save that answer: ${e.message}`);
+    }
+  }
+
+  // ---------- lookups ----------
+  const allItems = () => (inv ? inv.rooms.flatMap((r) => r.items) : []);
+  const findItem = (id) => allItems().find((i) => i.id === id);
+  const findContainer = (id) => (inv ? inv.rooms.flatMap((r) => r.containers || []).find((c) => c.id === id) : null);
+  const boxCount = (c) => Object.values(c.est_boxes || {}).reduce((a, n) => a + n, 0);
+
+  function thumb(ev, label, size = 160) {
+    const ph = window.PIU.placeholder(label, ev && !ev.sha256 ? "audio" : ev && ev.kind);
+    const src = api.cropUrl(runId, ev, size, label);
+    return `<img class="thumb" loading="lazy" alt="" src="${esc(src)}" onerror="this.onerror=null;this.src='${ph}'">`;
+  }
+
+  // ---------- render ----------
+  function render() {
+    if (!inv) return;
+    renderTotals();
+    renderQuestions();
+    renderRooms();
+    renderFooter();
+    const nRooms = inv.rooms.length;
+    $("#sub").textContent = partial
+      ? "Still working on some files; more items may appear."
+      : `${nRooms} room${nRooms > 1 ? "s" : ""}. Fix anything wrong, then plan the truck.`;
+  }
+
+  function renderTotals() {
+    const t = inv.totals || {};
+    const boxes = inv.rooms.flatMap((r) => r.containers || []).reduce((a, c) => a + boxCount(c), 0);
+    const vals = { "t-items": fmt(t.item_count), "t-vol": fmt(t.volume_cuft), "t-wt": fmt(t.weight_lb), "t-boxes": boxes ? "+" + boxes : "0" };
+    Object.entries(vals).forEach(([id, v]) => {
+      const el = document.getElementById(id);
+      if (lastTotals[id] != null && lastTotals[id] !== v) {
+        el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+      }
+      el.textContent = v;
+      lastTotals[id] = v;
+    });
+  }
+
+  function questionList() {
+    const qs = inv.questions || [];
+    const open = qs.filter((q) => (q.status || "open") === "open" || reopened.has(q.id));
+    const answered = qs.filter((q) => q.status === "answered" && !reopened.has(q.id));
+    return { open: open.slice(0, MAX_QUESTIONS), more: Math.max(0, open.length - MAX_QUESTIONS), answered };
+  }
+
+  function questionEvidence(q) {
+    if (q.evidence && (q.evidence.sha256 || q.evidence.box_2d)) return q.evidence;
+    const it = q.item_id && findItem(q.item_id);
+    const c = q.container_id && findContainer(q.container_id);
+    return (it && it.evidence) || (c && c.evidence) || q.evidence;
+  }
+
+  function renderQuestions() {
+    const host = $("#questions");
+    const { open, more, answered } = questionList();
+    if (!open.length && !answered.length) { host.innerHTML = ""; return; }
+    let html = open.length ? `<h2>${open.length === 1 ? "One question" : `${open.length} quick questions`}</h2>` : "";
+    open.forEach((q) => {
+      const busy = busyQ.has(q.id);
+      html += `<div class="card q" data-q="${esc(q.id)}">
+        <div class="row">${thumb(questionEvidence(q), q.text)}
+          <div><div class="kind">${esc((q.kind || "").replace(/_/g, " "))}</div>
+          <div class="text">${esc(q.text)}</div></div></div>
+        <div class="opts">${(q.options || []).map((o) =>
+          `<button class="btn" type="button" data-opt="${esc(o)}" ${busy ? "disabled" : ""}${q.answer === o ? ' aria-pressed="true"' : ""}>${esc(o)}</button>`).join("")}</div>
+      </div>`;
+    });
+    if (more) html += `<p class="small muted">${more} smaller question${more > 1 ? "s" : ""} skipped; the guesses are used.</p>`;
+    answered.forEach((q) => {
+      const who = ANSWERED_BY[q.answered_by] || "Answered";
+      const said = q.answered_by === "speech" && q.quote ? `: <q>${esc(q.quote)}</q>` : `: <b>${esc(q.answer)}</b>`;
+      html += `<div class="card q answered" data-q="${esc(q.id)}">
+        <div class="text">${esc(q.text)}</div>
+        <div class="small muted">${esc(who)}${said}
+        <button class="btn link" type="button" data-reopen>Change</button></div></div>`;
+    });
+    host.innerHTML = html;
+    host.querySelectorAll("[data-q]").forEach((card) => {
+      const q = (inv.questions || []).find((x) => x.id === card.dataset.q);
+      card.querySelectorAll("[data-opt]").forEach((b) => b.addEventListener("click", () => answer(q, b.dataset.opt)));
+      const re = card.querySelector("[data-reopen]");
+      if (re) re.addEventListener("click", () => { reopened.add(q.id); renderQuestions(); });
+    });
+  }
+
+  function itemHtml(it) {
+    const qty = pendingQty[it.id] ?? it.quantity;
+    const sz = it.size || {};
+    const d = sz.dims_in || [];
+    const dims = d.length === 3 ? `${fmt(d[0])} × ${fmt(d[1])} × ${fmt(d[2])} in` : "size unknown";
+    const badges = [];
+    if (it.heard_only) badges.push(`<span class="badge heard">🎙️ heard, not filmed</span>`);
+    if (it.partially_visible) badges.push(`<span class="badge">partly hidden</span>`);
+    if (it.stack_count > 1) badges.push(`<span class="badge">stack of ${esc(it.stack_count)}</span>`);
+    if (it.fragile) badges.push(`<span class="badge">fragile</span>`);
+    if (it.two_person) badges.push(`<span class="badge">two-person lift</span>`);
+    if (it.must_stay_upright) badges.push(`<span class="badge">keep upright</span>`);
+    if (it.disassemble) badges.push(`<span class="badge">take apart</span>`);
+    const said = (it.set_by_speech || []).map((s) =>
+      `<div class="said">You said <q>${esc(s.quote)}</q> <span class="muted">· ${esc(mmss(s.timestamp_s))} in ${esc(s.source)}</span></div>`).join("");
+    const disp = it.disposition || "undecided";
+    const segs = ["keep", "sell", "donate", "trash"];
+    if (!segs.includes(disp) && disp !== "undecided") segs.push(disp);
+    const seg = segs.map((s) => `<button type="button" data-disp="${s}" aria-pressed="${disp === s}"
+        class="${disp === "undecided" && s === "keep" ? "implied" : ""}">${s[0].toUpperCase() + s.slice(1)}</button>`).join("");
+    const st = rowState[it.id];
+    const status = st === "saving" ? `<div class="saving">Saving…</div>`
+      : st && st.error ? `<div class="saving error"><button class="btn link" type="button" data-retry>Didn't save (${esc(st.error)}). Tap to retry</button></div>` : "";
+    return `<div class="card item${OUT.has(disp) ? " out" : ""}" data-item="${esc(it.id)}">
+      ${thumb(it.evidence, it.label)}
+      <div>
+        <div class="label">${esc(it.label)}</div>
+        <div class="meta"><b>${esc(dims)}</b> · ${esc(SIZE_SRC[sz.size_source] || sz.size_source || "")}</div>
+        <div class="meta"><b>${fmt(sz.weight_lb_each)} lb</b>${qty > 1 ? " each" : ""} · ${esc(WT_SRC[sz.weight_source] || sz.weight_source || "")}
+          · ${fmt(sz.volume_cuft_total, 1)} cu ft</div>
+        ${badges.length ? `<div class="badges">${badges.join("")}</div>` : ""}
+      </div>
+      ${said}
+      <div class="controls">
+        <div class="stepper" role="group" aria-label="Quantity">
+          <button type="button" data-step="-1" aria-label="One fewer">−</button>
+          <output>${esc(qty)}</output>
+          <button type="button" data-step="1" aria-label="One more">+</button>
+        </div>
+        <div class="seg" role="group" aria-label="What happens to it">${seg}</div>
+      </div>
+      ${status}
+    </div>`;
+  }
+
+  function bindItem(el) {
+    const id = el.dataset.item;
+    el.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => stepQty(id, Number(b.dataset.step))));
+    el.querySelectorAll("[data-disp]").forEach((b) => b.addEventListener("click", () => setDisposition(id, b.dataset.disp)));
+    const r = el.querySelector("[data-retry]");
+    if (r) r.addEventListener("click", () => rowState[id].retry());
+  }
+
+  function renderItem(id) {
+    const el = document.querySelector(`[data-item="${CSS.escape(id)}"]`);
+    const it = findItem(id);
+    if (!el || !it) return;
+    const tmp = document.createElement("div");
+    tmp.innerHTML = itemHtml(it);
+    const fresh = tmp.firstElementChild;
+    // keep the loaded thumbnail instead of re-fetching it
+    fresh.replaceChild(el.querySelector(".thumb"), fresh.querySelector(".thumb"));
+    el.replaceWith(fresh);
+    bindItem(fresh);
+  }
+
+  function renderRooms() {
+    const host = $("#rooms");
+    let html = "";
+    inv.rooms.forEach((room) => {
+      const items = [...room.items].sort((a, b) =>
+        (OUT.has(a.disposition) - OUT.has(b.disposition)) || ((b.size?.volume_cuft_total || 0) - (a.size?.volume_cuft_total || 0)));
+      const t = room.totals || {};
+      html += `<div class="room-h"><h2>${esc(room.room.name)}</h2><span>${fmt(t.item_count)} items · ${fmt(t.volume_cuft)} cu ft</span></div>`;
+      html += items.map(itemHtml).join("") || `<p class="muted">Nothing found yet.</p>`;
+      const conts = room.containers || [];
+      if (conts.length) {
+        html += `<div class="card containers"><b>Packed into boxes</b><ul style="padding-left:18px;margin:6px 0 0">` +
+          conts.map((c) => {
+            const n = boxCount(c);
+            const what = c.items ? c.items.join(", ") : c.contents;
+            const full = c.fullness === "not_visible" ? "contents not visible" : c.fullness;
+            return `<li>${esc(c.label)}: ${esc(what)}, ${esc(full)}${n ? ` · <b>about ${n} box${n > 1 ? "es" : ""}</b>` : ""}</li>`;
+          }).join("") + `</ul></div>`;
+      }
+      const lo = room.left_out || {};
+      const kinds = Object.entries(lo.personal_belonging_kinds || {}).sort((a, b) => b[1] - a[1])
+        .map(([k, n]) => `${n} ${k}${n > 1 && !/s$/.test(k) ? "s" : ""}`).join(", ");
+      if (lo.fixtures || lo.personal_belongings) {
+        html += `<p class="leftout">Left out: ${fmt(lo.fixtures)} fixture${lo.fixtures === 1 ? "" : "s"}` +
+          (room.fixtures && room.fixtures.length ? ` (${esc(room.fixtures.map((f) => f.label).slice(0, 3).join(", "))}${room.fixtures.length > 3 ? "…" : ""})` : "") +
+          (lo.personal_belongings ? `, ${fmt(lo.personal_belongings)} personal belongings${kinds ? ` (${esc(kinds)})` : ""}` : "") + `.</p>`;
+      }
+    });
+    host.innerHTML = html;
+    host.querySelectorAll("[data-item]").forEach(bindItem);
+  }
+
+  function renderFooter() {
+    const t = inv.totals || {};
+    const open = (inv.questions || []).filter((q) => (q.status || "open") === "open").length;
+    const btn = $("#handoff");
+    btn.removeAttribute("aria-disabled");
+    $("#handoff-note").innerHTML = `<b>${fmt(t.item_count)} items · ${fmt(t.volume_cuft)} cu ft</b>` +
+      (open ? `${open} question${open > 1 ? "s" : ""} open; guesses used` : partial ? "Some files still processing" : "Edits carry over to the plan");
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
