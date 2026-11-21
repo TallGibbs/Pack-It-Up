@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pack It Up · Models</title>
+<link rel="stylesheet" href="ui/style.css">
+<style>
+  /* Page-only styles. Shared tokens (colours, dark mode) come from ui/style.css. */
+  main.wide { max-width: 980px; }
+  .bar-top { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0 2px; }
+  .bar-top select { font: inherit; font-size: 14px; min-height: 40px; padding: 6px 10px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink); max-width: 100%; }
+  .bar-top .grow { flex: 1; }
+  .live { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
+  .live.off i { background: var(--line); }
+
+  .jobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 12px 0; }
+  .job { margin: 0; border-top: 4px solid var(--c, var(--accent)); display: flex; flex-direction: column; gap: 6px; }
+  .job.idle { opacity: .55; }
+  .job .role { font-size: 22px; font-weight: 700; line-height: 1.1; }
+  .job .model { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  .job .does { font-size: 13px; color: var(--muted); }
+  .job dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 4px 0 0; font-size: 13px; }
+  .job dt { color: var(--muted); }
+  .job dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 8px 0 4px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--muted); }
+
+  .tl { overflow-x: auto; }
+  .tl svg { display: block; min-width: 560px; width: 100%; height: auto; }
+  .tl text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .tl .lane-name { fill: var(--ink); font-size: 12px; font-weight: 600; }
+  .tl .grid { stroke: var(--line); stroke-width: 1; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 18px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+
+  table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.t th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.t td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.t td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.t tr:last-child td { border-bottom: 0; }
+  .scroll { overflow-x: auto; }
+
+  .conf { display: inline-grid; grid-template-columns: 64px auto; gap: 6px; align-items: center; white-space: nowrap; }
+  .conf .meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .conf .meter i { display: block; height: 100%; border-radius: 3px; }
+  .who { font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+  .who.api { border-color: var(--ok); color: var(--ok); }
+  .who.user { border-color: var(--accent); color: var(--accent); }
+  .who.wait { color: var(--muted); }
+  .who.changed { border-color: var(--warn); color: var(--warn); }
+  .qtext { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+</style>
+</head>
+<body>
+<main class="wide">
+  <h1>Which model did what</h1>
+  <p class="muted" id="sub">Every model call this app made, read from the run's call log.</p>
+
+  <div class="bar-top">
+    <label class="sr-only" for="run">Run</label>
+    <select id="run"><option value="">Loading runs…</option></select>
+    <span class="grow"></span>
+    <span class="live off" id="live" title="Refreshes every few seconds while this tab is open"><i></i><span>Live</span></span>
+    <a class="btn link" id="to-review" href="#">Check list →</a>
+  </div>
+  <p class="error hidden" id="err"></p>
+
+  <section id="jobs" class="jobs" aria-live="polite"></section>
+
+  <section id="timeline-sec">
+    <h2>Calls over time</h2>
+    <p class="small muted" id="tl-note"></p>
+    <div class="card tl" id="timeline"></div>
+  </section>
+
+  <section id="decisions-sec">
+    <h2>Decisions API answers</h2>
+    <div class="stats" id="d-stats"></div>
+    <div class="card scroll" id="decisions"></div>
+  </section>
+
+  <section id="perception-sec">
+    <h2>What the perceive model found in each file</h2>
+    <div class="card scroll" id="perception"></div>
+  </section>
+
+  <p class="small muted" style="margin:24px 0 40px">
+    Source: <code>runs/&lt;run_id&gt;/calls.jsonl</code>, <code>questions.json</code> and the perception files,
+    copied into <code>.cache/analysis.db</code>. <b>Cached</b> calls replay the answer to an identical earlier call
+    (same file, prompt and model) and take no time. Model IDs come from <code>backend/llm/models.toml</code>.
+  </p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  const params = new URLSearchParams(location.search);
+  const API = (params.get("api") || "").replace(/\/+$/, "") || location.origin;
+  const ALL = "__all__";
+  // One colour per job, from the shared theme tokens so dark mode follows.
+  const COLORS = { perceive: "var(--accent)", perceive_fallback: "var(--accent)", decide: "var(--ok)",
+    decide_fallback: "var(--ok)", transcribe: "var(--warn)", plan: "#8250df", baseline: "var(--muted)",
+    image: "#bf3989", hello: "var(--muted)" };
+  const KIND = { same_item: "Same item?", count_check: "How many?", size_check: "Which size?", fixture_check: "Built in?",
+    fullness: "How full?", hidden_contents: "What's inside?", identify_item: "What is it?", include_class: "Moving these?",
+    unfilmed_area: "Anything not filmed?" };
+  const color = (job) => COLORS[job] || "var(--muted)";
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (n, d = 0) => n == null ? "–" : Number(n).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
+  const pct = (x) => x == null ? "–" : Math.round(x * 100) + "%";
+  const $ = (id) => document.getElementById(id);
+
+  function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  async function get(path) {
+    const res = await fetch(API + path, { cache: "no-store" });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try { detail = (await res.json()).detail || detail; } catch (e) { /* not json */ }
+      throw new Error(detail);
+    }
+    return res.json();
+  }
+
+  function link(page, extra) {
+    const q = new URLSearchParams();
+    if (params.get("api")) q.set("api", params.get("api"));
+    Object.entries(extra || {}).forEach(([k, v]) => v && q.set(k, v));
+    const s = q.toString();
+    return page + (s ? "?" + s : "");
+  }
+
+  // ---------- job cards ----------
+  function jobsHtml(jobs, configured) {
+    const seen = new Set(jobs.map((j) => j.job));
+    const cards = jobs.filter((j) => j.job !== "hello").map((j) => `
+      <div class="card job" style="--c:${color(j.job)}">
+        <div class="role">${esc(j.role)}</div>
+        <div class="model">${esc(j.model)}</div>
+        <div class="does">${esc(j.does)}</div>
+        <dl>
+          <dt>Calls</dt><dd>${fmt(j.calls)}${j.cached ? ` <span class="muted">(${fmt(j.cached)} cached)</span>` : ""}</dd>
+          <dt>Avg time</dt><dd>${j.avg_latency_s == null ? "–" : fmt(j.avg_latency_s, 1) + " s"}</dd>
+          <dt>Tokens in / out</dt><dd>${fmt(j.tokens_in)} / ${fmt(j.tokens_out)}</dd>
+          ${j.failed_attempts ? `<dt>Retries</dt><dd>${fmt(j.failed_attempts)}</dd>` : ""}
+        </dl>
+      </div>`);
+    // Jobs set up in models.toml but not called here: shown dimmed so the full line-up is visible.
+    const idle = Object.entries(configured || {}).filter(([job]) => !seen.has(job) && job !== "hello" && !job.endsWith("_fallback"))
+      .map(([job, c]) => `
+      <div class="card job idle" style="--c:${color(job)}">
+        <div class="role">${esc(c.role)}</div>
+        <div class="model">${esc(c.model)}</div>
+        <div class="does">${esc(c.does)}${c.does ? ". " : ""}<i>Set up; not called ${current === ALL ? "yet" : "in this run"}.</i></div>
+      </div>`);
+    return cards.concat(idle).join("") || `<p class="empty">No model calls logged yet.</p>`;
+  }
+
+  // ---------- timeline: one lane per job, bars from start to end ----------
+  function timelineSvg(tl) {
+    const bars = tl.bars.filter((b) => b.job !== "hello");
+    if (!bars.length) return `<p class="empty">No calls yet.</p>`;
+    const lanes = [...new Set(bars.map((b) => b.job))];
+    const W = 940, left = 92, right = 16, laneH = 34, top = 8, axis = 22;
+    const H = top + lanes.length * laneH + axis;
+    const span = Math.max(tl.span_s, 1);
+    const x = (s) => left + (s / span) * (W - left - right);
+    const step = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find((s) => span / s <= 8) || 1200;
+    let g = "";
+    for (let s = 0; s <= span + 0.001; s += step) {
+      g += `<line class="grid" x1="${x(s)}" x2="${x(s)}" y1="${top}" y2="${H - axis}"/>` +
+           `<text x="${x(s)}" y="${H - 6}" text-anchor="middle">${s >= 60 ? Math.floor(s / 60) + ":" + String(Math.round(s % 60)).padStart(2, "0") : s + " s"}</text>`;
+    }
+    lanes.forEach((job, i) => {
+      const y = top + i * laneH;
+      g += `<text class="lane-name" x="0" y="${y + laneH / 2 + 4}">${esc(job)}</text>`;
+      // Calls in one lane overlap when they run in parallel; stack them in thin rows so each is visible.
+      const mine = bars.filter((b) => b.job === job).sort((a, b) => a.start - b.start);
+      const rowEnds = [];
+      const placed = mine.map((b) => {
+        let r = rowEnds.findIndex((end) => end <= b.start);
+        if (r < 0) { r = rowEnds.length; rowEnds.push(0); }
+        rowEnds[r] = Math.max(b.end, b.start + span * 0.004);
+        return [b, r];
+      });
+      const rows = Math.max(rowEnds.length, 1), h = Math.max((laneH - 8) / rows, 3);
+      placed.forEach(([b, r]) => {
+        const bx = x(b.start), bw = Math.max(x(b.end) - bx, 3), by = y + 4 + r * h;
+        const tip = `${b.job} · ${b.model}\n${b.file || ""}\n${b.cache === "hit" ? "cached" : fmt(b.latency_s, 1) + " s"}${b.valid ? "" : " · failed attempt"}`;
+        const style = b.cache === "hit" ? `fill="none" stroke="${color(job)}" stroke-width="1.2"` : `fill="${color(job)}"`;
+        g += `<rect x="${bx}" y="${by}" width="${bw}" height="${Math.max(h - 1, 2)}" rx="2" ${style}${b.valid ? "" : ' stroke="var(--bad)" stroke-width="2"'}><title>${esc(tip)}</title></rect>`;
+      });
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Model calls over time, one row per job">${g}</svg>
+      <div class="legend">${lanes.map((j) => `<span><i style="background:${color(j)}"></i>${esc(j)}</span>`).join("")}
+        <span><i style="border:1.2px solid var(--muted)"></i>cached</span></div>`;
+  }
+
+  // ---------- Decisions API answers ----------
+  function statsHtml(d) {
+    const tiles = [
+      [fmt(d.questions), "questions raised"],
+      [fmt(d.by_decisions_api), "answered by the Decisions API"],
+      [fmt(d.applied_automatically), "applied without asking you"],
+      [pct(d.mean_confidence), "mean confidence"],
+      [d.agreement == null ? "–" : pct(d.agreement), `you agreed (${fmt(d.user_checked)} checked)`],
+    ];
+    if (d.by_fallback) tiles.splice(2, 0, [fmt(d.by_fallback), "answered by the fallback model"]);
+    return tiles.map(([b, s]) => `<div class="stat"><b>${b}</b><span>${esc(s)}</span></div>`).join("");
+  }
+
+  function confHtml(c) {
+    if (c == null) return `<span class="muted">–</span>`;
+    const col = c >= 0.9 ? "var(--ok)" : c >= 0.7 ? "var(--accent)" : "var(--warn)";
+    return `<span class="conf"><span class="meter"><i style="width:${Math.round(c * 100)}%;background:${col}"></i></span>${pct(c)}</span>`;
+  }
+
+  function whoHtml(q) {
+    if (q.user_changed) return `<span class="who changed">you changed it</span>`;
+    if (q.answered_by === "user") return `<span class="who user">you confirmed</span>`;
+    if (q.answered_by === "decisions_api") return `<span class="who api">applied${q.low_confidence ? " (best guess)" : ""}</span>`;
+    if (q.answered_by === "generate_json_fallback") return `<span class="who api">fallback model</span>`;
+    return `<span class="who wait">waiting for you</span>`;
+  }
+
+  function decisionsHtml(rows) {
+    if (!rows.length) return `<p class="empty">No questions in this run.</p>`;
+    return `<table class="t"><thead><tr><th>Question</th><th>Item</th><th>Model's answer</th><th>Confidence</th><th>Final</th></tr></thead><tbody>` +
+      rows.map((q) => `<tr>
+        <td><b>${esc(KIND[q.kind] || q.kind)}</b><div class="qtext">${esc((q.text || "").slice(0, 120))}${(q.text || "").length > 120 ? "…" : ""}</div></td>
+        <td>${esc(q.item_label || q.refers_to || "")}</td>
+        <td>${q.model_answer_label != null ? esc(q.model_answer_label) : `<span class="muted">–</span>`}
+            ${q.via === "generate_json_fallback" ? `<div class="qtext">fallback model</div>` : ""}</td>
+        <td>${confHtml(q.model_confidence)}</td>
+        <td>${q.final_answer_label != null ? esc(q.final_answer_label) + "<br>" : ""}${whoHtml(q)}</td>
+      </tr>`).join("") + `</tbody></table>`;
+  }
+
+  function perceptionHtml(rows) {
+    if (!rows.length) return `<p class="empty">No perception files.</p>`;
+    return `<table class="t"><thead><tr><th>File</th><th>Room</th><th>Model · prompt</th><th class="n">Item lines</th><th class="n">Units</th><th class="n">Containers</th><th class="n">Spoken facts</th><th class="n">Seconds</th></tr></thead><tbody>` +
+      rows.map((p) => `<tr>
+        <td style="max-width:220px;overflow-wrap:anywhere">${esc(p.file)}</td><td>${esc(p.room_id || "")}</td>
+        <td>${esc((p.model || "").replace(/^[a-z]+:/, ""))}<div class="qtext">${esc(p.prompt_version || "")}</div></td>
+        <td class="n">${fmt(p.items)}</td><td class="n">${fmt(p.units)}</td><td class="n">${fmt(p.containers)}</td>
+        <td class="n">${fmt(p.spoken_facts)}</td><td class="n">${p.seconds == null ? "–" : fmt(p.seconds, 1)}</td>
+      </tr>`).join("") + `</tbody></table>`;
+  }
+
+  // ---------- loading ----------
+  let current = null, lastJson = "", timer = null;
+
+  function show(id, on) { $(id).classList.toggle("hidden", !on); }
+
+  function render(data, isAll) {
+    $("err").classList.add("hidden");
+    $("jobs").innerHTML = jobsHtml(data.jobs, data.configured);
+    $("d-stats").innerHTML = statsHtml(data.decision_stats);
+    show("timeline-sec", !isAll);
+    show("perception-sec", !isAll);
+    show("decisions", !isAll);
+    if (isAll) {
+      $("sub").textContent = `Totals across ${fmt(data.runs)} runs on this laptop.`;
+      $("to-review").classList.add("hidden");
+      return;
+    }
+    const r = data.run;
+    $("sub").textContent = `${r.rooms || "Run"} · ${fmt(r.n_files)} file${r.n_files === 1 ? "" : "s"} · ${fmt(r.items)} items · ${r.run_id}`;
+    $("to-review").classList.remove("hidden");
+    $("to-review").href = link("review.html", { run_id: r.run_id });
+    const live = data.timeline.bars.filter((b) => b.cache !== "hit");
+    $("tl-note").textContent = data.timeline.bars.length
+      ? `${fmt(data.timeline.span_s, 0)} s from first call to last; ${fmt(live.length)} live call${live.length === 1 ? "" : "s"}. Hover a bar for the file and time.`
+      : "";
+    $("timeline").innerHTML = timelineSvg(data.timeline);
+    $("decisions").innerHTML = decisionsHtml(data.decisions);
+    $("perception").innerHTML = perceptionHtml(data.perception);
+  }
+
+  async function load(quiet) {
+    const isAll = current === ALL;
+    try {
+      const data = await get(isAll ? "/analysis/summary" : "/analysis/runs/" + encodeURIComponent(current));
+      const s = JSON.stringify(data);
+      if (s !== lastJson) { lastJson = s; render(data, isAll); }
+    } catch (e) {
+      if (!quiet) { $("err").textContent = "Couldn't load: " + e.message; $("err").classList.remove("hidden"); }
+    }
+  }
+
+  function poll() {
+    clearTimeout(timer);
+    const on = !document.hidden;
+    $("live").classList.toggle("off", !on);
+    if (on) timer = setTimeout(async () => { await load(true); poll(); }, 4000);
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) load(true); poll(); });
+
+  async function init() {
+    let runs = [];
+    try { runs = (await get("/analysis/runs")).runs; }
+    catch (e) { $("err").textContent = "Couldn't reach the server: " + e.message; $("err").classList.remove("hidden"); }
+    const sel = $("run");
+    sel.innerHTML = `<option value="${ALL}">All runs (${runs.length})</option>` + runs.map((r) =>
+      `<option value="${esc(r.run_id)}">${esc(r.run_id.slice(9, 15).replace(/(\d\d)(\d\d)(\d\d)/, "$1:$2"))} · ${esc(r.rooms || r.run_id)} · ${fmt(r.calls)} calls</option>`).join("");
+    const want = params.get("run_id") || recall("piu_last_run");
+    current = runs.some((r) => r.run_id === want) ? want : (runs[0] ? runs[0].run_id : ALL);
+    sel.value = current;
+    sel.addEventListener("change", () => {
+      current = sel.value; lastJson = "";
+      const q = new URLSearchParams(location.search);
+      if (current === ALL) q.delete("run_id"); else q.set("run_id", current);
+      history.replaceState(null, "", "?" + q.toString());
+      load();
+    });
+    await load();
+    poll();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
