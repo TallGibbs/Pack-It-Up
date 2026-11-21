@@ -165,3 +165,14 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Decision:** The event key in `.env` (`GEMINI_API_KEY`) is the only key used today. No personal key. That key already reaches all four Gemini 4 models and the Decisions API (`gemini-decision-1`, api_version `v1alpha`).
 - **Note:** The unused key-profile switch (`GEMINI_KEY_PROFILE`) stays in `backend/llm/gemini.py`; it does nothing unless set.
 - **By:** Chris.
+
+## 2026-11-21 11:55 · Track B builds on branch `track-b` before the join
+- **Decision:** Track B works on branch `track-b` and merges into `main` when joining with Track A.
+- **Why:** Isolates Track B solver, catalog and frontend work while Track A finishes ingestion and phone testing on `main`.
+- **By:** George.
+
+## 2026-11-21 11:55 · Penn Station move stocks retail stores, café, kiosks and lounges
+- **Decision:** Instead of unloading everything into one open concourse, the Penn Station destination includes distinct retail storefronts, café stall, bookshop, tech hub, merch kiosk, ticketed lounge and concourse zones (`data/penn_zones.csv`), each with dimensions, doorway clearances, weight limits and loading-dock stop order.
+- **Why:** Moving into one giant open hall is trivial; filling constrained storefronts with doorway limits and LIFO dock-stop ordering creates real packing and routing trade-offs that showcase Gemini 4 planning and verification.
+- **By:** George.
+- **Replaces:** The "placing items inside Penn Station is out of scope" clause of `2026-11-21 ~09:45 · Demo: move this hackathon to Penn Station`.
