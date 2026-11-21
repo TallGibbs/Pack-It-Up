@@ -209,8 +209,8 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
                 continue
             for m in ms:
                 if not any(compatible(m["label"], b["label"]) for b in base):
-                    ref = max(base, key=lambda b: b["confidence"])
-                    flags.append({"kind": "same_item", "item_id": item_id, "a": ref, "b": m})
+                    # Ask whether m is any of the pieces already counted (all of `base`), not just one of them.
+                    flags.append({"kind": "same_item", "item_id": item_id, "base": base, "b": m})
 
     return {
         "id": rid, "name": room["name"],

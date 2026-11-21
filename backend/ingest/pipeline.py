@@ -29,7 +29,9 @@ def rebuild(run_id: str, questions: bool = False) -> dict:
         gaps.reapply_answers(run_id)
         inv = resolve(run_id)
         if questions:
-            gaps.build_questions(run_id)
+            gaps.build_questions(run_id)  # may store auto-applied Decisions API answers
+            merge(run_id)                 # so rebuild from scratch and apply them once
+            gaps.reapply_answers(run_id)
             inv = resolve(run_id)
         return inv
 

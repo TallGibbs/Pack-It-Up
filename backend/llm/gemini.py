@@ -146,11 +146,12 @@ class GeminiProvider:
             inputs.append({"type": "text", "text": "(no media)"})
         criteria = settings.get("criteria") or {o: o for o in options}
         model = self.model if self.model.startswith("models/") else f"models/{self.model}"
+        extra = {"api_version": settings["api_version"]} if settings.get("api_version") else {}
         try:
             resp = _get_client().decisions.create(
                 model=model, input=inputs,
                 questions={"q": {"type": "choice", "instructions": question, "criteria": criteria}},
-                timeout=settings.get("timeout_s", 90))
+                timeout=settings.get("timeout_s", 90), **extra)
         except Exception as e:
             raise ProviderError(f"Decisions API {type(e).__name__}: {e}") from e
         ans = (resp.answers or {}).get("q")

@@ -26,7 +26,12 @@ video_fps = 2
 thinking = "low"
 
 [jobs.decide]
-model = "gemini:gemini-4-hydrogen"    # model passed to the Decisions API (client.decisions.create)
+model = "gemini:gemini-decision-1"    # Decisions API (client.decisions.create); listed only under v1alpha
+api_version = "v1alpha"
 media_resolution = "high"
+
+[jobs.decide_fallback]
+model = "gemini:gemini-4-hydrogen"    # generic enum generate_json, used when the Decisions API call fails
+thinking = "low"
 
 # Track B adds plan, baseline and image.

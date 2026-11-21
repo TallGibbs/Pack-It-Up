@@ -239,9 +239,13 @@ class Job:
         prompt = (f"{question}\n\nAnswer with exactly one of these options:\n" +
                   "\n".join(f"- {o}" + (f": {crit[o]}" if crit.get(o) and crit[o] != o else "") for o in options) +
                   "\nGive your confidence (0-1) and a one-sentence rationale.")
-        out = self._run("decide_fallback", prompt, media or [], "decide_fallback_v1",
-                        lambda p, m: self.provider.generate_json(p, m, schema, self.settings),
-                        validate=validate, extra_key=_sha(schema), label=label)
+        # The Decisions model may not do generate_json, so the fallback runs as its own job if configured.
+        fb = self
+        if self.name != "decide_fallback" and "decide_fallback" in load_config().get("jobs", {}):
+            fb = for_job("decide_fallback", self.run_dir)
+        out = fb._run("decide_fallback", prompt, media or [], "decide_fallback_v1",
+                      lambda p, m: fb.provider.generate_json(p, m, schema, fb.settings),
+                      validate=validate, extra_key=_sha(schema), label=label)
         return {**out, "via": "generate_json_fallback"}
 
     def generate_image(self, prompt: str, refs: list[Media] | None = None, label: str | None = None) -> bytes:
