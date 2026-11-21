@@ -79,11 +79,13 @@
 
   function answeredHtml(q) {
     let who, val;
-    if (isOpen(q)) { // model-only question the server hasn't closed yet: show the API's guess
+    if (isOpen(q)) { // model-only question still open: both decide() paths failed (model_error), or an older run
       who = "Decisions API best guess";
-      val = guess(q) != null ? `<b>${esc(label(q, guess(q)))}</b>` : "none yet";
+      val = guess(q) != null ? `<b>${esc(label(q, guess(q)))}</b>` : q.model_error ? "the model couldn't decide" : "none yet";
     } else {
       who = ANSWERED_BY[q.answered_by] || "Answered";
+      // below 0.7 the server still applies model-only answers, flagged low_confidence: say it's a guess
+      if (q.low_confidence) who = q.answered_by === "generate_json_fallback" ? "Model's best guess" : "Decisions API best guess";
       val = q.answered_by === "speech" && q.quote ? `<q>${esc(q.quote)}</q>` : `<b>${esc(label(q, q.answer))}</b>`;
     }
     return `<div class="card q answered" data-q="${esc(q.id)}">
