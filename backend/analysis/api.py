@@ -5,6 +5,8 @@ GET /analysis/runs/{run_id}     -> jobs, Decisions API answers, per-file percept
 GET /analysis/summary           -> the same job and decision totals across all runs
 GET /analysis/trends            -> one row per run, oldest first: speed, confidence, answers kept
 
+GET /analysis/databricks        -> is the Databricks copy on, when it last ran, its last error
+
 Runs whose folder was deleted stay in the database, marked `archived`.
 """
 from __future__ import annotations
@@ -13,9 +15,10 @@ from fastapi import APIRouter, HTTPException
 
 from backend.ingest.common import run_dir
 
-from . import store
+from . import databricks, store
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
+databricks.start_background()  # copies runs to Databricks every minute, only if .env has its settings
 
 
 @router.get("/runs")
@@ -43,3 +46,8 @@ def summary():
 @router.get("/trends")
 def trends():
     return {"runs": store.trends()}
+
+
+@router.get("/databricks")
+def databricks_status():
+    return databricks.status()

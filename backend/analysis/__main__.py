@@ -3,6 +3,7 @@
     python -m backend.analysis              # totals across every run
     python -m backend.analysis <run_id>     # one run
     python -m backend.analysis --trends     # one row per run, oldest first
+    python -m backend.analysis --push       # copy new or changed runs to Databricks (--push-all: every run)
 """
 from __future__ import annotations
 
@@ -38,6 +39,11 @@ def _trends_table(rows: list[dict]) -> str:
 
 
 def main(argv: list[str]) -> int:
+    if argv and argv[0] in ("--push", "--push-all"):
+        from . import databricks
+        out = databricks.push(force=argv[0] == "--push-all")
+        print(f"Copied {len(out['pushed'])} run(s) to {out['target']}" + (": " + ", ".join(out["pushed"]) if out["pushed"] else " (nothing new)"))
+        return 0
     if argv and argv[0] == "--trends":
         print(_trends_table(store.trends()))
         return 0

@@ -1,4 +1,4 @@
-"""Build and query `.cache/analysis.db` from the run folders. See __init__.py."""
+"""Build and query `.history/analysis.db` from the run folders. See __init__.py."""
 from __future__ import annotations
 
 import datetime as dt

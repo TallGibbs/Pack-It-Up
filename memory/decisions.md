@@ -177,3 +177,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** A move takes hours or days, and phones reload background tabs, often after the camera has been open. Before this, a reload or review's "Film another room" link silently started a new move.
 - **By:** Chris, on the quality-check session's recommendation.
 - **See:** [frontend/README.md](../frontend/README.md#what-a-move-is), branch `feature/resume-move`
+
+## 2026-11-21 13:10 · Model-use history copied to Chris's Databricks
+- **Decision:** The model-use history (`backend/analysis/`) is also copied to Chris's own Databricks Free Edition workspace, catalog `pack_it_up`, schema `model_use`, so it outlives this laptop. The local `.history/analysis.db` stays the source the page reads; the copy is one-way, in the background, every minute.
+- **Why:** Chris wants the record kept apart from local files. Not MongoDB (Chris's choice). Not Google Cloud: the event key reaches only the Gemini API, and the event's account is temporary.
+- **Limits:** Databricks stores data only; no model runs there, so the demo stays on Gemini 4. The workspace address and token live only in `.env`.
+- **By:** Chris.

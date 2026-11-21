@@ -15,7 +15,7 @@ In progress. Track A (ingestion: photos and clips to a resolved inventory with s
 - **Brought in:**
   - Penn Station reference photos and clips (`data/NYPenn/`), taken by the team before kickoff. Used as the move destination; not committed.
   - `data/item_catalog.csv`: starting item sizes and handling flags, drafted in the planning repo before kickoff and brought in at the event.
-  - Python libraries (see `requirements.txt`): `google-genai` (Apache-2.0), `fastapi` (MIT), `uvicorn` (BSD-3-Clause), `python-multipart` (Apache-2.0), `jsonschema` (MIT), `Pillow` (MIT-CMU), `pillow-heif` (BSD-3-Clause), `imageio-ffmpeg` (BSD-2-Clause; ships an ffmpeg binary under its own licence), `python-dotenv` (BSD-3-Clause).
+  - Python libraries (see `requirements.txt`): `google-genai` (Apache-2.0), `fastapi` (MIT), `uvicorn` (BSD-3-Clause), `python-multipart` (Apache-2.0), `jsonschema` (MIT), `Pillow` (MIT-CMU), `pillow-heif` (BSD-3-Clause), `imageio-ffmpeg` (BSD-2-Clause; ships an ffmpeg binary under its own licence), `python-dotenv` (BSD-3-Clause), `databricks-sql-connector` (Apache-2.0; only for the optional Databricks copy of the model-use history, which stores data and runs no model).
 
 ## Layout
 
@@ -45,7 +45,7 @@ Every model call goes through `backend/llm/` and is set per job in [backend/llm/
 3. Check the models answer: `python -m backend.llm.hello`.
 4. Inventory a folder of photos and clips: `python -m backend.ingest data/Inputs/Malin --room "Malin lounge"`.
 5. API: `uvicorn backend.app:app --port 8000`, then `curl -F room="Lounge" -F files=@photo.jpg localhost:8000/upload` and `curl localhost:8000/inventory/<run_id>`.
-6. Which model did which job: open `/app/models.html?run_id=<run_id>`, or `?run_id=all` for totals and run-by-run trends; or run `python -m backend.analysis [run_id | --trends]`. It copies each run's `calls.jsonl` and `questions.json` into `.history/analysis.db` (git-ignored), which keeps a run, marked archived, after its folder is deleted.
+6. Which model did which job: open `/app/models.html?run_id=<run_id>`, or `?run_id=all` for totals and run-by-run trends; or run `python -m backend.analysis [run_id | --trends]`. It copies each run's `calls.jsonl` and `questions.json` into `.history/analysis.db` (git-ignored), which keeps a run, marked archived, after its folder is deleted. If `.env` has the `DATABRICKS_*` settings (see `.env.example`), the API also copies new or changed runs every minute to Delta tables in your own Databricks workspace (`pack_it_up.model_use`: runs, calls, decisions, perception); `python -m backend.analysis --push` copies now, and `GET /analysis/databricks` shows when it last ran.
 7. Score against a hand count: `python eval/score_inventory.py runs/<run_id> eval/hand_counts/malin.json`.
 
 ## Open the pages (phone upload and review)
