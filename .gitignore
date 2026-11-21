@@ -29,3 +29,7 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+
+# Pipeline outputs and model-call cache (may hold derived media)
+.cache/
+runs/

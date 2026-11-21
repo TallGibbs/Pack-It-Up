@@ -1,0 +1,32 @@
+# Which provider and model does each job, plus per-job settings.
+# Format: model = "<provider>:<model id>". Override any line with an env var,
+# e.g. MODEL_PERCEIVE=gemini:gemini-4-argon. Changing a line needs no code change.
+#
+# Model IDs below were confirmed by listing models with the event API key
+# (Nov 21 2026): gemini-4-hydrogen, gemini-4-argon, gemini-4-neon, gemini-4-carbon.
+
+[defaults]
+timeout_s = 90
+retries = 1
+
+[jobs.hello]
+model = "gemini:gemini-4-hydrogen"
+thinking = "low"
+
+[jobs.perceive]
+model = "gemini:gemini-4-hydrogen"    # fast tier; one call per file
+media_resolution = "high"
+video_fps = 2
+thinking = "low"
+
+[jobs.perceive_fallback]
+model = "gemini:gemini-4-argon"       # if Hydrogen's output is weak
+media_resolution = "high"
+video_fps = 2
+thinking = "low"
+
+[jobs.decide]
+model = "gemini:gemini-4-hydrogen"    # model passed to the Decisions API (client.decisions.create)
+media_resolution = "high"
+
+# Track B adds plan, baseline and image.

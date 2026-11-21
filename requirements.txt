@@ -1,0 +1,9 @@
+google-genai
+fastapi
+uvicorn[standard]
+python-multipart
+jsonschema
+pillow
+pillow-heif
+imageio-ffmpeg
+python-dotenv
