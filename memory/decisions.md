@@ -190,3 +190,8 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **By:** George.
 - **Replaces:** `memory/open-questions.md` undecided stretch notes on "Truck-mode reminder" and "Route warnings".
 - **See:** `data/trucks.csv`, `backend/route_guide.py`, `backend/route_api.py`, `frontend/ui/journey.js`, `frontend/index.html`
+
+## 2026-11-21 12:16 · Two separate final judge steps (Move Plan Judge, then Hackathon Rubric Judge)
+- **Decision:** Add two distinct judge steps at the end of the pipeline rather than combining them: (1) `backend/judge_plan.py` evaluates the solved truck load, Penn Station store LIFO routing, verifier checks, and arrival render via multi-question Decisions API (`noul` + `choice` + `score`) with Gemini 4 escalation on low confidence; (2) `backend/judge_rubric.py` separately audits the run, model logs, baselines, and compliance gates against the four Cerebral Valley judging criteria (Round 1 35/25/20/20 and Round 2 25/25/25/25). Extend `backend/llm/` with `decide_batch()` to keep all SDK calls inside `backend/llm/`.
+- **Why:** Keeps product-facing move readiness separate from hackathon submission self-scoring while showcasing `gemini-decision-1`'s single-pass `noul`, `choice`, and `score` capabilities from the official Builder Guide.
+- **By:** George.
