@@ -491,10 +491,12 @@
           <div>
             <label class="field" for="sel-truck">Truck size</label>
             <select id="sel-truck">
-              <option value="uhaul_26" selected>U-Haul 26 ft (314×98×99")</option>
-              <option value="uhaul_20">U-Haul 20 ft (234×92×85")</option>
-              <option value="uhaul_15">U-Haul 15 ft (180×92×85")</option>
+              <option value="auto" selected>✨ Auto Right-Size (Smallest Fit)</option>
+              <option value="uhaul_van">U-Haul 9 ft Cargo Van (114×66×56")</option>
               <option value="uhaul_10">U-Haul 10 ft (119×76×73")</option>
+              <option value="uhaul_15">U-Haul 15 ft (180×92×85")</option>
+              <option value="uhaul_20">U-Haul 20 ft (234×92×85")</option>
+              <option value="uhaul_26">U-Haul 26 ft (314×98×99")</option>
             </select>
           </div>
           <div>
@@ -606,11 +608,13 @@ const ROOM_PALETTE = ["#3b82f6", "#f97316", "#10b981", "#a855f7", "#eab308", "#e
 
 /* ---------- Browser Fallback Solver (for ?mock=1 with no Python server) ---------- */
 const TRUCKS_SPEC = {
+  uhaul_van: { truck_id: "uhaul_van", name: "U-Haul 9 ft Cargo Van", dims_in: [114, 66, 56], max_weight_lb: 3670 },
   uhaul_10: { truck_id: "uhaul_10", name: "U-Haul 10 ft", dims_in: [119, 76, 73], max_weight_lb: 2850 },
   uhaul_15: { truck_id: "uhaul_15", name: "U-Haul 15 ft", dims_in: [180, 92, 85], max_weight_lb: 6385 },
   uhaul_20: { truck_id: "uhaul_20", name: "U-Haul 20 ft", dims_in: [234, 92, 85], max_weight_lb: 5700 },
   uhaul_26: { truck_id: "uhaul_26", name: "U-Haul 26 ft", dims_in: [314, 98, 99], max_weight_lb: 12859 },
 };
+const TRUCK_ORDER_IDS = ["uhaul_van", "uhaul_10", "uhaul_15", "uhaul_20", "uhaul_26"];
 const PENN_ZONES_SPEC = [
   { zone_id: "penn_merch_kiosk", name: "Concourse Pop-Up Merch Kiosk", zone_type: "merch_kiosk", dock_stop: 1, dims_in: [120, 84, 90], door_in: [34, 80], max_weight_lb: 1800, kw: ["kiosk", "merch", "toy", "clothes"] },
   { zone_id: "penn_cafe", name: "Trackside Espresso & Cafe Storefront", zone_type: "cafe_store", dock_stop: 2, dims_in: [168, 120, 96], door_in: [42, 84], max_weight_lb: 3500, kw: ["coffee", "espresso", "stool", "dish", "food", "kitchen", "pot"] },
@@ -817,6 +821,8 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
     const placedStandX = [];
     const leftovers = [];
     let curWt = 0, wy = 0;
+    const estFootprint = itemsToPack.reduce((a, p) => a + p.dims_in[0] * p.dims_in[1], 0);
+    const sparseFloor = !rawMode && balanceY && estFootprint <= 0.50 * Math.max(1, L * W);
     const ordered = itemsToPack.slice().sort((a, b) => {
       if (rawMode) return b.volume_cuft - a.volume_cuft;
       const tier = (p) => (p.stackable === "yes" || p.dims_in[2] >= 45 ? 0 : p.stackable === "light_only" ? 1 : 2);
@@ -848,6 +854,7 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
         }
         for (const [ax, ay, az] of anchors) {
           if (ax < 0 || ay < 0 || az < 0 || ax + dx > L + 1e-3 || ay + dy > W + 1e-3 || az + dz > H + 1e-3) continue;
+          if (sparseFloor && az > 1e-3 && (dz >= 6 || az + dz > 18)) continue;
           let hit = false;
           for (const b of placed) {
             const [bx, by, bz] = b.pos_in, [bdx, bdy, bdz] = b.size_in;
@@ -866,7 +873,7 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
             if (badAbove) continue;
           }
           if (!rawMode && az > 1e-3) {
-            let sup = 0, badStack = false;
+            let sup = 0, badStack = false, colDx = dx, colDy = dy;
             for (let si = 0; si < placed.length; si++) {
               const b = placed[si];
               const [bx, by, bz] = b.pos_in, [bdx, bdy, bdz] = b.size_in;
@@ -876,23 +883,45 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
               if (bz + bdz <= az + 0.25 && placedStandX[si] > reqStandX) reqStandX = placedStandX[si];
               if (Math.abs(bz + bdz - az) > 0.1) continue;
               if (b.stackable === "no" || ((b.stackable === "light_only" || b.fragile) && p.weight_lb > 30)) { badStack = true; break; }
+              colDx = Math.max(colDx, bdx);
+              colDy = Math.max(colDy, bdy);
               sup += ox * oy;
             }
             if (badStack || sup < 0.75 * dx * dy || reqStandX - (ax + dx) > MAX_REACH_SETBACK + 1e-3) continue;
+            if (balanceY) {
+              const reqBraceZ = az + 0.35 * dz, z2 = az + dz;
+              let bNx = ax <= 1.5, bPx = ax + dx >= L - 1.5, bNy = ay <= 1.5, bPy = ay + dy >= W - 1.5;
+              for (const b of placed) {
+                const [bx, by, bz] = b.pos_in, [bdx, bdy, bdz] = b.size_in;
+                if (bz + bdz < reqBraceZ) continue;
+                if (Math.min(ay + dy, by + bdy) - Math.max(ay, by) > 1e-3) {
+                  if (Math.abs(bx + bdx - ax) <= 2.5) bNx = true;
+                  if (Math.abs(bx - (ax + dx)) <= 2.5) bPx = true;
+                }
+                if (Math.min(ax + dx, bx + bdx) - Math.max(ax, bx) > 1e-3) {
+                  if (Math.abs(by + bdy - ay) <= 2.5) bNy = true;
+                  if (Math.abs(by - (ay + dy)) <= 2.5) bPy = true;
+                }
+              }
+              if ((!bNy && !bPy && z2 / Math.max(1, colDy) > 2.15) || (!bNx && !bPx && z2 / Math.max(1, colDx) > 2.15) || (!bPx && (!bNy || !bPy) && z2 / Math.max(1, Math.min(colDx, colDy)) > 3.55)) continue;
+            }
           }
           const nextCom = (wy + p.weight_lb * (ay + 0.5 * dy)) / (curWt + p.weight_lb);
-          const balPen = balanceY && !rawMode ? Math.abs(nextCom - 0.5 * W) * 1.6 : 0;
-          const zCost = (!rawMode && az > 1e-3 && (p.weight_lb <= 30 || (p.stackable === "yes" && p.weight_lb <= 80))) ? az * 0.10 : az * 0.55;
-          let sameBonus = 0;
-          if (!rawMode && az > 1e-3 && p.stackable === "yes") {
+          const balPen = balanceY && !rawMode ? Math.abs(nextCom - 0.5 * W) * 1.8 : 0;
+          const zCm = az + 0.5 * dz;
+          const floorZCost = (0.5 * dz) * (0.42 + p.weight_lb / 90);
+          const peCost = zCm * (0.42 + p.weight_lb / 90);
+          let alignAdj = 0;
+          if (!rawMode && az > 1e-3 && !sparseFloor && p.stackable === "yes") {
             for (const b of placed) {
               if (Math.abs(b.pos_in[2] + b.size_in[2] - az) <= 0.1 && Math.abs(b.pos_in[0] - ax) <= 0.5 && Math.abs(b.pos_in[1] - ay) <= 0.5 && b.catalog_id === p.catalog_id) {
-                sameBonus = -28;
+                alignAdj = -3.5;
                 break;
               }
             }
           }
-          const cost = ax * 1.0 + zCost + balPen + ay * 0.01 + sameBonus;
+          const effZ = rawMode ? az * 1.8 : Math.max(floorZCost + (az > 1e-3 ? 2.5 : 0), peCost + alignAdj);
+          const cost = ax * 1.15 + effZ + balPen + ay * 0.01;
           if (cost < bestCost) { bestCost = cost; best = { pos: [ax, ay, az], sz: [dx, dy, dz], standX: reqStandX }; }
         }
       }
@@ -914,17 +943,45 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
     return { placed, leftovers };
   };
 
-  const tid = strategy.truck_id || "uhaul_26";
-  const tSpec = TRUCKS_SPEC[tid] || TRUCKS_SPEC.uhaul_26;
+  const rawTid = String(strategy.truck_id || "auto").trim();
+  const autoRightsize = !rawTid || rawTid === "auto";
+  let defaultTid = autoRightsize ? "uhaul_26" : rawTid;
+  if (autoRightsize && !rawMode && pieces.length) {
+    for (const candId of TRUCK_ORDER_IDS) {
+      const cs = TRUCKS_SPEC[candId];
+      const { placed: cp, leftovers: cl } = packBin(pieces, cs.dims_in, cs.max_weight_lb, "t1", true);
+      if (!cl.length && cp.length) {
+        defaultTid = candId;
+        break;
+      }
+    }
+  }
+  const downsizeLast = strategy.downsize_last_truck ?? autoRightsize;
   let rem = pieces.slice();
   const trucks = [];
   const unplaced = [];
   let tIdx = 0;
   while (rem.length) {
-    const { placed, leftovers } = packBin(rem, tSpec.dims_in, tSpec.max_weight_lb, `t${tIdx + 1}`, true);
+    let tid = defaultTid;
+    let tSpec = TRUCKS_SPEC[tid] || TRUCKS_SPEC.uhaul_26;
+    let { placed, leftovers } = packBin(rem, tSpec.dims_in, tSpec.max_weight_lb, `t${tIdx + 1}`, true);
     if (!placed.length) {
       leftovers.forEach((u) => unplaced.push({ id: u.id, label: u.label, dims_in: u.dims_in, reason: `Cannot fit inside ${tSpec.name} (${tSpec.dims_in.join("×")} in)` }));
       break;
+    }
+    if (!leftovers.length && downsizeLast && !rawMode) {
+      const curVol = tSpec.dims_in[0] * tSpec.dims_in[1] * tSpec.dims_in[2];
+      for (const smId of TRUCK_ORDER_IDS) {
+        const sm = TRUCKS_SPEC[smId];
+        if (sm.dims_in[0] * sm.dims_in[1] * sm.dims_in[2] >= curVol) break;
+        const cand = packBin(rem, sm.dims_in, sm.max_weight_lb, `t${tIdx + 1}`, true);
+        if (!cand.leftovers.length && cand.placed.length) {
+          tid = smId;
+          tSpec = sm;
+          placed = cand.placed;
+          break;
+        }
+      }
     }
     placed.forEach((it) => { it.truck_index = tIdx; it.truck_id = tid; it.unload_seq = placed.length - it.load_seq + 1; });
     const pVol = placed.reduce((a, i) => a + i.size_in[0] * i.size_in[1] * i.size_in[2], 0);
@@ -961,6 +1018,9 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
   unplaced.forEach((u) => violations.push({ rule: "unplaced_item", item_ids: [u.id], detail: `${u.label}: ${u.reason}` }));
   trucks.forEach((t) => {
     const tStandX = computeStandX(t.items);
+    const tFloorArea = Math.max(1, t.dims_in[0] * t.dims_in[1]);
+    const tFootprint = t.items.reduce((a, x) => a + x.size_in[0] * x.size_in[1], 0);
+    const tSparseFloor = tFootprint <= 0.50 * tFloorArea;
     for (let idx = 0; idx < t.items.length; idx++) {
       const it = t.items[idx];
       if (it.must_stay_upright && Math.abs(it.size_in[2] - it.orig_dims_in[2]) > 0.5) {
@@ -981,6 +1041,9 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
         if (sup < 0.75 * it.size_in[0] * it.size_in[1]) {
           violations.push({ rule: "support", truck_index: t.index, item_ids: [it.id], detail: `${it.label} has only ${Math.round((sup / (it.size_in[0] * it.size_in[1])) * 100)}% base support (<75%)` });
         }
+        if (tSparseFloor && (it.size_in[2] >= 6 || it.pos_in[2] + it.size_in[2] > 18)) {
+          violations.push({ rule: "shake_stability", truck_index: t.index, item_ids: [it.id], detail: `${it.label} stacked at z=${it.pos_in[2]}" raises potential energy while truck floor is open — place on floor` });
+        }
         const ax2 = it.pos_in[0] + it.size_in[0];
         if (tStandX[idx] - ax2 > 25.0) {
           violations.push({ rule: "walk_in_access", truck_index: t.index, item_ids: [it.id], detail: `${it.label} sits ${Math.round(tStandX[idx] - ax2)}" behind support front — unreachable without stepping on lower cargo` });
@@ -993,19 +1056,39 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
       }
     }
   });
+  if (trucks.length === 1 && !unplaced.length && trucks[0].fill_pct < 10.0) {
+    const t0 = trucks[0];
+    const curVol = t0.dims_in[0] * t0.dims_in[1] * t0.dims_in[2];
+    const pVol = t0.items.reduce((a, x) => a + x.size_in[0] * x.size_in[1] * x.size_in[2], 0);
+    const pFoot = t0.items.reduce((a, x) => a + x.size_in[0] * x.size_in[1], 0);
+    for (const smId of TRUCK_ORDER_IDS) {
+      const sm = TRUCKS_SPEC[smId];
+      const smVol = sm.dims_in[0] * sm.dims_in[1] * sm.dims_in[2];
+      if (smVol >= curVol * 0.65) break;
+      const fitsAll = t0.weight_lb <= sm.max_weight_lb * 0.9 && pVol <= smVol * 0.55 && pFoot <= sm.dims_in[0] * sm.dims_in[1] * 0.8 &&
+        t0.items.every((x) => x.size_in[2] <= sm.dims_in[2] - 0.5 && Math.max(x.size_in[0], x.size_in[1]) <= sm.dims_in[0] - 0.5 && Math.min(x.size_in[0], x.size_in[1]) <= sm.dims_in[1] - 0.5);
+      if (fitsAll) {
+        violations.push({ rule: "oversized_truck", truck_index: 0, item_ids: [], detail: `Truck 1 (${t0.name}) is only ${t0.fill_pct}% full — cargo fits in ${sm.name} (${sm.truck_id})` });
+        break;
+      }
+    }
+  }
 
   const allPlaced = trucks.flatMap((t) => t.items);
   const avgFill = trucks.length ? Math.round((trucks.reduce((a, t) => a + t.fill_pct, 0) / trucks.length) * 10) / 10 : 0;
   const byRule = {};
   violations.forEach((v) => { byRule[v.rule] = (byRule[v.rule] || 0) + 1; });
   const totalScore = Math.max(5, Math.min(100, Math.round((82 + avgFill * 0.35 - violations.length * 9) * 10) / 10));
+  const countsByTid = {};
+  trucks.forEach((t) => { countsByTid[t.truck_id] = (countsByTid[t.truck_id] || 0) + 1; });
+  const fleetLabel = Object.entries(countsByTid).map(([k, n]) => `${n} × ${k}`).join(" + ") || "0 trucks";
 
   return {
     run_id: rawRunId,
     trucks, zones, unplaced,
     summary: {
       truck_count: trucks.length,
-      fleet_label: trucks.length ? `${trucks.length} × ${tid}` : "0 trucks",
+      fleet_label: fleetLabel,
       total_items: allPlaced.length,
       furniture_count: allPlaced.filter((i) => !i.is_box).length,
       box_count: allPlaced.filter((i) => i.is_box).length,
@@ -1887,10 +1970,11 @@ function renderPanels() {
   // Verifier rule pills
   const byRule = sc.violation_counts_by_rule || {};
   const ruleGroups = [
-    ["Fit & Payload", (byRule.fit || 0) + (byRule.unplaced_item || 0) + (byRule.unplaced || 0) + (byRule.truck_overweight || 0)],
+    ["Fit & Right-Size", (byRule.fit || 0) + (byRule.unplaced_item || 0) + (byRule.unplaced || 0) + (byRule.truck_overweight || 0) + (byRule.oversized_truck || 0)],
     ["No Overlap", (byRule.overlap || 0) + (byRule.zone_overlap || 0)],
     ["≥75% Base Support", (byRule.support || 0) + (byRule.load_seq_support || 0)],
     ["Walk-In Tier Order", byRule.walk_in_access || 0],
+    ["Shake & CoG Energy", byRule.shake_stability || 0],
     ["Upright & On-Edge", (byRule.upright || 0) + (byRule.load_on_edge || 0)],
     ["Stack & Fragile", (byRule.no_stack || 0) + (byRule.light_only_on_top || 0) + (byRule.fragile_crushed || 0)],
     ["L/R Balance", byRule.weight_balance || 0],

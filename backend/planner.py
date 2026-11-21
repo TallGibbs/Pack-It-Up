@@ -29,7 +29,7 @@ from backend.llm.managed_agents import plan_job
 def has_api_key() -> bool:
     return managed_agents.has_api_key()
 
-TRUCK_IDS = ["uhaul_10", "uhaul_15", "uhaul_20", "uhaul_26"]
+TRUCK_IDS = ["uhaul_van", "uhaul_10", "uhaul_15", "uhaul_20", "uhaul_26"]
 PACKER_ENGINES = ["constrained", "raw_py3dbp"]
 ORDER_MODES = ["lifo_heavy_first", "zone_strict_lifo", "heavy_first", "volume_first", "fragile_last"]
 

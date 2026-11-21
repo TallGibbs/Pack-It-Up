@@ -501,10 +501,10 @@ def post_solve(body: dict[str, Any] | None = None) -> dict[str, Any]:
 @router.get("/solve/{run_id}")
 def get_solve(
     run_id: str,
-    truck_id: str = Query("uhaul_26"),
+    truck_id: str = Query("auto"),
     packer_engine: str = Query("constrained"),
     order_mode: str = Query("lifo_heavy_first"),
-    downsize_last_truck: bool = Query(False),
+    downsize_last_truck: bool = Query(True),
 ) -> dict[str, Any]:
     return post_solve({
         "run_id": run_id,

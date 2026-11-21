@@ -138,6 +138,9 @@ def _check_support_and_stacking(
     placed_boxes: list[tuple[float, float, float, float, float, float]],
     placed_stand_x: list[float],
     *,
+    L: float,
+    W: float,
+    enforce_shake: bool = True,
     min_support: float,
     light_max_lb: float,
 ) -> tuple[bool, float]:
@@ -165,6 +168,7 @@ def _check_support_and_stacking(
 
     sup_area = 0.0
     req_stand_x = x2
+    col_dx, col_dy = dx, dy
     for i, sup in enumerate(placed):
         bx1, by1, bz1, bx2, by2, bz2 = placed_boxes[i]
         ox = min(x2, bx2) - max(x1, bx1)
@@ -182,12 +186,47 @@ def _check_support_and_stacking(
             return False, req_stand_x
         if (bstack == "light_only" or sup.get("fragile")) and wt > light_max_lb + EPS:
             return False, req_stand_x
+        col_dx = max(col_dx, bx2 - bx1)
+        col_dy = max(col_dy, by2 - by1)
         # Placed items in a valid truck are pairwise non-overlapping, so top faces at height z1 are disjoint.
         sup_area += ox * oy
 
     if req_stand_x - x2 > MAX_REACH_SETBACK_IN + EPS:
         return False, req_stand_x
-    return sup_area >= min_support * (dx * dy) - 1e-4, req_stand_x
+    if sup_area < min_support * (dx * dy) - 1e-4:
+        return False, req_stand_x
+
+    # 0.45g braking & pothole shake topple guard: prevent unbraced slender Jenga columns.
+    if enforce_shake:
+        req_brace_z = z1 + 0.35 * dz
+        braced_neg_x = x1 <= 1.5
+        braced_pos_x = x2 >= L - 1.5
+        braced_neg_y = y1 <= 1.5
+        braced_pos_y = y2 >= W - 1.5
+        for bx1, by1, _, bx2, by2, bz2 in placed_boxes:
+            if bz2 < req_brace_z:
+                continue
+            if min(y2, by2) - max(y1, by1) > EPS:
+                if abs(bx2 - x1) <= 2.5:
+                    braced_neg_x = True
+                if abs(bx1 - x2) <= 2.5:
+                    braced_pos_x = True
+            if min(x2, bx2) - max(x1, bx1) > EPS:
+                if abs(by2 - y1) <= 2.5:
+                    braced_neg_y = True
+                if abs(by1 - y2) <= 2.5:
+                    braced_pos_y = True
+
+        if (not braced_neg_y and not braced_pos_y) and (z2 / max(1.0, col_dy) > 2.15):
+            return False, req_stand_x
+        if (not braced_neg_x and not braced_pos_x) and (z2 / max(1.0, col_dx) > 2.15):
+            return False, req_stand_x
+        if (not braced_pos_x and (not braced_neg_y or not braced_pos_y)) and (
+            z2 / max(1.0, min(col_dx, col_dy)) > 3.55
+        ):
+            return False, req_stand_x
+
+    return True, req_stand_x
 
 
 def _candidate_anchors(
@@ -238,7 +277,7 @@ def _candidate_anchors(
 
 
 def _recenter_sparse_y(placed: list[dict], W: float, balance_band: tuple[float, float]) -> None:
-    """Rigidly shift all items in `y` if a sparse truck's CoG sits outside the center band."""
+    """Rigidly shift all items in `y` only when a sparse truck's CoG falls outside the safe band."""
     if not placed or W <= 0:
         return
     tot_wt = sum(it["weight_lb"] for it in placed)
@@ -246,7 +285,7 @@ def _recenter_sparse_y(placed: list[dict], W: float, balance_band: tuple[float, 
         return
     cog_y = sum(it["weight_lb"] * (it["pos_in"][1] + 0.5 * it["size_in"][1]) for it in placed) / tot_wt
     ratio = cog_y / W
-    if balance_band[0] + 0.02 <= ratio <= balance_band[1] - 0.02:
+    if balance_band[0] + 0.005 <= ratio <= balance_band[1] - 0.005:
         return
     min_y = min(it["pos_in"][1] for it in placed)
     max_y = max(it["pos_in"][1] + it["size_in"][1] for it in placed)
@@ -349,6 +388,12 @@ def _pack_single_bin_constrained(
     cur_wt = 0.0
     weighted_y = 0.0
 
+    # When total horizontal footprint fits within <=50% of floor area, keep cargo on the floor (`z=0`)
+    # to minimize gravitational potential energy (`U = m*g*z_cm`) and eliminate shake/braking topple risk.
+    floor_area = max(1.0, L * W)
+    est_footprint = sum(float(p["dims_in"][0]) * float(p["dims_in"][1]) for p in pieces)
+    sparse_floor = est_footprint <= 0.50 * floor_area
+
     for piece in pieces:
         wt = float(piece["weight_lb"])
         if cur_wt + wt > max_weight_lb + EPS:
@@ -367,6 +412,8 @@ def _pack_single_bin_constrained(
                     continue
                 if x + dx > L + EPS or y + dy > W + EPS or z + dz > H + EPS:
                     continue
+                if sparse_floor and balance_width and z > EPS and (dz >= 6.0 or z + dz > 18.0):
+                    continue
                 if _overlaps_3d(x, y, z, x + dx, y + dy, z + dz, placed_boxes):
                     continue
                 ok_sup, req_stand_x = _check_support_and_stacking(
@@ -374,6 +421,7 @@ def _pack_single_bin_constrained(
                     str(piece.get("stackable", "no")),
                     bool(piece.get("fragile", False)),
                     placed, placed_boxes, placed_stand_x,
+                    L=L, W=W, enforce_shake=balance_width,
                     min_support=min_support, light_max_lb=light_max_lb,
                 )
                 if not ok_sup:
@@ -383,17 +431,18 @@ def _pack_single_bin_constrained(
                 new_cog_y = (weighted_y + wt * (y + 0.5 * dy)) / (new_wt * W) if (new_wt > 0 and W > 0) else 0.5
                 bal_cost = abs(new_cog_y - 0.5) * balance_wt
 
-                # Compact along length x first; sturdy boxes and flat folded tables/desks (<= 80 lb)
-                # stack into vertical columns on `stackable="yes"` bases instead of carpeting the floor.
-                if z > EPS and (wt <= light_max_lb or (piece.get("stackable") == "yes" and wt <= 80.0)):
-                    z_cost = z * 0.10
+                # Gravitational potential energy penalty (`z_cm = z + 0.5*dz`): floor slots (`z=0`) across
+                # truck width ALWAYS beat stacking upward (`z>0`), preventing skinny single-column towers.
+                z_cm = z + 0.5 * dz
+                floor_z_cost = (0.5 * dz) * (0.42 + wt / 90.0)
+                if sparse_floor and z > EPS:
+                    pe_cost = 4000.0 + z_cm * 8.0
                 else:
-                    z_cost = z * (0.45 + wt / 200.0)
+                    pe_cost = z_cm * (0.42 + wt / 90.0)
 
-                # Identical stackable slabs/boxes (e.g. folded tables, standing desks, book boxes)
-                # naturally form flush vertical stacks rather than spreading across the floor.
-                same_stack_bonus = 0.0
-                if z > EPS and piece.get("stackable") == "yes":
+                # Small tie-breaker for flush column alignment ONLY among `z > 0` candidates (never beats `z = 0`).
+                align_adj = 0.0
+                if z > EPS and not sparse_floor and piece.get("stackable") == "yes":
                     for si, sup in enumerate(placed):
                         bx1, by1, bz1, bx2, by2, bz2 = placed_boxes[si]
                         if (
@@ -402,10 +451,11 @@ def _pack_single_bin_constrained(
                             and abs(by1 - y) <= 0.5
                             and sup.get("catalog_id") == piece.get("catalog_id")
                         ):
-                            same_stack_bonus = -32.0
+                            align_adj = -3.5
                             break
 
-                cost = x * 1.0 + z_cost + bal_cost + y * 0.01 + same_stack_bonus
+                effective_z_cost = max(floor_z_cost + (2.5 if z > EPS else 0.0), pe_cost + align_adj)
+                cost = x * 1.15 + effective_z_cost + bal_cost + y * 0.01
                 if best_choice is None or cost < best_choice[0]:
                     best_choice = (cost, x, y, z, dx, dy, dz, req_stand_x)
 
@@ -580,12 +630,14 @@ def _pack_penn_zones(
 
 
 def solve_pieces(pieces: list[dict], strategy: dict | None = None) -> dict[str, Any]:
-    """Pack expanded `pieces` into a fleet of moving trucks and Penn Station stores."""
+    """Pack expanded `pieces` into a right-sized fleet of vans/trucks and Penn Station stores."""
     strategy = dict(strategy or {})
-    default_truck_id = str(strategy.get("truck_id") or "uhaul_26")
+    raw_tid = str(strategy.get("truck_id") or "auto").strip()
+    auto_rightsize = raw_tid in ("", "auto")
+    default_truck_id = "uhaul_26" if auto_rightsize else raw_tid
     truck_seq: list[str] = list(strategy.get("truck_sequence") or [])
     engine = str(strategy.get("packer_engine") or "constrained")
-    downsize_last = bool(strategy.get("downsize_last_truck", False))
+    downsize_last = bool(strategy.get("downsize_last_truck", auto_rightsize))
 
     # First pack Penn Station destination stores so any capacity spill updates `dock_stop` before truck LIFO sort.
     zone_placements = _pack_penn_zones(pieces, strategy)
@@ -593,6 +645,25 @@ def solve_pieces(pieces: list[dict], strategy: dict | None = None) -> dict[str, 
     remaining = sort_pieces(pieces, strategy)
     trucks_out: list[dict] = []
     unplaced_out: list[dict] = []
+
+    # When `truck_id="auto"` (default), first check if a single smaller van/truck (`uhaul_van` -> `uhaul_26`)
+    # fits the entire move cleanly with 0 physics/shake violations before opening multi-truck `uhaul_26` fleets.
+    if auto_rightsize and not truck_seq and remaining and engine != "raw_py3dbp":
+        for cand_spec in catalog.list_trucks():
+            cand_placed, cand_left = _pack_single_bin_constrained(
+                remaining, cand_spec["dims_in"], cand_spec["max_weight_lb"], prefix="t1", strategy=strategy
+            )
+            if not cand_left and cand_placed:
+                tv, _ = verify.verify_truck({
+                    "truck_id": cand_spec["truck_id"],
+                    "index": 0,
+                    "dims_in": cand_spec["dims_in"],
+                    "max_weight_lb": cand_spec["max_weight_lb"],
+                    "items": cand_placed,
+                })
+                if not tv:
+                    default_truck_id = cand_spec["truck_id"]
+                    break
 
     t_idx = 0
     while remaining:
@@ -626,7 +697,7 @@ def solve_pieces(pieces: list[dict], strategy: dict | None = None) -> dict[str, 
                 })
             break
 
-        # Optional optimization: if this is the final truck, see if a smaller U-Haul fits everything cleanly.
+        # Right-size the final truck to the smallest van/truck (`uhaul_van`..`uhaul_20`) that passes physics checks.
         if not leftovers and downsize_last and engine != "raw_py3dbp":
             for smaller in catalog.list_trucks():
                 if smaller["volume_cuft"] >= t_spec["volume_cuft"]:
@@ -635,10 +706,18 @@ def solve_pieces(pieces: list[dict], strategy: dict | None = None) -> dict[str, 
                     remaining, smaller["dims_in"], smaller["max_weight_lb"], prefix=prefix, strategy=strategy
                 )
                 if not cand_left and cand_placed:
-                    t_spec = smaller
-                    tid = smaller["truck_id"]
-                    placed = cand_placed
-                    break
+                    tv, _ = verify.verify_truck({
+                        "truck_id": smaller["truck_id"],
+                        "index": t_idx,
+                        "dims_in": smaller["dims_in"],
+                        "max_weight_lb": smaller["max_weight_lb"],
+                        "items": cand_placed,
+                    })
+                    if not tv:
+                        t_spec = smaller
+                        tid = smaller["truck_id"]
+                        placed = cand_placed
+                        break
 
         t_vol = max(1.0, t_spec["length_in"] * t_spec["width_in"] * t_spec["height_in"])
         p_vol = sum(it["size_in"][0] * it["size_in"][1] * it["size_in"][2] for it in placed)

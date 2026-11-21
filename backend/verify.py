@@ -168,6 +168,7 @@ def verify_truck(
     placed_vol = 0.0
     weighted_y = 0.0
     weighted_z = 0.0
+    floor_min_pe_lb_in = 0.0
 
     # 1. Fit, dimensions, orientation rules
     for i, it in enumerate(items):
@@ -179,6 +180,7 @@ def verify_truck(
         placed_vol += max(0.0, dx * dy * dz)
         weighted_y += wt * (y1 + 0.5 * dy)
         weighted_z += wt * (z1 + 0.5 * dz)
+        floor_min_pe_lb_in += wt * (0.5 * max(0.0, dz))
 
         if dx <= 0 or dy <= 0 or dz <= 0:
             violations.append(_violation("fit", f"{iid} has non-positive size {it.get('size_in')}", truck_index=t_idx, item_ids=[iid]))
@@ -240,8 +242,15 @@ def verify_truck(
                     item_ids=[aid, bid],
                 ))
 
-    # 3. Base support (>= 75%), stacking rules, load_seq support order, and walk-in tier reachability
+    # 3. Base support (>= 75%), stacking rules, load_seq support order, walk-in tier reachability,
+    #    and gravitational potential energy / road-shake topple physics.
     stand_x = compute_stand_x(boxes)
+    floor_area = max(1.0, L * W)
+    total_footprint_area = sum(max(0.0, b[3] - b[0]) * max(0.0, b[4] - b[1]) for b in boxes)
+    floor_used_area = _rect_union_area([(b[0], b[1], b[3], b[4]) for b in boxes if b[2] <= SUPPORT_Z_TOL])
+    sparse_floor = (L > 0 and W > 0 and total_footprint_area <= 0.50 * floor_area)
+    pe_ratio = (weighted_z / floor_min_pe_lb_in) if floor_min_pe_lb_in > EPS else 1.0
+
     for i, it in enumerate(items):
         ax1, ay1, az1, ax2, ay2, az2 = boxes[i]
         dx, dy = ax2 - ax1, ay2 - ay1
@@ -344,6 +353,77 @@ def verify_truck(
                     item_ids=[aid, bid_bad],
                 ))
 
+        # Potential energy & 0.45g braking / pothole shake topple check
+        dz_i = az2 - az1
+        if sparse_floor and (dz_i >= 6.0 or az2 > 18.0):
+            open_floor_pct = max(0.0, 100.0 - (floor_used_area / floor_area) * 100.0)
+            violations.append(_violation(
+                "shake_stability",
+                f"{aid} stacked at z={az1:.0f}..{az2:.0f} in raises gravitational potential energy ({pe_ratio:.1f}x floor baseline) "
+                f"while {open_floor_pct:.0f}% of truck floor is open — place cargo on the floor",
+                truck_index=t_idx,
+                item_ids=[aid],
+            ))
+        else:
+            col_dx, col_dy = dx, dy
+            for j in range(n):
+                if i == j:
+                    continue
+                bx1, by1, _, bx2, by2, bz2 = boxes[j]
+                if abs(bz2 - az1) <= SUPPORT_Z_TOL:
+                    if min(ax2, bx2) - max(ax1, bx1) > EPS and min(ay2, by2) - max(ay1, by1) > EPS:
+                        col_dx = max(col_dx, bx2 - bx1)
+                        col_dy = max(col_dy, by2 - by1)
+
+            req_brace_z = az1 + 0.35 * dz_i
+            braced_neg_x = ax1 <= 1.5
+            braced_pos_x = ax2 >= L - 1.5
+            braced_neg_y = ay1 <= 1.5
+            braced_pos_y = ay2 >= W - 1.5
+            for j in range(n):
+                if i == j:
+                    continue
+                bx1, by1, _, bx2, by2, bz2 = boxes[j]
+                if bz2 < req_brace_z:
+                    continue
+                if min(ay2, by2) - max(ay1, by1) > EPS:
+                    if abs(bx2 - ax1) <= 2.5:
+                        braced_neg_x = True
+                    if abs(bx1 - ax2) <= 2.5:
+                        braced_pos_x = True
+                if min(ax2, bx2) - max(ax1, bx1) > EPS:
+                    if abs(by2 - ay1) <= 2.5:
+                        braced_neg_y = True
+                    if abs(by1 - ay2) <= 2.5:
+                        braced_pos_y = True
+
+            if (not braced_neg_y and not braced_pos_y) and (az2 / max(1.0, col_dy) > 2.2):
+                violations.append(_violation(
+                    "shake_stability",
+                    f"{aid} forms an unbraced {az2:.0f}-in tower on a {col_dy:.0f}-in lateral base "
+                    f"(slenderness {az2 / max(1.0, col_dy):.1f}x > 2.2x) — topples under 0.45g cornering/pothole shake",
+                    truck_index=t_idx,
+                    item_ids=[aid],
+                ))
+            elif (not braced_neg_x and not braced_pos_x) and (az2 / max(1.0, col_dx) > 2.2):
+                violations.append(_violation(
+                    "shake_stability",
+                    f"{aid} forms an unbraced {az2:.0f}-in column on a {col_dx:.0f}-in length base "
+                    f"(slenderness {az2 / max(1.0, col_dx):.1f}x > 2.2x) — topples under 0.45g hard braking",
+                    truck_index=t_idx,
+                    item_ids=[aid],
+                ))
+            elif (not braced_pos_x and (not braced_neg_y or not braced_pos_y)) and (
+                az2 / max(1.0, min(col_dx, col_dy)) > 3.6
+            ):
+                violations.append(_violation(
+                    "shake_stability",
+                    f"{aid} stacked {az2:.0f} in high on a narrow {min(col_dx, col_dy):.0f}-in column without side/front bracing "
+                    "— topple hazard under road vibration",
+                    truck_index=t_idx,
+                    item_ids=[aid],
+                ))
+
     # 4. Left-right weight balance across truck width (y axis)
     cog_y_ratio = (weighted_y / (total_wt * W)) if (total_wt > 0 and W > 0) else 0.5
     cog_z_ratio = (weighted_z / (total_wt * H)) if (total_wt > 0 and H > 0) else 0.25
@@ -382,9 +462,13 @@ def verify_truck(
         "fill_pct": (placed_vol / truck_vol) * 100.0,
         "placed_vol_cuin": placed_vol,
         "truck_vol_cuin": truck_vol,
+        "total_footprint_area": total_footprint_area,
         "weight_lb": total_wt,
         "cog_y_ratio": cog_y_ratio,
         "cog_z_ratio": cog_z_ratio,
+        "cog_z_in": (weighted_z / total_wt) if total_wt > 0 else 0.0,
+        "potential_energy_j": weighted_z * 0.112985,
+        "pe_ratio": pe_ratio,
         "lifo_ratio": lifo_ratio,
     }
     return violations, stats
@@ -496,6 +580,8 @@ RULE_WEIGHTS: dict[str, float] = {
     "fragile_crushed": 9.0,
     "load_seq_support": 6.0,
     "walk_in_access": 8.0,
+    "shake_stability": 10.0,
+    "oversized_truck": 12.0,
     "weight_balance": 10.0,
     "zone_door_clearance": 10.0,
     "zone_fit": 10.0,
@@ -536,6 +622,39 @@ def verify(
         violations.extend(tv)
         truck_stats.append(st)
 
+    # Fleet right-sizing check: catch putting a tiny sparse load into a giant box truck when a smaller van/truck fits.
+    if len(trucks) == 1 and not placement.get("unplaced") and truck_stats:
+        t0 = trucks[0]
+        st0 = truck_stats[0]
+        t0_items = t0.get("items") or []
+        cur_spec = catalog.get_truck(str(t0.get("truck_id") or ""))
+        if cur_spec and t0_items and st0["fill_pct"] < 10.0:
+            for sm in catalog.list_trucks():
+                if sm["volume_cuft"] >= cur_spec["volume_cuft"] * 0.65:
+                    break
+                sm_vol_cuin = sm["length_in"] * sm["width_in"] * sm["height_in"]
+                sm_floor = sm["length_in"] * sm["width_in"]
+                if st0["weight_lb"] > sm["max_weight_lb"] * 0.9:
+                    continue
+                if st0["placed_vol_cuin"] > sm_vol_cuin * 0.55:
+                    continue
+                if st0["total_footprint_area"] > sm_floor * 0.80:
+                    continue
+                all_dims_fit = True
+                for it in t0_items:
+                    dx, dy, dz = [float(v) for v in it["size_in"]]
+                    if dz > sm["height_in"] - 0.5 or max(dx, dy) > sm["length_in"] - 0.5 or min(dx, dy) > sm["width_in"] - 0.5:
+                        all_dims_fit = False
+                        break
+                if all_dims_fit:
+                    violations.append(_violation(
+                        "oversized_truck",
+                        f"Truck 1 ({cur_spec['name']}) is only {st0['fill_pct']:.1f}% full ({st0['weight_lb']:.0f} lb) — "
+                        f"cargo fits in {sm['name']} ({sm['truck_id']}); use the smallest van/truck to prevent load shift",
+                        truck_index=0,
+                    ))
+                    break
+
     zone_stats = {"zone_coverage_pct": 0.0, "stocked_zones": 0.0}
     if check_zones:
         zv, zone_stats = verify_zones(placement)
@@ -545,12 +664,16 @@ def verify(
     total_truck_vol = sum(s["truck_vol_cuin"] for s in truck_stats)
     overall_fill_pct = (total_placed_vol / total_truck_vol * 100.0) if total_truck_vol > 0 else 0.0
 
-    # Efficiency rewards high fill on full lead trucks and not opening unnecessary extra trucks.
+    # Efficiency rewards high fill on full lead trucks, right-sized smallest van selection, and no extra trucks.
     if len(truck_stats) > 1:
         lead_fill = sum(s["fill_pct"] for s in truck_stats[:-1]) / (len(truck_stats) - 1)
         efficiency_pts = min(20.0, 12.0 * (lead_fill / 55.0) + 8.0 * (overall_fill_pct / 50.0))
+    elif len(trucks) == 1:
+        smallest_tid = catalog.list_trucks()[0]["truck_id"]
+        min_floor = 0.65 if trucks[0].get("truck_id") == smallest_tid else 0.35
+        efficiency_pts = min(20.0, 20.0 * min(1.0, max(min_floor, overall_fill_pct / 45.0)))
     else:
-        efficiency_pts = min(20.0, 20.0 * min(1.0, max(0.35, overall_fill_pct / 45.0)))
+        efficiency_pts = 0.0
 
     if truck_stats:
         avg_balance_err = sum(abs(s["cog_y_ratio"] - 0.5) for s in truck_stats) / len(truck_stats)
@@ -576,6 +699,10 @@ def verify(
     for v in violations:
         by_rule[v["rule"]] = by_rule.get(v["rule"], 0) + 1
 
+    total_pe_j = sum(s["potential_energy_j"] for s in truck_stats)
+    avg_pe_ratio = (sum(s["pe_ratio"] for s in truck_stats) / len(truck_stats)) if truck_stats else 1.0
+    avg_cog_z_in = (sum(s["cog_z_in"] for s in truck_stats) / len(truck_stats)) if truck_stats else 0.0
+
     return {
         "total": total_score,
         "valid": len(violations) == 0,
@@ -583,6 +710,9 @@ def verify(
         "zone_coverage_pct": round(zone_stats["zone_coverage_pct"], 1),
         "lifo_score": round(lifo_pts, 1),
         "balance_pct": round(avg_balance_pct, 1),
+        "potential_energy_j": round(total_pe_j, 1),
+        "pe_ratio": round(avg_pe_ratio, 2),
+        "cog_height_in": round(avg_cog_z_in, 1),
         "violation_count": len(violations),
         "violation_counts_by_rule": by_rule,
         "violations": violations,

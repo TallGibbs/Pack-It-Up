@@ -135,7 +135,7 @@ ESCALATION_SCHEMA: dict[str, Any] = {
             "type": "object",
             "required": ["truck_id", "order_mode", "downsize_last_truck"],
             "properties": {
-                "truck_id": {"type": "string", "enum": ["uhaul_10", "uhaul_15", "uhaul_20", "uhaul_26"]},
+                "truck_id": {"type": "string", "enum": ["uhaul_van", "uhaul_10", "uhaul_15", "uhaul_20", "uhaul_26"]},
                 "order_mode": {
                     "type": "string",
                     "enum": ["lifo_heavy_first", "zone_strict_lifo", "heavy_first", "volume_first", "fragile_last"],

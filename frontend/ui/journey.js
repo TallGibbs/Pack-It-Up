@@ -8,6 +8,7 @@
   const DEFAULT_DEST = "NY Penn Station, 234 W 31st St, New York, NY 10001";
 
   const TRUCK_SPECS_JS = {
+    uhaul_van: { name: "U-Haul 9 ft Cargo Van", extHIn: 81, extLenFt: 18.5, gvwr: 9000, dualRear: false },
     uhaul_10: { name: "U-Haul 10 ft", extHIn: 103, extLenFt: 19.5, gvwr: 8600, dualRear: false },
     uhaul_15: { name: "U-Haul 15 ft", extHIn: 122, extLenFt: 22.5, gvwr: 14500, dualRear: true },
     uhaul_20: { name: "U-Haul 20 ft", extHIn: 121, extLenFt: 26.4, gvwr: 14500, dualRear: true },
