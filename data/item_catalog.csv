@@ -1,0 +1,58 @@
+catalog_id,name,category,length_in,width_in,height_in,stackable_on_top,must_stay_upright,load_on_edge,fragile,two_person
+sofa_3seat,Sofa (3-seat),living,84,36,34,light_only,no,no,no,yes
+sofa_loveseat,Loveseat,living,60,36,34,light_only,no,no,no,yes
+sofa_sectional_piece,Sectional piece,living,90,38,34,light_only,no,no,no,yes
+armchair,Armchair,living,36,36,36,light_only,no,no,no,no
+recliner,Recliner,living,38,38,40,light_only,no,no,no,yes
+coffee_table,Coffee table,living,48,24,18,yes,no,no,no,no
+end_table,End table,living,22,22,24,yes,no,no,no,no
+tv_stand,TV stand / media console,living,60,18,24,yes,no,no,no,yes
+tv_55,TV 50-59 in,living,50,6,30,no,yes,no,yes,no
+tv_65,TV 60-70 in,living,58,6,34,no,yes,no,yes,yes
+bookshelf_tall,Bookshelf (tall),living,32,12,72,no,no,no,no,yes
+bookshelf_short,Bookshelf (short),living,32,12,36,yes,no,no,no,no
+floor_lamp,Floor lamp,living,12,12,60,no,yes,no,yes,no
+area_rug_rolled,Area rug (rolled),living,96,10,10,no,no,no,no,no
+mattress_twin,Mattress (twin),bedroom,75,38,10,no,no,yes,no,no
+mattress_full,Mattress (full),bedroom,75,54,10,no,no,yes,no,yes
+mattress_queen,Mattress (queen),bedroom,80,60,10,no,no,yes,no,yes
+mattress_king,Mattress (king),bedroom,80,76,10,no,no,yes,no,yes
+box_spring_queen,Box spring (queen),bedroom,80,60,9,no,no,yes,no,yes
+bed_frame_disassembled,Bed frame (disassembled),bedroom,82,10,8,yes,no,no,no,no
+headboard_queen,Headboard (queen),bedroom,62,4,48,no,no,yes,no,no
+dresser_tall,Dresser (tall),bedroom,36,18,48,yes,yes,no,no,yes
+dresser_wide,Dresser (wide),bedroom,60,18,34,yes,yes,no,no,yes
+nightstand,Nightstand,bedroom,20,16,24,yes,no,no,no,no
+wardrobe_armoire,Wardrobe / armoire,bedroom,40,22,72,no,yes,no,no,yes
+mirror_floor,Floor mirror,bedroom,24,3,65,no,yes,yes,yes,no
+dining_table_4,Dining table (4-seat),dining,48,36,30,yes,no,no,no,yes
+dining_table_6,Dining table (6-seat),dining,72,38,30,yes,no,no,no,yes
+dining_chair,Dining chair,dining,18,20,36,light_only,no,no,no,no
+bar_stool,Bar stool,dining,16,16,30,light_only,no,no,no,no
+china_cabinet,China cabinet / hutch,dining,48,18,78,no,yes,no,yes,yes
+refrigerator,Refrigerator,kitchen,36,32,70,no,yes,no,no,yes
+range_stove,Range / stove,kitchen,30,28,36,yes,yes,no,no,yes
+dishwasher,Dishwasher,kitchen,24,24,34,yes,yes,no,no,yes
+microwave,Microwave,kitchen,20,16,12,yes,no,no,no,no
+washer,Washing machine,laundry,27,30,39,yes,yes,no,no,yes
+dryer,Dryer,laundry,27,30,39,yes,yes,no,no,yes
+desk,Desk,office,60,30,30,yes,no,no,no,yes
+office_chair,Office chair,office,26,26,40,no,no,no,no,no
+filing_cabinet_2drawer,Filing cabinet (2-drawer),office,15,25,29,yes,yes,no,no,no
+monitor,Computer monitor,office,25,8,18,no,yes,no,yes,no
+bicycle,Bicycle,garage,68,24,42,no,yes,no,no,no
+lawn_mower,Lawn mower (push),garage,60,22,40,no,yes,no,no,no
+grill,Grill,garage,55,24,46,no,yes,no,no,yes
+tool_chest,Tool chest,garage,42,18,40,yes,yes,no,no,yes
+patio_chair,Patio chair,outdoor,26,28,34,light_only,no,no,no,no
+patio_table,Patio table,outdoor,48,48,29,yes,no,no,no,yes
+crib,Crib (assembled),kids,54,30,36,light_only,no,no,no,no
+stroller_folded,Stroller (folded),kids,40,22,16,light_only,no,no,no,no
+piano_upright,Upright piano,specialty,58,25,48,no,yes,no,yes,yes
+treadmill,Treadmill,specialty,72,34,56,no,yes,no,no,yes
+box_small,Box small (1.5 cu ft),box,16,12,12,yes,no,no,no,no
+box_medium,Box medium (3.0 cu ft),box,18,18,16,yes,no,no,no,no
+box_large,Box large (4.5 cu ft),box,18,18,24,yes,no,no,no,no
+box_xl,Box extra large (6.0 cu ft),box,24,18,24,yes,no,no,no,no
+box_wardrobe,Wardrobe box,box,24,21,46,no,yes,no,no,no
+box_dish_pack,Dish pack,box,18,18,28,light_only,yes,no,yes,no
