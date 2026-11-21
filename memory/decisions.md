@@ -290,3 +290,10 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Red-teaming with 4 boxes previously picked a 26-ft truck (`0.7%` fill), stacked all 4 boxes into a 64-in Jenga tower on an empty floor, and passed all checks.
 - **By:** George.
 - **See:** `data/trucks.csv`, `backend/solver.py`, `backend/verify.py`, `frontend/index.html`, `tests/test_track_b.py`
+
+## 2026-11-21 15:41 · Supply kit: fewer stores over the cheapest store per item
+- **Decision:** The Move Supply Kit picks stores for the whole kit, not item by item. A store is dropped when moving its lines to stores already in the kit costs less than an estimated $15 shipping fee per store (`EST_SHIPPING_PER_STORE_CENTS` in `backend/commerce.py`). The browser fallback in `frontend/ui/commerce.js` uses the same rule.
+- **Why:** Each Shopify store is its own cart and its own shipping charge; a $5.80 tape cart was charged $25 shipping. One cart per store is a Shopify limit, so fewer stores is the only way to fewer carts. (Chris)
+- **Limits:** $15 is a guess; real shipping is only known at checkout. A store stays when it is the only one in the kit offering a line within $15.
+- **By:** Chris. Track B files (George's), changed at Chris's request.
+- **See:** commit 12aa644, FAILURES.md 15:41 row
