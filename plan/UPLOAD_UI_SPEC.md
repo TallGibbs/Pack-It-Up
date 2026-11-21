@@ -21,7 +21,7 @@ Query parameters, on either page:
 
 - `?mock=1` runs against the mock. No server, no key, no media needed.
 - `?api=http://host:port` points at an API on another origin. Default: the page's own origin.
-- `?run_id=…` on `review.html` picks the run.
+- `?run_id=…` picks the run: the one `review.html` shows, and the one `capture.html` carries on with. The capture page adds it to its own address after the first upload, so a reload continues the same move (decision 12:19; details in [frontend/README.md](../frontend/README.md#what-a-move-is)).
 
 ## Screen 1: Capture
 

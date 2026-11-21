@@ -14,6 +14,16 @@
   <h1>Film your rooms</h1>
   <p class="muted">Photos or short clips of each room. We list what's there, then plan the truck.</p>
 
+  <p id="notice" class="warn hidden" aria-live="polite"></p>
+  <section id="resume" class="card q hidden">
+    <div class="text"><b>Pick up where you left off?</b></div>
+    <div class="small muted" id="resume-what"></div>
+    <div class="opts">
+      <a class="btn primary" id="resume-yes" href="#">Continue this move</a>
+      <button class="btn" id="resume-no" type="button">Not now</button>
+    </div>
+  </section>
+
   <div id="rooms"></div>
 
   <section id="live-q" aria-live="polite"></section>
@@ -71,7 +81,7 @@
 <script>
 (function () {
   "use strict";
-  const { api, link, MOCK } = window.PIU;
+  const { api, link, MOCK, params } = window.PIU;
   const $ = (s, el = document) => el.querySelector(s);
   const ACCEPT_EXT = /\.(jpe?g|png|heic|heif|webp|mp4|mov|m4v)$/i;
   const TUNNEL = /trycloudflare\.com$/i.test(location.hostname);
@@ -79,13 +89,16 @@
 
   if (MOCK) $("#mock-banner").classList.remove("hidden");
 
+  // One move is one run on the server. The run id is kept in the address (?run_id=), so a reload
+  // comes back to the same move; see "coming back to a move" below.
   let runId = null;
   let firstSentAt = 0;
   const rooms = [];          // {el, name, locked, files: [row]}
-  const usedNames = new Set();
+  const usedNames = new Set();   // every file name in this run, lower case: the server keys files by name
   const queue = [];
   let uploading = false;
-  let pollTimer = null;
+  let pollTimer = null;      // a poll is scheduled
+  let polling = false;       // a poll is waiting on the server
   let lastRun = null;
   const Q = window.PIU_Q;
   const busyQ = new Set();
@@ -106,6 +119,15 @@
     rooms.push(room);
     $("#rooms").appendChild(el);
     return room;
+  }
+
+  // A room's name is fixed once it has files: the server files them under that name.
+  function lockRoom(room, name) {
+    room.name = name;
+    room.locked = true;
+    const input = $(".room-name", room.el);
+    input.value = name;
+    input.readOnly = true;
   }
 
   function roomName(room) {
@@ -141,11 +163,7 @@
     warn.classList.toggle("hidden", !msgs.length);
     if (!ok.length) return;
 
-    room.name = roomName(room);
-    room.locked = true;
-    const nameInput = $(".room-name", room.el);
-    nameInput.value = room.name;
-    nameInput.readOnly = true;
+    lockRoom(room, roomName(room));
 
     const batch = ok.map((f) => {
       const name = uniqueName(f.name || "upload");
@@ -172,16 +190,13 @@
         job.rows.forEach((r) => (r.pct = p));
         render(job.room);
       });
-      runId = res.run_id;
-      window.PIU.rememberRun(runId);
+      adoptRun(res.run_id);
       const skipped = new Set((res.skipped || []).map((s) => (typeof s === "string" ? s : s.name)));
       job.rows.forEach((r) => {
         r.phase = skipped.has(r.name) ? "failed" : "sent";
         if (r.phase === "failed") r.err = "server skipped this file";
       });
       if (!firstSentAt) firstSentAt = Date.now();
-      $("#footer").classList.remove("hidden");
-      $("#new-move").classList.remove("hidden");
       startPolling();
     } catch (e) {
       job.rows.forEach((r) => { r.phase = "failed"; r.err = e.message; });
@@ -249,6 +264,7 @@
   async function poll() {
     pollTimer = null;
     if (!runId || document.hidden) return;
+    polling = true;
     try {
       const run = await api.getRun(runId);
       lastRun = run;
@@ -259,16 +275,18 @@
       });
       updateFooter(run);
       renderLiveQ(run.inventory);
-      if (allFinished(run)) return; // stop until the next upload
+      if (allFinished(run)) { polling = false; return; } // stop until the next upload
     } catch (e) {
       $("#found").innerHTML = `<b>Can't reach the server</b><span class="error"></span>`;
       $("#found .error").textContent = e.message;
     }
+    polling = false;
     pollTimer = setTimeout(poll, 1000);
   }
 
+  // One poll loop at most: an upload that finishes while a poll is waiting must not start a second.
   function startPolling() {
-    if (!pollTimer) pollTimer = setTimeout(poll, 300);
+    if (!pollTimer && !polling) pollTimer = setTimeout(poll, 300);
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden && runId) startPolling(); });
 
@@ -349,10 +367,96 @@
     }
   }
 
+  // ---------- coming back to a move ----------
+  // Take `id` as this page's move: remember it, and put it in the address so a reload returns to it.
+  function adoptRun(id) {
+    runId = id;
+    window.PIU.rememberRun(id);
+    try { history.replaceState(null, "", link("capture.html", { run_id: id })); } catch (e) { /* file:// */ }
+    $("#footer").classList.remove("hidden");
+    $("#new-move").classList.remove("hidden");
+    $("#resume").classList.add("hidden");
+  }
+
+  function notice(text) {
+    $("#notice").textContent = text || "";
+    $("#notice").classList.toggle("hidden", !text);
+  }
+
+  // Rebuild the room cards from GET /runs: `rooms` gives the names, `status.files` each file's state.
+  // These rows have no File object; they are already on the server, so they never need a retry.
+  function showRun(run) {
+    const byRoom = {};
+    Object.entries((run.status && run.status.files) || {}).forEach(([name, st]) => {
+      usedNames.add(name.toLowerCase());
+      (byRoom[st.room_id] = byRoom[st.room_id] || []).push({
+        name, file: null, kind: st.kind === "video" ? "video" : "image", phase: "sent", pct: 0, server: st, err: "" });
+    });
+    (run.rooms || []).forEach((r) => {
+      const room = addRoom();
+      lockRoom(room, r.name);
+      room.files = byRoom[r.id] || [];
+      render(room);
+    });
+  }
+
+  // ?run_id= in the address: load that move and carry on with it. Nothing can be picked until it has
+  // loaded, because new file names must not repeat ones the run already has.
+  async function resume(id) {
+    notice("Loading your move…");
+    let run;
+    try {
+      run = await api.getRun(id);
+    } catch (e) {
+      if (e.status === 404) return startFresh("That move isn't on this server any more, so this is a new one.");
+      notice(`Can't reach the server (${e.message}). Trying again…`);
+      setTimeout(() => resume(id), 2000);
+      return;
+    }
+    notice("");
+    showRun(run);
+    adoptRun(id);
+    addRoom();
+    lastRun = run;
+    updateFooter(run);
+    renderLiveQ(run.inventory);
+    startPolling();
+  }
+
+  function startFresh(why) {
+    window.PIU.forgetRun();
+    try { history.replaceState(null, "", link("capture.html")); } catch (e) { /* file:// */ }
+    notice(why);
+    addRoom();
+  }
+
+  // No run in the address, but this browser was in a move earlier: offer it, without getting in the
+  // way. Picking files instead starts a new move and hides the offer.
+  async function offerLastRun(id) {
+    let run;
+    try {
+      run = await api.getRun(id);
+    } catch (e) {
+      if (e.status === 404) window.PIU.forgetRun();
+      return;
+    }
+    if (runId) return; // an upload got there first
+    const names = (run.rooms || []).map((r) => r.name);
+    const n = run.inventory ? run.inventory.totals.item_count : null;
+    $("#resume-what").textContent = [names.slice(0, 3).join(", ") + (names.length > 3 ? "…" : ""),
+      n != null ? `${n} items` : "still being listed"].filter(Boolean).join(" · ");
+    $("#resume-yes").href = link("capture.html", { run_id: id });
+    $("#resume").classList.remove("hidden");
+  }
+  $("#resume-no").addEventListener("click", () => $("#resume").classList.add("hidden"));
+
   // ---------- QR code for opening this page on a phone (laptop only) ----------
   function setupQr() {
     if (!matchMedia("(min-width: 900px) and (hover: hover)").matches) return;
-    const url = location.href;
+    // Without the run id: everyone who scans the code starts their own move.
+    const here = new URL(location.href);
+    here.searchParams.delete("run_id");
+    const url = here.href;
     $("#qr-url").textContent = url;
     if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
       $("#qr").outerHTML = `<p class="small">This page is open on <b>localhost</b>, which a phone can't reach. Open it with the laptop's LAN address or the tunnel address to get a QR code.</p>`;
@@ -373,11 +477,19 @@
   });
   $("#new-move").addEventListener("click", () => {
     if (!confirm("Start a new move? This page forgets the current one (the server keeps it).")) return;
+    window.PIU.forgetRun();
     location.href = link("capture.html");
   });
 
-  addRoom();
   setupQr();
+  const wanted = params.get("run_id");
+  if (wanted) {
+    resume(wanted);
+  } else {
+    addRoom();
+    const last = window.PIU.lastRun();
+    if (last) offerLastRun(last);
+  }
 })();
 </script>
 </body>

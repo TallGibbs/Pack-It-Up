@@ -150,7 +150,8 @@
     else status.stage = now - lastDone > 1000 ? "done" : "questions";
     status.updated = new Date(now).toISOString().slice(0, 19);
 
-    if (!rooms.length) return { run_id: run.id, status };
+    const roomList = run.rooms.map((r) => ({ id: r.id, name: r.name })); // as GET /runs: every room, in upload order
+    if (!rooms.length) return { run_id: run.id, rooms: roomList, status };
     const sum = (k) => r1(rooms.reduce((a, r) => a + r.totals[k], 0));
     const inventory = {
       schema_version: "inventory_v2", run_id: run.id, generated: status.updated, rooms,
@@ -158,7 +159,7 @@
                 boxed_volume_cuft: sum("boxed_volume_cuft") },
       questions, answers_applied: [],
     };
-    return { run_id: run.id, status, inventory, partial: status.stage !== "done",
+    return { run_id: run.id, rooms: roomList, status, inventory, partial: status.stage !== "done",
              questions: questions.filter((q) => q.status === "open") };
   }
 

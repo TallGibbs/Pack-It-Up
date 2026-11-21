@@ -16,6 +16,11 @@
   function recall(key) {
     try { return store("localStorage").getItem(key); } catch (e) { return null; }
   }
+  function forget(key) {
+    try { store("localStorage").removeItem(key); } catch (e) { /* private mode */ }
+  }
+  // The last move this browser was in. Mock runs are kept apart: they don't exist on the server.
+  const RUN_KEY = "piu_last_run" + (MOCK ? "_mock" : "");
 
   // Link to another page, keeping ?mock and ?api.
   function link(page, extra) {
@@ -95,8 +100,9 @@
     params,
     link,
     placeholder,
-    rememberRun: (id) => remember("piu_last_run" + (MOCK ? "_mock" : ""), id),
-    lastRun: () => recall("piu_last_run" + (MOCK ? "_mock" : "")),
+    rememberRun: (id) => remember(RUN_KEY, id),
+    lastRun: () => recall(RUN_KEY),
+    forgetRun: () => forget(RUN_KEY),
     api: MOCK ? window.PIU_MOCK : real,
   };
   if (MOCK && !window.PIU_MOCK) console.error("?mock=1 needs mock/mock-api.js loaded before ui/api.js");

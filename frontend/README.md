@@ -28,10 +28,13 @@ Each page loads `mock/mock-api.js`, then `ui/api.js`, then `ui/questions.js`, th
 
 The pages say "move"; the API and the disk say "run". One move is one `run_id`, one folder `runs/<run_id>/` on the server, and any number of rooms.
 
-- The server makes the `run_id` on the first `POST /upload` that arrives without one. Later uploads from the same page send it back, which adds files or rooms to the same move.
-- `capture.html` keeps the `run_id` in a script variable only. Reloading the page, or opening it from review's "Film another room" link, starts with no run, so the next upload starts a new move.
-- `review.html` takes the run from `?run_id=`, or else from the last run this browser saw (`localStorage` key `piu_last_run`).
-- There is no login. Anyone with a `run_id` can read and edit that move.
+- The server makes the `run_id` on the first `POST /upload` that arrives without one. Later uploads send it back, which adds files or rooms to the same move.
+- **Coming back continues the move** (decision 2026-11-21 12:19). After the first upload `capture.html` puts `?run_id=` in its own address, so a reload returns to the same move: it loads `GET /runs/{run_id}` and rebuilds the room cards from `rooms` and `status.files`. Review's "Film another room" link carries the `run_id` too.
+- Opened with no `run_id`, `capture.html` offers the last move this browser was in (`localStorage` key `piu_last_run`) in a "Pick up where you left off?" card. Picking files without answering starts a new move. "Start a new move" forgets the saved one.
+- `review.html` takes the run from `?run_id=`, or else from that same saved run.
+- The QR code on the capture page leaves `run_id` out, so everyone who scans it starts their own move.
+- The server keys a run's files by name. The capture page renames repeats (`image.jpg`, `image_2.jpg`) and, when it resumes a run, counts the names already there. Two phones adding to one move at the same moment are not protected from a name clash.
+- There is no login. Anyone with a `run_id` can read and edit that move; the id ends in a random suffix so it can't be guessed.
 
 ## URL parameters
 
@@ -39,4 +42,4 @@ The pages say "move"; the API and the disk say "run". One move is one `run_id`, 
 |---|---|---|
 | `?mock=1` | both | No server: the mock answers, with invented items |
 | `?api=http://host:port` | both | Call an API on another origin (page work with `python -m http.server`) |
-| `?run_id=…` | `review.html` | Which move to show |
+| `?run_id=…` | both | Which move to show (review) or carry on with (capture) |
