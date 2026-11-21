@@ -45,7 +45,7 @@ Every model call goes through `backend/llm/` and is set per job in [backend/llm/
 3. Check the models answer: `python -m backend.llm.hello`.
 4. Inventory a folder of photos and clips: `python -m backend.ingest data/Inputs/Malin --room "Malin lounge"`.
 5. API: `uvicorn backend.app:app --port 8000`, then `curl -F room="Lounge" -F files=@photo.jpg localhost:8000/upload` and `curl localhost:8000/inventory/<run_id>`.
-6. Which model did which job: open `/app/models.html?run_id=<run_id>` (all runs if no id), or run `python -m backend.analysis [run_id]`. It reads each run's `calls.jsonl` and `questions.json` into `.cache/analysis.db`.
+6. Which model did which job: open `/app/models.html?run_id=<run_id>`, or `?run_id=all` for totals and run-by-run trends; or run `python -m backend.analysis [run_id | --trends]`. It copies each run's `calls.jsonl` and `questions.json` into `.history/analysis.db` (git-ignored), which keeps a run, marked archived, after its folder is deleted.
 7. Score against a hand count: `python eval/score_inventory.py runs/<run_id> eval/hand_counts/malin.json`.
 
 ## Open the pages (phone upload and review)

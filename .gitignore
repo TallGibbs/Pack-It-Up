@@ -33,3 +33,6 @@ Thumbs.db
 # Pipeline outputs and model-call cache (may hold derived media)
 .cache/
 runs/
+
+# Model-use history database (backend/analysis); holds labels and question text from real footage
+.history/

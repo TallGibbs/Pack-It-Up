@@ -10,7 +10,9 @@ from pathlib import Path
 
 from backend.ingest.common import ROOT, RUNS_DIR
 
-DB_PATH = Path(os.environ.get("PACK_ANALYSIS_DB", ROOT / ".cache" / "analysis.db"))
+# Outside .cache/ (which people wipe to force fresh model calls) and runs/ (which gets cleaned up), so the
+# history survives both. Git-ignored: it holds item labels and question text from real footage.
+DB_PATH = Path(os.environ.get("PACK_ANALYSIS_DB", ROOT / ".history" / "analysis.db"))
 SOURCES = ("calls.jsonl", "questions.json", "status.json", "manifest.json", "inventory.json", "answers.json")
 
 # What each job is for, in words a judge can repeat back. Jobs not listed show their own name.
@@ -30,7 +32,7 @@ ORDER = list(ROLES)
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
   run_id TEXT PRIMARY KEY, created TEXT, rooms TEXT, n_files INTEGER, stage TEXT,
-  items INTEGER, volume_cuft REAL, weight_lb REAL, sig TEXT);
+  items INTEGER, volume_cuft REAL, weight_lb REAL, sig TEXT, archived INTEGER DEFAULT 0, archived_at TEXT);
 CREATE TABLE IF NOT EXISTS calls (
   run_id TEXT, seq INTEGER, ts TEXT, job TEXT, provider TEXT, model TEXT, kind TEXT, prompt_version TEXT,
   file TEXT, cache TEXT, valid INTEGER, latency_s REAL, tokens_in INTEGER, tokens_out INTEGER,
@@ -75,6 +77,10 @@ def connect() -> sqlite3.Connection:
     con = sqlite3.connect(DB_PATH, timeout=10)
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    cols = {r["name"] for r in con.execute("PRAGMA table_info(runs)")}
+    for col, decl in (("archived", "INTEGER DEFAULT 0"), ("archived_at", "TEXT")):  # databases made before 12:40
+        if col not in cols:
+            con.execute(f"ALTER TABLE runs ADD COLUMN {col} {decl}")
     return con
 
 
@@ -98,7 +104,8 @@ def _load_run(con: sqlite3.Connection, run_id: str, rd: Path, sig: str) -> None:
     labels = {it.get("id"): it.get("label") for room in inv.get("rooms", []) for it in room.get("items", [])}
     labels.update({c.get("id"): c.get("label") for room in inv.get("rooms", []) for c in room.get("containers", [])})
     rooms = ", ".join(r.get("name", r.get("id", "")) for r in manifest.get("rooms", []))
-    con.execute("INSERT INTO runs VALUES (?,?,?,?,?,?,?,?,?)",
+    con.execute("INSERT INTO runs (run_id, created, rooms, n_files, stage, items, volume_cuft, weight_lb, sig, archived) "
+                "VALUES (?,?,?,?,?,?,?,?,?,0)",
                 (run_id, manifest.get("created"), rooms, len(manifest.get("files", [])), status.get("stage"),
                  totals.get("item_count"), totals.get("volume_cuft"), totals.get("weight_lb"), sig))
 
@@ -159,11 +166,13 @@ def sync(run_id: str | None = None) -> None:
                 sig = _sig(rd)
                 if known.get(rd.name) != sig:
                     _load_run(con, rd.name, rd, sig)
-            if not run_id:  # drop runs whose folder is gone
+            if not run_id:
+                # A run whose folder is gone stays, marked archived: the database is the history, and the
+                # folders can be cleaned up. If the folder comes back, the next sync reloads it.
                 gone = set(known) - {p.name for p in dirs}
-                for rid in gone:
-                    for t in ("calls", "decisions", "perception", "runs"):
-                        con.execute(f"DELETE FROM {t} WHERE run_id = ?", (rid,))
+                now = dt.datetime.now().isoformat(timespec="seconds")
+                con.executemany("UPDATE runs SET archived = 1, archived_at = ? WHERE run_id = ? AND archived = 0",
+                                [(now, rid) for rid in gone])
             con.commit()
         finally:
             con.close()
@@ -268,6 +277,40 @@ def overall() -> dict:
         n = con.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
         return {"runs": n, "configured": _configured(), "jobs": _jobs(con, "1 = 1", ()),
                 "decision_stats": _decision_stats(con, "1 = 1", ())}
+    finally:
+        con.close()
+
+
+def trends() -> list[dict]:
+    """One row per run, oldest first: how fast and how sure the models were, and how often the user kept
+    the Decisions API's answer. Cached calls are left out of the times (they replay an earlier answer)."""
+    sync()
+    con = connect()
+    try:
+        rows = con.execute("""
+            SELECT r.run_id, r.created, r.rooms, r.n_files, r.items, r.archived,
+              (SELECT ROUND(AVG(latency_s), 1) FROM calls c WHERE c.run_id = r.run_id AND c.job = 'perceive'
+                 AND c.cache = 'miss' AND c.valid = 1) AS perceive_s,
+              (SELECT COUNT(*) FROM calls c WHERE c.run_id = r.run_id AND c.job = 'perceive' AND c.cache = 'miss') AS perceive_live,
+              (SELECT COUNT(*) FROM calls c WHERE c.run_id = r.run_id AND c.job = 'perceive' AND c.cache = 'hit') AS perceive_cached,
+              (SELECT ROUND(AVG(latency_s), 2) FROM calls c WHERE c.run_id = r.run_id AND c.job = 'decide'
+                 AND c.cache = 'miss' AND c.valid = 1) AS decide_s,
+              (SELECT COUNT(*) FROM calls c WHERE c.run_id = r.run_id AND c.job = 'decide') AS decide_calls,
+              (SELECT ROUND(AVG(model_confidence), 3) FROM decisions d WHERE d.run_id = r.run_id
+                 AND d.via = 'decisions_api') AS confidence,
+              (SELECT COUNT(*) FROM decisions d WHERE d.run_id = r.run_id AND d.via = 'decisions_api') AS answers,
+              (SELECT COUNT(*) FROM decisions d WHERE d.run_id = r.run_id AND d.answered_by = 'user'
+                 AND d.model_answer IS NOT NULL) AS user_checked,
+              (SELECT COALESCE(SUM(user_changed), 0) FROM decisions d WHERE d.run_id = r.run_id) AS user_changed,
+              (SELECT prompt_version FROM perception p WHERE p.run_id = r.run_id AND prompt_version IS NOT NULL
+                 GROUP BY prompt_version ORDER BY COUNT(*) DESC LIMIT 1) AS prompt_version
+            FROM runs r ORDER BY COALESCE(r.created, r.run_id), r.run_id""").fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["kept"] = round(1 - d["user_changed"] / d["user_checked"], 3) if d["user_checked"] else None
+            out.append(d)
+        return out
     finally:
         con.close()
 

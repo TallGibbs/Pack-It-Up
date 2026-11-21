@@ -3,6 +3,9 @@
 GET /analysis/runs              -> every run with call and question counts
 GET /analysis/runs/{run_id}     -> jobs, Decisions API answers, per-file perception, call timeline
 GET /analysis/summary           -> the same job and decision totals across all runs
+GET /analysis/trends            -> one row per run, oldest first: speed, confidence, answers kept
+
+Runs whose folder was deleted stay in the database, marked `archived`.
 """
 from __future__ import annotations
 
@@ -35,3 +38,8 @@ def run(run_id: str):
 @router.get("/summary")
 def summary():
     return store.overall()
+
+
+@router.get("/trends")
+def trends():
+    return {"runs": store.trends()}

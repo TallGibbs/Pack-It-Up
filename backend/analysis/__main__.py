@@ -2,6 +2,7 @@
 
     python -m backend.analysis              # totals across every run
     python -m backend.analysis <run_id>     # one run
+    python -m backend.analysis --trends     # one row per run, oldest first
 """
 from __future__ import annotations
 
@@ -26,7 +27,20 @@ def _decisions(d: dict) -> str:
             f"User agreed with the model's answer: {agree} ({d['user_checked']} checked, {d['user_changed']} changed).")
 
 
+def _trends_table(rows: list[dict]) -> str:
+    head = ("| Run | Rooms | Prompt | Perceive s/file | Decide s | Decisions confidence | Kept (checked) | Archived |\n"
+            "|---|---|---|---|---|---|---|---|")
+    f = lambda v, fmt="{}": "–" if v is None else fmt.format(v)
+    lines = [f"| {r['run_id']} | {r['rooms'] or ''} | {f(r['prompt_version'])} | {f(r['perceive_s'])} | {f(r['decide_s'])} | "
+             f"{f(r['confidence'], '{:.0%}')} | {f(r['kept'], '{:.0%}')} ({r['user_checked']}) | {'yes' if r['archived'] else ''} |"
+             for r in rows]
+    return "\n".join([head, *lines])
+
+
 def main(argv: list[str]) -> int:
+    if argv and argv[0] == "--trends":
+        print(_trends_table(store.trends()))
+        return 0
     if argv:
         s = store.run_summary(argv[0])
         if s is None:

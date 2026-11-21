@@ -56,6 +56,27 @@
   .who.changed { border-color: var(--warn); color: var(--warn); }
   .qtext { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+  .trends { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+  .trend { margin: 0; position: relative; }
+  .trend h3 { font-size: 14px; margin: 0 0 2px; }
+  .trend p { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+  .trend svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .trend text { fill: var(--muted); font-size: 10px; font-family: inherit; }
+  .trend .band { fill: var(--ink); opacity: .045; }
+  .trend .band-label { fill: var(--muted); font-size: 10px; font-weight: 600; }
+  .trend .axis { stroke: var(--line); stroke-width: 1; }
+  .trend .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .trend .dot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+  .trend .dot.archived { fill: var(--card); stroke: var(--accent); stroke-width: 2; }
+  .trend .hit { fill: transparent; cursor: default; }
+  .trend .hl { stroke: var(--muted); stroke-width: 1; opacity: 0; }
+  .tip { position: fixed; z-index: 10; pointer-events: none; background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); max-width: 260px; }
+  .tip b { display: block; font-size: 13px; }
+  .tip .muted { font-size: 11px; }
+  .arch { font-size: 11px; color: var(--muted); border: 1px dashed var(--line); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+  .notice { background: var(--quote); border-radius: 10px; padding: 8px 12px; font-size: 13px; margin: 10px 0; }
 </style>
 </head>
 <body>
@@ -71,8 +92,20 @@
     <a class="btn link" id="to-review" href="#">Check list →</a>
   </div>
   <p class="error hidden" id="err"></p>
+  <p class="notice hidden" id="archived-note"></p>
 
   <section id="jobs" class="jobs" aria-live="polite"></section>
+
+  <section id="trends-sec" class="hidden">
+    <h2>Run by run</h2>
+    <p class="small muted">One dot per run, oldest on the left. Shaded bands mark the perceive prompt version.
+      Hollow dots are archived runs (their folder was deleted; their numbers are kept). Times count live calls only.</p>
+    <div class="trends" id="trends"></div>
+    <details class="card scroll" style="margin-top:12px">
+      <summary class="small" style="cursor:pointer">Table of every run</summary>
+      <div id="trend-table" style="margin-top:8px"></div>
+    </details>
+  </section>
 
   <section id="timeline-sec">
     <h2>Calls over time</h2>
@@ -93,7 +126,7 @@
 
   <p class="small muted" style="margin:24px 0 40px">
     Source: <code>runs/&lt;run_id&gt;/calls.jsonl</code>, <code>questions.json</code> and the perception files,
-    copied into <code>.cache/analysis.db</code>. <b>Cached</b> calls replay the answer to an identical earlier call
+    copied into <code>.history/analysis.db</code> on this laptop. A run stays there after its folder is deleted. <b>Cached</b> calls replay the answer to an identical earlier call
     (same file, prompt and model) and take no time. Model IDs come from <code>backend/llm/models.toml</code>.
   </p>
 </main>
@@ -103,7 +136,7 @@
   "use strict";
   const params = new URLSearchParams(location.search);
   const API = (params.get("api") || "").replace(/\/+$/, "") || location.origin;
-  const ALL = "__all__";
+  const ALL = "all"; // ?run_id=all opens the totals and run-by-run trends
   // One colour per job, from the shared theme tokens so dark mode follows.
   const COLORS = { perceive: "var(--accent)", perceive_fallback: "var(--accent)", decide: "var(--ok)",
     decide_fallback: "var(--ok)", transcribe: "var(--warn)", plan: "#8250df", baseline: "var(--muted)",
@@ -254,6 +287,140 @@
       </tr>`).join("") + `</tbody></table>`;
   }
 
+  // ---------- run-by-run trends (All runs view) ----------
+  const hhmm = (id) => id.slice(9, 13).replace(/(\d\d)(\d\d)/, "$1:$2");
+  const short = (pv) => (pv || "").replace(/^perceive_/, "");
+  const TRENDS = [
+    { key: "perceive_s", title: "Perceive: seconds per file", note: "Average live call; lower is faster",
+      fmt: (v) => fmt(v, 1) + " s", pct: false },
+    { key: "confidence", title: "Decisions API: mean confidence", note: "Across its answers in the run",
+      fmt: pct, pct: true },
+    { key: "kept", title: "Answers you kept", note: "Of the Decisions API answers you checked; n under each dot",
+      fmt: pct, pct: true, n: "user_checked" },
+  ];
+
+  function niceMax(v) {
+    const p = Math.pow(10, Math.floor(Math.log10(v || 1)));
+    return [1, 2, 2.5, 5, 10].map((m) => m * p).find((m) => m >= v) || v;
+  }
+
+  function trendSvg(rows, t, idx) {
+    const W = 300, H = 170, L = 34, R = 8, T = 16, B = 22;
+    const n = rows.length;
+    const P = 10; // inner padding so the first and last dots clear the y labels and the frame edge
+    const x = (i) => L + P + (n === 1 ? (W - L - R - 2 * P) / 2 : (i / (n - 1)) * (W - L - R - 2 * P));
+    const vals = rows.map((r) => r[t.key]);
+    const max = t.pct ? 1 : niceMax(Math.max(...vals.filter((v) => v != null), 0) * 1.1);
+    const y = (v) => T + (1 - v / max) * (H - T - B);
+    let g = "";
+    // prompt-version bands behind the data
+    let start = 0;
+    for (let i = 1; i <= n; i++) {
+      if (i === n || rows[i].prompt_version !== rows[start].prompt_version) {
+        const pv = rows[start].prompt_version;
+        if (pv) {
+          const x0 = start === 0 ? L : (x(start - 1) + x(start)) / 2, x1 = i === n ? W - R : (x(i - 1) + x(i)) / 2;
+          const k = [...new Set(rows.map((r) => r.prompt_version).filter(Boolean))].indexOf(pv);
+          if (k % 2 === 0) g += `<rect class="band" x="${x0}" y="${T}" width="${x1 - x0}" height="${H - T - B}"/>`;
+          g += `<text class="band-label" x="${(x0 + x1) / 2}" y="${T - 4}" text-anchor="middle">${esc(short(pv))}</text>`;
+        }
+        start = i;
+      }
+    }
+    // y ticks: 0, half, max (hairline, recessive)
+    [0, max / 2, max].forEach((v) => {
+      g += `<line class="axis" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>` +
+           `<text x="${L - 4}" y="${y(v) + 3}" text-anchor="end">${t.pct ? Math.round(v * 100) + "%" : fmt(v)}</text>`;
+    });
+    // x labels: first, last and a few between
+    const every = Math.max(1, Math.ceil(n / 5));
+    rows.forEach((r, i) => {
+      if (i === 0 || i === n - 1 || (i % every === 0 && n - 1 - i >= every / 2))
+        g += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${hhmm(r.run_id)}</text>`;
+    });
+    // line between neighbouring runs that both have a value; a missing run breaks the line
+    let path = "";
+    rows.forEach((r, i) => {
+      const v = r[t.key];
+      if (v == null) return;
+      path += (i > 0 && rows[i - 1][t.key] != null ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1);
+    });
+    if (path) g += `<path class="line" d="${path}"/>`;
+    rows.forEach((r, i) => {
+      const v = r[t.key];
+      g += `<line class="hl" data-i="${i}" x1="${x(i)}" x2="${x(i)}" y1="${T}" y2="${H - B}"/>`;
+      if (v != null) {
+        g += `<circle class="dot${r.archived ? " archived" : ""}" cx="${x(i)}" cy="${y(v)}" r="4.5"/>`;
+        // n below the dot, or above it when the dot sits near the baseline (keeps clear of the time labels)
+        if (t.n) g += `<text x="${x(i)}" y="${v < max * 0.2 ? y(v) - 9 : y(v) + 15}" text-anchor="middle">n=${r[t.n]}</text>`;
+      }
+      const half = n === 1 ? 20 : (x(1) - x(0)) / 2;
+      g += `<rect class="hit" data-chart="${idx}" data-i="${i}" x="${x(i) - half}" y="${T}" width="${half * 2}" height="${H - T - B}"/>`;
+    });
+    const has = vals.some((v) => v != null);
+    return `<div class="card trend"><h3>${esc(t.title)}</h3><p>${esc(t.note)}</p>
+      ${has ? `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t.title)}, one point per run">${g}</svg>`
+            : `<p class="empty">No ${t.n ? "checked answers" : "values"} yet.</p>`}</div>`;
+  }
+
+  function tipHtml(r) {
+    const line = (label, v) => `<div>${label}: <b style="display:inline">${v}</b></div>`;
+    return `<b>${esc(hhmm(r.run_id))} · ${esc(r.rooms || r.run_id)}</b>
+      <div class="muted">${esc(short(r.prompt_version) || "no perceive")} · ${fmt(r.n_files)} file${r.n_files === 1 ? "" : "s"} · ${fmt(r.items)} items${r.archived ? " · archived" : ""}</div>
+      ${line("Perceive", r.perceive_s == null ? (r.perceive_cached ? "cached only" : "–") : fmt(r.perceive_s, 1) + " s per file")}
+      ${line("Decisions API", r.confidence == null ? "–" : pct(r.confidence) + " mean confidence, " + fmt(r.answers) + " answers")}
+      ${line("You kept", r.kept == null ? "none checked" : pct(r.kept) + " of " + fmt(r.user_checked))}`;
+  }
+
+  let trendRows = [];
+  const tip = document.createElement("div");
+  tip.className = "tip hidden";
+  document.body.appendChild(tip);
+
+  function bindTrendHover() {
+    $("trends").querySelectorAll(".hit").forEach((h) => {
+      const i = +h.dataset.i;
+      const on = (e) => {
+        document.querySelectorAll(`.trend .hl[data-i="${i}"]`).forEach((l) => (l.style.opacity = 1));
+        tip.innerHTML = tipHtml(trendRows[i]);
+        tip.classList.remove("hidden");
+        const px = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8);
+        const py = e.clientY + 14 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 10 : e.clientY + 14;
+        tip.style.left = px + "px"; tip.style.top = py + "px";
+      };
+      h.addEventListener("mousemove", on);
+      h.addEventListener("click", on); // touch
+      h.addEventListener("mouseleave", () => {
+        tip.classList.add("hidden");
+        document.querySelectorAll(".trend .hl").forEach((l) => (l.style.opacity = 0));
+      });
+    });
+  }
+
+  function trendTable(rows) {
+    return `<table class="t"><thead><tr><th>Run</th><th>Rooms</th><th>Prompt</th><th class="n">Files</th><th class="n">Items</th>
+      <th class="n">Perceive s/file</th><th class="n">Decide s</th><th class="n">Confidence</th><th class="n">Kept (checked)</th><th></th></tr></thead><tbody>` +
+      rows.slice().reverse().map((r) => `<tr>
+        <td><a href="${link("models.html", { run_id: r.run_id })}">${esc(hhmm(r.run_id))}</a></td><td>${esc(r.rooms || "")}</td>
+        <td>${esc(short(r.prompt_version))}</td><td class="n">${fmt(r.n_files)}</td><td class="n">${fmt(r.items)}</td>
+        <td class="n">${r.perceive_s == null ? (r.perceive_cached ? "cached" : "–") : fmt(r.perceive_s, 1)}</td>
+        <td class="n">${r.decide_s == null ? "–" : fmt(r.decide_s, 2)}</td><td class="n">${pct(r.confidence)}</td>
+        <td class="n">${r.kept == null ? "–" : pct(r.kept)} (${fmt(r.user_checked)})</td>
+        <td>${r.archived ? `<span class="arch">archived</span>` : ""}</td></tr>`).join("") + `</tbody></table>`;
+  }
+
+  async function loadTrends() {
+    try {
+      const rows = (await get("/analysis/trends")).runs;
+      const s = JSON.stringify(rows);
+      if (s === JSON.stringify(trendRows)) return;
+      trendRows = rows;
+      $("trends").innerHTML = rows.length ? TRENDS.map((t, i) => trendSvg(rows, t, i)).join("") : `<p class="empty">No runs yet.</p>`;
+      $("trend-table").innerHTML = trendTable(rows);
+      bindTrendHover();
+    } catch (e) { /* the totals above still show; trends retry on the next poll */ }
+  }
+
   // ---------- loading ----------
   let current = null, lastJson = "", timer = null;
 
@@ -266,15 +433,22 @@
     show("timeline-sec", !isAll);
     show("perception-sec", !isAll);
     show("decisions", !isAll);
+    show("trends-sec", isAll);
     if (isAll) {
-      $("sub").textContent = `Totals across ${fmt(data.runs)} runs on this laptop.`;
+      $("sub").textContent = `Totals across ${fmt(data.runs)} runs on this laptop, including archived ones.`;
       $("to-review").classList.add("hidden");
+      $("archived-note").classList.add("hidden");
       return;
     }
     const r = data.run;
     $("sub").textContent = `${r.rooms || "Run"} · ${fmt(r.n_files)} file${r.n_files === 1 ? "" : "s"} · ${fmt(r.items)} items · ${r.run_id}`;
-    $("to-review").classList.remove("hidden");
+    // An archived run's folder is gone, so its check list (and crops) can't open; its numbers are kept here.
+    $("to-review").classList.toggle("hidden", !!r.archived);
     $("to-review").href = link("review.html", { run_id: r.run_id });
+    $("archived-note").textContent = r.archived
+      ? `Archived: this run's folder was deleted${r.archived_at ? " (noticed " + r.archived_at.replace("T", " ") + ")" : ""}. Its numbers are kept here; its check list and photos are gone.`
+      : "";
+    $("archived-note").classList.toggle("hidden", !r.archived);
     const live = data.timeline.bars.filter((b) => b.cache !== "hit");
     $("tl-note").textContent = data.timeline.bars.length
       ? `${fmt(data.timeline.span_s, 0)} s from first call to last; ${fmt(live.length)} live call${live.length === 1 ? "" : "s"}. Hover a bar for the file and time.`
@@ -290,6 +464,7 @@
       const data = await get(isAll ? "/analysis/summary" : "/analysis/runs/" + encodeURIComponent(current));
       const s = JSON.stringify(data);
       if (s !== lastJson) { lastJson = s; render(data, isAll); }
+      if (isAll) await loadTrends();
     } catch (e) {
       if (!quiet) { $("err").textContent = "Couldn't load: " + e.message; $("err").classList.remove("hidden"); }
     }
@@ -309,14 +484,14 @@
     catch (e) { $("err").textContent = "Couldn't reach the server: " + e.message; $("err").classList.remove("hidden"); }
     const sel = $("run");
     sel.innerHTML = `<option value="${ALL}">All runs (${runs.length})</option>` + runs.map((r) =>
-      `<option value="${esc(r.run_id)}">${esc(r.run_id.slice(9, 15).replace(/(\d\d)(\d\d)(\d\d)/, "$1:$2"))} · ${esc(r.rooms || r.run_id)} · ${fmt(r.calls)} calls</option>`).join("");
+      `<option value="${esc(r.run_id)}">${esc(hhmm(r.run_id))} · ${esc(r.rooms || r.run_id)} · ${fmt(r.calls)} calls${r.archived ? " · archived" : ""}</option>`).join("");
     const want = params.get("run_id") || recall("piu_last_run");
-    current = runs.some((r) => r.run_id === want) ? want : (runs[0] ? runs[0].run_id : ALL);
+    current = want === ALL || runs.some((r) => r.run_id === want) ? want : (runs[0] ? runs[0].run_id : ALL);
     sel.value = current;
     sel.addEventListener("change", () => {
       current = sel.value; lastJson = "";
       const q = new URLSearchParams(location.search);
-      if (current === ALL) q.delete("run_id"); else q.set("run_id", current);
+      q.set("run_id", current);
       history.replaceState(null, "", "?" + q.toString());
       load();
     });
