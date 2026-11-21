@@ -63,3 +63,27 @@ def test_planner_stops_on_repeated_settings_and_ignores_unknown_values() -> None
     cleaned = planner._clean_settings({"truck_id": "semi_53", "order_mode": "random", "truck_sequence": ["uhaul_10", "x"],
                                        "light_max_lb": 999})
     assert cleaned == {**planner.DEFAULTS, "truck_sequence": ["uhaul_10"]}
+
+
+def _all_routes(routes, prefix: str = ""):
+    """Every (method, path) the app answers, walking into included routers (FastAPI keeps those nested)."""
+    for route in routes:
+        inner = getattr(route, "original_router", None) or getattr(route, "router", None)
+        if getattr(route, "methods", None) and getattr(route, "path", None):
+            for method in route.methods:
+                if method not in ("HEAD", "OPTIONS"):
+                    yield (method, prefix + route.path)
+        elif inner is not None:
+            yield from _all_routes(inner.routes, prefix + (getattr(route, "prefix", "") or ""))
+
+
+def test_no_route_is_declared_twice() -> None:
+    """Two routers once both declared POST /plan; the first one added answered and the other was never reached."""
+    from backend.app import app
+
+    seen: dict[tuple[str, str], int] = {}
+    for key in _all_routes(app.routes):
+        seen[key] = seen.get(key, 0) + 1
+    # If these two are missing, the walk above no longer matches how FastAPI nests routers.
+    assert ("POST", "/plan") in seen and ("POST", "/arena/plan") in seen
+    assert [k for k, n in seen.items() if n > 1] == []

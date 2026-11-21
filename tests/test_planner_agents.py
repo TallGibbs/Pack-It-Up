@@ -1,4 +1,4 @@
-"""Tests for Stage B6 (`planner.py` Neon loop) and Stage B7 (`agents.py` competing agents + `/plan` & `/agents` API)."""
+"""Tests for Stage B6 (`planner.py` Neon loop) and Stage B7 (`agents.py` competing agents + `/arena/plan` & `/agents` API)."""
 from __future__ import annotations
 
 import json
@@ -133,7 +133,7 @@ def test_b7_background_race_endpoints_via_fastapi() -> None:
     test_app.include_router(arena_api.router)
     client = TestClient(test_app)
     with patch.object(agents, "has_api_key", return_value=False):
-        r_plan = client.post("/plan", json={"run_id": "mock-demo", "max_rounds": 2})
+        r_plan = client.post("/arena/plan", json={"run_id": "mock-demo", "max_rounds": 2})
         assert r_plan.status_code == 200
         plan_body = r_plan.json()
         assert plan_body["winner"]["score"]["valid"] is True

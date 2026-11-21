@@ -2,7 +2,7 @@
  *
  * Drop `<script src="ui/arena.js"></script>` into `frontend/index.html` to mount the
  * live AI Strategy Arena card above `#verifier-panel` without touching `index.html` internals.
- * Works both against the live FastAPI server (`/plan`, `/agents/start`, `/agents/{job_id}`)
+ * Works both against the live FastAPI server (`/arena/plan`, `/agents/start`, `/agents/{job_id}`)
  * and in `?mock=1` standalone browser mode.
  */
 (function () {
@@ -247,7 +247,8 @@
         return;
       }
 
-      const res = await origFetch(`${API_BASE}/plan`, {
+      // /arena/plan: POST /plan belongs to the What-If card's "Plan with Neon" and replies in another shape.
+      const res = await origFetch(`${API_BASE}/arena/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ run_id: runId, max_rounds: 3 }),

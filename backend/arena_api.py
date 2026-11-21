@@ -35,7 +35,9 @@ def _attach_metadata(plan: dict[str, Any], rid: str, inv: dict[str, Any]) -> Non
             pass
 
 
-@router.post("/plan")
+# `/arena/plan`, not `/plan`: `POST /plan` is the What-If card's planner route in `backend/pack_api.py`,
+# which `backend/app.py` adds first, so a second `/plan` here was never reached (FAILURES.md 15:01).
+@router.post("/arena/plan")
 def post_plan(body: dict[str, Any] | None = None) -> dict[str, Any]:
     """Run B6 Gemini 4 Neon iterative planning loop (up to 3 rounds) and return progression + winner."""
     payload = body or {}
