@@ -42,3 +42,7 @@ Move an item to [decisions.md](decisions.md) once it is decided, and delete it h
 
 ## Ideas proposed, not decided
 - *(Moved lifting guidance, truck-mode reminder, and live route/parking warnings to active Track B decisions — see `decisions.md`.)*
+
+## Left by the branch audit session (16:18)
+- **George has not seen the merge of his `track-b` QR work** (2f26c31): `main`'s `labels.py` kept, his helpers added on top, `encode_qr_matrix` returning bools instead of 0/1, and in `frontend/index.html` his side taken for the print rule, `qrPayloadText` and the tape seam. (Track B)
+- **Not checked:** scanning a box QR code from the truck page or a printed label with a phone.

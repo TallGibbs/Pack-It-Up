@@ -327,3 +327,13 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** The solver and checker changed at 15:34, 15:39 and 15:46 (tier-by-tier loading, a 9 ft cargo van, two new rules), and each change moves the scores and truck choices. A rebuild started at 15:45 was out of date before it finished.
 - **By:** Chris.
 - **See:** open-questions.md, 'Left by the whole-repo review session (15:55)'
+
+## 2026-11-21 16:05 · `labels.py` in the track-b merge: keep main's encoder, add George's helpers
+- **Decision:** When merging `track-b` (9490c64), keep the `backend/labels.py` already on `main` (used by `/labels`, `labels.html` and `tests/test_labels.py`) and add George's top-flap helpers on top of it, rather than his second encoder. `encode_qr_matrix` now returns bools so his test passes.
+- **Why:** His branch version dropped `labels_for_run`, `qr_png_bytes` and `identify_box_from_photo`, which the live routes call.
+- **By:** Chris (Track B file, at his request).
+- **See:** merge 2f26c31; open-questions.md, 'Left by the branch audit session (16:18)'
+
+## 2026-11-21 16:16 · Merged branches deleted
+- **Decision:** Delete `feature/sign-in` (local and GitHub), `track-b-planner` (GitHub), the local `claude/recursing-chatterjee-0c606b`, and the `sign-in` and `recursing-chatterjee-0c606b` worktrees. All their commits were on `main`; `track-b` stays because George still pushes to it.
+- **By:** Chris.
