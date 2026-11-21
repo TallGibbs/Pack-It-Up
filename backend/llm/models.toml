@@ -49,3 +49,8 @@ thinking = "low"
 [jobs.shop]
 model = "gemini:gemini-4-neon"        # Shopify shop.dev Shopping Agent (tier/bundle planning & Q&A)
 thinking = "low"
+
+[jobs.route]
+model = "gemini:gemini-4-neon"        # Live Point A->B truck route, toll, clearance & city parking advisor
+thinking = "low"
+timeout_s = 25

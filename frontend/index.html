@@ -566,6 +566,7 @@
 <script src="mock/mock-api.js"></script>
 <script src="ui/api.js"></script>
 <script src="ui/commerce.js"></script>
+<script src="ui/journey.js"></script>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -1951,6 +1952,7 @@ async function loadAndSolve(resetCam = false) {
     });
 
     renderPanels();
+    if (window.PIU_JOURNEY) window.PIU_JOURNEY.setPlan(plan);
     rebuildScene(resetCam);
   } catch (e) {
     errBox.textContent = `Couldn't load packing plan: ${e.message}`;
