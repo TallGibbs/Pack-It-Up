@@ -229,7 +229,8 @@ class Job:
                           latency_s=round(time.time() - t0, 2), attempt=attempt, error=str(e)[:300])
                 if "GEMINI_API_KEY" in str(e):
                     break
-        _append_failure(f"{self.name} ({self.spec}) failed: {last_err}", files)
+        if "is not set; add it to .env" not in str(last_err):
+            _append_failure(f"{self.name} ({self.spec}) failed: {last_err}", files)
         raise LLMError(f"{self.name} failed on {files}: {last_err}") from last_err
 
     def generate_text(self, prompt: str, media: list[Media] | None = None, prompt_version: str = "",
@@ -289,6 +290,175 @@ class Job:
                       lambda p, m: fb.provider.generate_json(p, m, schema, fb.settings),
                       validate=validate, extra_key=_sha(schema), label=label)
         return {**out, "via": "generate_json_fallback"}
+
+    def decide_batch(
+        self,
+        input_text: str,
+        questions: dict[str, dict],
+        media: list[Media] | None = None,
+        prompt_version: str = "decide_batch_v1",
+        label: str | None = None,
+    ) -> dict:
+        """Evaluate multiple independent Decisions API questions (`noul`, `choice`, `score`) in one pass.
+
+        Returns `{"answers": {qid: {...}}, "via": "decisions_api" | "generate_json_fallback"}`.
+        """
+        assert questions, "decide_batch needs at least one question"
+        for qid, q in questions.items():
+            qtype = q.get("type")
+            assert qtype in ("noul", "choice", "score"), f"bad question type {qtype!r} for {qid!r}"
+            assert isinstance(q.get("instructions"), str) and q["instructions"].strip(), f"empty instructions for {qid!r}"
+            if qtype == "choice":
+                assert isinstance(q.get("criteria"), dict) and len(q["criteria"]) >= 2, f"choice {qid!r} needs >=2 criteria"
+            elif qtype == "score":
+                assert isinstance(q.get("criteria"), list) and 2 <= len(q["criteria"]) <= 255, f"score {qid!r} needs 2..255 criteria"
+
+        def validate_batch(value: dict) -> None:
+            if not isinstance(value, dict) or not isinstance(value.get("answers"), dict):
+                raise ValueError("decide_batch output missing 'answers' dict")
+            ans_map = value["answers"]
+            for qid, q in questions.items():
+                if qid not in ans_map or not isinstance(ans_map[qid], dict):
+                    raise ValueError(f"missing answer for {qid!r}")
+                a = ans_map[qid]
+                qtype = q["type"]
+                if a.get("type") != qtype:
+                    raise ValueError(f"answer {qid!r} expected type {qtype!r}, got {a.get('type')!r}")
+                conf = a.get("confidence")
+                if not isinstance(conf, (int, float)) or not (0.0 <= float(conf) <= 1.0):
+                    raise ValueError(f"answer {qid!r} invalid confidence {conf!r}")
+                if qtype == "noul":
+                    nv = a.get("noul")
+                    if not isinstance(nv, (int, float)) or not (0.0 <= float(nv) <= 1.0):
+                        raise ValueError(f"noul {qid!r} invalid probability {nv!r}")
+                elif qtype == "choice":
+                    if a.get("choice") not in q["criteria"]:
+                        raise ValueError(f"choice {qid!r} value {a.get('choice')!r} not in {list(q['criteria'])}")
+                elif qtype == "score":
+                    max_lvl = len(q["criteria"]) - 1
+                    sv = a.get("score")
+                    if not isinstance(sv, (int, float)) or not (-1e-4 <= float(sv) <= max_lvl + 1e-4):
+                        raise ValueError(f"score {qid!r} value {sv!r} outside 0..{max_lvl}")
+
+        if "decide_native" in self.provider.capabilities and not os.environ.get("DECIDE_FORCE_FALLBACK"):
+            try:
+                out = self._run(
+                    "decide_batch",
+                    input_text,
+                    media or [],
+                    prompt_version,
+                    lambda p, m: self.provider.decide_batch(p, m, questions, self.settings),
+                    validate=validate_batch,
+                    extra_key=questions,
+                    label=label,
+                )
+                return {**out, "via": "decisions_api"}
+            except LLMError as e:
+                if "GEMINI_API_KEY" in str(e):
+                    raise
+                # Fall through to structured JSON fallback; native failure is already logged.
+
+        # Structured generate_json fallback covering noul, choice, and score questions.
+        fb_props: dict[str, dict] = {}
+        prompt_blocks: list[str] = [
+            "Evaluate every question below against the shared input and return calibrated structured judgments.",
+            "",
+            "=== SHARED INPUT ===",
+            input_text or "(see attached media)",
+            "",
+            "=== QUESTIONS ===",
+        ]
+        for qid, q in questions.items():
+            qtype = q["type"]
+            if qtype == "noul":
+                fb_props[qid] = {
+                    "type": "object",
+                    "required": ["noul", "confidence"],
+                    "properties": {
+                        "noul": {"type": "number", "minimum": 0, "maximum": 1},
+                        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    },
+                }
+                prompt_blocks.append(f"[{qid}] (YES/NO probability `noul` in 0..1): {q['instructions']}")
+            elif qtype == "choice":
+                opts = list(q["criteria"].keys())
+                fb_props[qid] = {
+                    "type": "object",
+                    "required": ["choice", "confidence"],
+                    "properties": {
+                        "choice": {"type": "string", "enum": opts},
+                        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    },
+                }
+                crit_lines = "; ".join(f"{k}={v}" for k, v in q["criteria"].items())
+                prompt_blocks.append(f"[{qid}] (CHOICE from {opts}; {crit_lines}): {q['instructions']}")
+            elif qtype == "score":
+                crit = list(q["criteria"])
+                max_lvl = len(crit) - 1
+                fb_props[qid] = {
+                    "type": "object",
+                    "required": ["score", "confidence"],
+                    "properties": {
+                        "score": {"type": "number", "minimum": 0, "maximum": max_lvl},
+                        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    },
+                }
+                rubric_lines = "; ".join(f"{i}={c}" for i, c in enumerate(crit))
+                prompt_blocks.append(f"[{qid}] (SCORE in 0..{max_lvl}; {rubric_lines}): {q['instructions']}")
+
+        fb_schema = {
+            "type": "object",
+            "required": ["answers"],
+            "properties": {
+                "answers": {
+                    "type": "object",
+                    "required": list(questions.keys()),
+                    "properties": fb_props,
+                }
+            },
+        }
+        fb = self
+        if self.name != "decide_fallback" and "decide_fallback" in load_config().get("jobs", {}):
+            fb = for_job("decide_fallback", self.run_dir)
+        raw_fb = fb.generate_json(
+            "\n".join(prompt_blocks),
+            media=media or [],
+            schema=fb_schema,
+            prompt_version=f"{prompt_version}_fallback",
+            label=label,
+        )
+        norm_answers: dict[str, dict] = {}
+        for qid, q in questions.items():
+            a = raw_fb["answers"][qid]
+            qtype = q["type"]
+            conf = round(float(a["confidence"]), 4)
+            if qtype == "noul":
+                p_yes = round(max(0.01, min(0.99, float(a["noul"]))), 4)
+                norm_answers[qid] = {"type": "noul", "noul": p_yes, "answer": p_yes >= 0.5, "confidence": conf}
+            elif qtype == "choice":
+                ch = str(a["choice"])
+                opts = list(q["criteria"].keys())
+                rem = round((1.0 - conf) / max(1, len(opts) - 1), 4) if len(opts) > 1 else 0.0
+                probs = {o: (conf if o == ch else rem) for o in opts}
+                norm_answers[qid] = {"type": "choice", "choice": ch, "probabilities": probs, "confidence": conf}
+            elif qtype == "score":
+                crit = list(q["criteria"])
+                max_lvl = max(1, len(crit) - 1)
+                sc = round(max(0.0, min(float(max_lvl), float(a["score"]))), 4)
+                nearest = int(round(sc))
+                rem = round((1.0 - conf) / max(1, len(crit) - 1), 4) if len(crit) > 1 else 0.0
+                probs = {str(i): (conf if i == nearest else rem) for i in range(len(crit))}
+                norm_answers[qid] = {
+                    "type": "score",
+                    "score": sc,
+                    "max_score": max_lvl,
+                    "normalized": round(sc / max_lvl, 4),
+                    "probabilities": probs,
+                    "legend": {str(i): c for i, c in enumerate(crit)},
+                    "confidence": conf,
+                }
+        validate_batch({"answers": norm_answers})
+        return {"answers": norm_answers, "via": "generate_json_fallback"}
 
     def generate_image(self, prompt: str, refs: list[Media] | None = None, label: str | None = None) -> bytes:
         import base64

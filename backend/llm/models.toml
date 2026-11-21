@@ -40,7 +40,7 @@ thinking = "low"
 model = "gemini:gemini-4-hydrogen"    # generic enum generate_json, used when the Decisions API call fails
 thinking = "low"
 
-# Track B adds plan, shop, baseline and image.
+# Track B jobs: planning, commerce, route, final judge steps, baseline, and arrival render.
 
 [jobs.plan]
 model = "gemini:gemini-4-neon"
@@ -54,3 +54,20 @@ thinking = "low"
 model = "gemini:gemini-4-neon"        # Live Point A->B truck route, toll, clearance & city parking advisor
 thinking = "low"
 timeout_s = 25
+
+[jobs.judge]
+model = "gemini:gemini-decision-1"    # single-pass calibrated noul/choice/score rubrics (0 output tokens)
+api_version = "v1alpha"
+media_resolution = "high"
+
+[jobs.judge_escalate]
+model = "gemini:gemini-4-neon"        # escalates low-confidence or flagged judge checks (override with Carbon if needed)
+thinking = "high"
+media_resolution = "high"
+
+[jobs.baseline]
+model = "gemini:gemini-4-hydrogen"    # single-call baseline for eval comparison
+thinking = "low"
+
+[jobs.image]
+model = "gemini:gemini-nano-banana-2.1"  # illustrative Penn Station arrival render
