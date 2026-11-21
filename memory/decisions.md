@@ -214,3 +214,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Filling the entire truck floor before loading level 2 forces movers to walk on top of first-level cardboard boxes to reach the front of the truck.
 - **By:** George.
 - **See:** `backend/solver.py`, `backend/verify.py`, `frontend/index.html`, `tests/test_track_b.py`
+
+## 2026-11-21 15:35 · Auto right-size to 9 ft Cargo Van + Potential Energy & Shake/Topple floor-first physics
+- **Decision:** Add `uhaul_van` (U-Haul 9 ft Cargo Van) and default fleet selection to `auto` (smallest van/truck that fits with 0 violations); keep boxes flat on the floor (`z=0`, minimum gravitational potential energy `U = m*g*z_cm`) whenever cargo fits comfortably on the deck (`<=50%` floor area), enforce `0.45g` braking/pothole slenderness bracing limits (`shake_stability`), and fail verification (`oversized_truck`) if a sparse single-van load is placed in a giant box truck.
+- **Why:** Red-teaming with 4 boxes previously picked a 26-ft truck (`0.7%` fill), stacked all 4 boxes into a 64-in Jenga tower on an empty floor, and passed all checks.
+- **By:** George.
+- **See:** `data/trucks.csv`, `backend/solver.py`, `backend/verify.py`, `frontend/index.html`, `tests/test_track_b.py`
