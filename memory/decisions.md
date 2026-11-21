@@ -190,3 +190,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Limits:** The box sizes (space inside per kind and size class, capped at 60% of the furniture) are the review session's rough figures; Chris merged them knowing that, and George has not agreed them. `est_boxes` keys now include `box_small`, `box_large`, `box_dish_pack` and `box_wardrobe`.
 - **By:** Chris, on the review session's recommendation. The phone test session's own id fix (ids kept in `item_ids.json`) was taken back out in favour of this one.
 - **See:** [backend/ingest/README.md](../backend/ingest/README.md), FAILURES.md 13:10 and 13:25 rows
+
+## 2026-11-21 13:41 · Box estimates use George's table, with two exceptions
+- **Decision:** `backend/ingest/resolve.py` takes its container sizes and its box for each kind of contents from George's table in `backend/expand.py` (`track-b`). Two exceptions stay: bathroom cabinets and `other` are smaller, and a container holds at most 60% of the listed furniture it is part of.
+- **Why:** Both tracks should give the same boxes, and George's solver packs whatever `est_boxes` ingest writes. His table alone gave 47 boxes (116 cu ft) on Chris's phone run 120009 next to 114 cu ft of furniture, with a full medicine cabinet at 6 boxes; with the exceptions it is 19. On the kitchen run and two Malin runs the result is the same as his table (10, 9, 9).
+- **Limits:** George has not seen the two exceptions. The table now exists in both files; change them together.
+- **By:** Chris, on the review session's recommendation. Replaces the box sizes in the 13:27 entry.
