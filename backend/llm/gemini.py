@@ -27,13 +27,21 @@ _uploaded: dict[str, types.File] = {}  # sha256 -> active File
 _upload_locks: dict[str, threading.Lock] = {}
 
 
+def key_var() -> str:
+    """Which .env variable holds the key: GEMINI_API_KEY by default, GEMINI_API_KEY_<PROFILE> when
+    GEMINI_KEY_PROFILE is set (e.g. PERSONAL for your own AI Studio key next to the event key)."""
+    profile = os.environ.get("GEMINI_KEY_PROFILE", "").strip().upper()
+    return f"GEMINI_API_KEY_{profile}" if profile else "GEMINI_API_KEY"
+
+
 def _get_client() -> genai.Client:
     global _client
     with _client_lock:
         if _client is None:
-            if not os.environ.get("GEMINI_API_KEY"):
-                raise ProviderError("GEMINI_API_KEY is not set; add it to .env")
-            _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+            var = key_var()
+            if not os.environ.get(var):
+                raise ProviderError(f"{var} is not set; add it to .env")
+            _client = genai.Client(api_key=os.environ[var])
         return _client
 
 

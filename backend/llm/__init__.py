@@ -134,6 +134,7 @@ class Job:
         settings = {k: v for k, v in self.settings.items() if k not in ("timeout_s", "retries")}
         return _sha({"job": self.name, "kind": kind, "model": self.spec, "pv": prompt_version,
                      "caps": sorted(self.provider.capabilities),
+                     "key_profile": os.environ.get("GEMINI_KEY_PROFILE", "").upper() or None,
                      "prompt": _sha(prompt), "media": [m.cache_token() for m in media],
                      "settings": settings, "extra": extra})
 

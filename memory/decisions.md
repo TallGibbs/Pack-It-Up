@@ -152,3 +152,11 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Decision:** The perceive prompt (v3) classifies sofas and chairs by seats (single, two, three, sectional) rather than by names like armchair or loveseat, and asks for extra care counting partly hidden repeated items and the room's edges. Count questions offer up to twice the estimate plus "more" and a typed number.
 - **Why:** Size is what packing needs. In person the Malin lounge has 6 bar stools and 16 work chairs; the pipeline said 5 and 10, and the count question offered at most 12.
 - **By:** Chris.
+
+## 2026-11-21 11:55 · Build and verify the full pipeline before optimizing
+- **Decision:** Hold accuracy work (more prompt versions, repeat-run variation tests, tape-measured sizes, long re-filming) until the whole flow is built and checked end to end: phone capture, inventory, questions, solver, 3D view. Chris will film a few more short clips; no tape measure is available, and no 5-minute videos.
+- **By:** Chris.
+
+## 2026-11-21 11:55 · Try a personal Gemini API key next to the event key
+- **Decision:** Chris creates his own AI Studio key and tests whether it reaches the Gemini 4 models and the Decisions API, because he has no admin control over the event account. The code holds both: `GEMINI_API_KEY` (event) and `GEMINI_API_KEY_PERSONAL`, chosen with `GEMINI_KEY_PROFILE=PERSONAL`. The event key stays the default until the test says otherwise.
+- **By:** Chris.
