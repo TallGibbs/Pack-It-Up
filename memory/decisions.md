@@ -171,3 +171,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** The Hackathon wifi blocks phone-to-laptop traffic, and a quick tunnel's address changes whenever it restarts, which would break the QR codes on the slides and cards. A fixed name survives restarts.
 - **Limits:** It works only while the laptop runs the API and the tunnel. Anyone with the address can use the app and see uploads; there is no login.
 - **By:** Chris.
+
+## 2026-11-21 12:19 · Coming back continues the same move
+- **Decision:** A person who uploads, leaves and returns carries on with the same move (run), not a new one. The capture page keeps the run id in its address, so a reload continues; opened without one, it offers the last move this browser was in, and picking files without answering starts a new move. The QR code leaves the run id out, so each person who scans it gets their own move.
+- **Why:** A move takes hours or days, and phones reload background tabs, often after the camera has been open. Before this, a reload or review's "Film another room" link silently started a new move.
+- **By:** Chris, on the quality-check session's recommendation.
+- **See:** [frontend/README.md](../frontend/README.md#what-a-move-is), branch `feature/resume-move`
