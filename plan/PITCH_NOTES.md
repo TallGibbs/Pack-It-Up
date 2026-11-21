@@ -35,22 +35,21 @@ Open on phone during rehearsal or judging: `/app/pitch.html` (or read below).
 ### 2. 3D Fleet, Physics & Penn Station (`0:55 – 1:55`)
 - **Right-sized U-Haul fleet** (`10 / 15 / 20 / 26 ft` downsizing): snug load so nothing slides, compact enough for NYC streets.
 - **Physics Verifier (`verify.py`):** `0 violations` — `>=75%` base support, 0 overlaps, upright/on-edge rules, fragile top-protection, `40–60%` left-right CoG balance.
-- **Neon + Managed Agents:** Compete on packing strategies to repair violations.
+- **Antigravity Managed Agents (`antigravity-preview-09-2026`) + Neon:** Compete in parallel Google-hosted Linux sandboxes to repair violations.
 - **Penn Station 6-Store LIFO Unload:** Stop 1 (*Merch Kiosk*) loaded last by rear door → Stop 6 (*Concourse*) loaded first by cab, all clearing store doorways.
 - **Outputs:** Scan **offline QR box label** (holds full manifest, no wifi needed) + **Nano Banana 2.1** arrival visual *(badged illustrative)*.
 
-### 3. Judge "What-If" + Model Close (`1:55 – 2:25` & `2:45 – 3:00`)
+### 3. Judge "What-If" + Antigravity Close (`1:55 – 2:25` & `2:45 – 3:00`)
 - **At `1:55`:** Ask judge to **add a piano** or **force a 10-ft truck** → 1-tap re-solve → **Move Plan Judge (`gemini-decision-1`)** gates safety/rubrics & escalates to **Neon**.
-- **At `2:45` (Closing line):**
-  - **Hydrogen** sees & hears the room.
-  - **Neon + Managed Agents** plan & optimize the pack.
-  - **Nano Banana 2.1** previews arrival.
-  - **Decision 1** routes gap questions & judges the final load.
+- **At `2:45` ("Built in Antigravity, powered by Antigravity"):**
+  - *"Downloaded **Google Antigravity** this morning just for this — ran parallel **Gemini 4 Carbon** worktrees with the live Gemini Docs MCP."*
+  - **Hydrogen** watches/hears · **Neon + Antigravity Managed Agents** pack in sandboxes · **Nano Banana 2.1** previews · **Decision 1** gates & judges.
 
 ---
 
 ## ⚡ 2-Minute Q&A Quick Hits
 
+- **How did 2 people build all this since 10:30 AM?** George downloaded **Google Antigravity** at kickoff, connected `gemini-skills` (`gemini-api-dev`) + the live Gemini Docs MCP server, and ran 5 parallel **Gemini 4 Carbon** git worktrees coordinated through `memory/sessions.md` (visible in git!).
 - **What was built today vs brought in?** All code written after 10:30 AM (see public git commits); `item_catalog.csv` & Penn Station reference photos disclosed under *Brought in* in `README.md`.
 - **Why not one model call?** Hydrogen is fast/parallel on video+audio; `gemini-decision-1` gives calibrated probabilities in ~200 ms with 0 output tokens; Neon reasons over 3D verifier violations. Single-call LLM baseline fails physics checks.
 - **Is the arrival image the plan?** No — the 3D coordinates & verifier math are the plan; Nano Banana is clearly badged illustrative.

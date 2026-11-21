@@ -178,8 +178,8 @@ PRESENTER_CARDS: dict[str, Any] = {
     ],
     "george": [
         "0:12–0:25 Hook (Part 2): Short hop from West New York, NJ -> Upper East Side — a smaller right-sized truck makes tight NYC streets & turns way easier; moving this room into 6 NY Penn Station stores.",
-        "0:55–1:55 3D Fleet & Penn Station: Downsized U-Haul (snug so nothing slides, compact for NYC) + 0-violation physics verifier (>=75% support, 40–60% CoG) + Neon/Agents + 6-store LIFO dock order + offline QR label + Nano Banana arrival.",
-        "1:55–2:25 & 2:45–3:00 Judge What-If + Close: Add piano / 10-ft truck live -> Move Plan Judge (Decision 1 -> Neon); close with 1 job per model (Hydrogen sees/hears, Neon+Agents plan, Nano Banana previews, Decision 1 gates & judges).",
+        "0:55–1:55 3D Fleet & Antigravity Sandboxes: Downsized U-Haul (snug so nothing slides, compact for NYC) + 0-violation physics verifier + Antigravity Managed Agents (`antigravity-preview-09-2026`) & Neon + 6-store LIFO dock order + offline QR label + Nano Banana arrival.",
+        "1:55–2:25 & 2:45–3:00 Judge What-If + Antigravity Close: Add piano / 10-ft truck live -> Move Plan Judge (Decision 1 -> Neon); close with 'Built in Google Antigravity today (parallel Carbon worktrees + Docs MCP), powered by Antigravity Managed Agents + Hydrogen + Neon + Decision 1'.",
     ],
 }
 
