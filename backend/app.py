@@ -3,8 +3,11 @@
 Track A routes live in backend/ingest/api.py; Track B adds its own router here
 (e.g. POST /solve, POST /render).
 """
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from backend.ingest.api import router as ingest_router
 
@@ -16,3 +19,8 @@ app.include_router(ingest_router)
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+# Phone pages (frontend/capture.html, review.html, index.html) on the same port as the API,
+# so one tunnel address serves both: open /app/capture.html. Mounted last so the API routes win.
+app.mount("/app", StaticFiles(directory=Path(__file__).resolve().parent.parent / "frontend", html=True), name="app")
