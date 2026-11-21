@@ -257,6 +257,21 @@ def _containers(room: dict, furniture: dict[str, float] | None = None) -> list[d
     return out
 
 
+def personal_container(room: dict, n: int) -> dict | None:
+    """The box line for a room's personal belongings (bags, laptops, jackets) once the user has said
+    they are part of the move: what the things measure (bags and jackets need no padding, unlike
+    loose decor), and at least a box for every eight."""
+    pb = room["personal_belongings"]
+    if not (pb.get("included") and pb["count"]):
+        return None
+    boxed = max(pb.get("volume_cuft", 0), BOX_CUFT * (pb["count"] / 8))
+    return {"id": f"{room['id']}_cont_{n:02d}", "label": "personal belongings", "kind": "other", "contents": "mixed",
+            "fullness": "full", "size": "small", "est_item_count": pb["count"], "personal": True,
+            "items": [f"{k.replace('_', ' ')} x{c}" for k, c in sorted(pb["kinds"].items(), key=lambda kv: -kv[1])],
+            "est_volume_cuft": round(boxed, 1), "est_boxes": {"box_medium": max(1, round(boxed / BOX_CUFT))},
+            "seen_in": [], "evidence": None, "set_by_speech": []}
+
+
 def resolve_room(room: dict) -> dict:
     items = [resolve_item(it) for it in room["items"] if it.get("disposition") != "removed"]
     from .merge import canon_key
@@ -265,6 +280,10 @@ def resolve_room(room: dict) -> dict:
         k = canon_key(it["label"])
         furniture[k] = max(furniture.get(k, 0), it["size"]["volume_cuft_each"])
     containers = _containers(room, furniture)
+    packed = personal_container(room, len(containers) + 1)
+    if packed:
+        containers.append(packed)
+    n_personal = room["personal_belongings"]["count"]
     # Flag the piece of furniture that holds a closed container ("credenza sideboard" <- "credenza sideboard drawers").
     closed = {canon_key(c["label"]) for c in containers if c.get("contents_unknown")}
     for it in items:
@@ -280,7 +299,8 @@ def resolve_room(room: dict) -> dict:
         "containers": containers,
         "fixtures": [{"label": f["label"], "quantity": f["quantity"]} for f in room["fixtures"]],
         "left_out": {"fixtures": sum(f["quantity"] for f in room["fixtures"]),
-                     "personal_belongings": room["personal_belongings"]["count"],
+                     "personal_belongings": 0 if packed else n_personal,
+                     "personal_belongings_packed": n_personal if packed else 0,  # the user said they move: boxed above
                      "personal_belonging_kinds": room["personal_belongings"]["kinds"]},
         "totals": {
             "item_count": sum(i["quantity"] for i in keep),

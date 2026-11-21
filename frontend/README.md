@@ -18,6 +18,8 @@ The phone pages for Track A: film or pick photos and clips, watch them being pro
 | `ui/style.css` | Shared styles, phone first |
 | `mock/mock-api.js` | `window.PIU_MOCK`: the same API methods, run in the browser from `mock/inventory.json` |
 
+The mock works out each container's boxes itself, with a copy of the tables in `backend/ingest/resolve.py` (`KIND_CUFT`, `BOX_FOR` in `mock/mock-api.js`): change the two together. Containers in `mock/inventory.json` carry kind, size, contents and fullness, not box counts.
+
 The HTML files hold markup only. Each page loads `mock/mock-api.js`, then `ui/api.js`, then `ui/questions.js`, then its own script. The order matters: `api.js` picks the mock when the URL has `?mock=1`, and the later files take their helpers from `window.PIU`. A helper two pages need goes in `ui/api.js`, not in both page scripts.
 
 ## Rules the code follows

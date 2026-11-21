@@ -77,6 +77,45 @@
   ];
   const MOCK_DENSITY = 7; // lb per cubic foot, resolve.py's "mixed"
 
+  // Boxes for what a cabinet, shelf or closet holds, worked out as backend/ingest/resolve.py does
+  // (container_boxes: the same tables, so keep them in step). The fixture gives each container its
+  // kind, size, contents and fullness and no box count; answering "how full is it?" changes the
+  // fullness and the boxes follow, as on the server. One thing the server does and this doesn't: it
+  // caps a container at 60% of the furniture it is part of.
+  const KIND_CUFT = { // cubic feet inside when full: [small, medium, large]
+    closet: [12, 24, 42], kitchen_cabinet: [8, 16, 28], pantry: [8, 15, 26], bookshelf: [9, 18, 30],
+    dresser_drawers: [8, 15, 24], desk: [4.5, 9, 15], toy_storage: [6, 13.5, 22.5], garage_shelving: [12, 24, 42],
+    bathroom_cabinet: [1, 2, 4], other: [4, 10, 20],
+  };
+  const DEFAULT_CUFT = [6, 15, 30];
+  const FULLNESS = { empty: 0, quarter: 0.25, half: 0.5, three_quarters: 0.75, full: 1 };
+  const BOX_FOR = { books: "box_small", tools: "box_small", papers_office: "box_small", toiletries: "box_small",
+                    dishes_glassware: "box_dish_pack", clothes_hanging: "box_wardrobe",
+                    linens: "box_large", clothes_folded: "box_large", toys: "box_large" }; // anything else: box_medium
+  const BOX_CUFT = { box_small: 16 * 12 * 12 / 1728, box_medium: 18 * 18 * 16 / 1728, box_large: 18 * 18 * 24 / 1728,
+                     box_dish_pack: 18 * 18 * 28 / 1728, box_wardrobe: 24 * 21 * 46 / 1728 }; // data/item_catalog.csv
+  function containerBoxes(c) {
+    if (c.kind === "open_surfaces" || c.personal) return; // sized from the things seen: the fixture carries the figures
+    const i = ["small", "medium", "large"].indexOf(c.size);
+    const space = (KIND_CUFT[c.kind] || DEFAULT_CUFT)[i < 0 ? 1 : i];
+    const vol = c.contents_unknown ? 0 : space * (FULLNESS[c.fullness] || 0); // closed: counted as empty
+    const box = BOX_FOR[c.contents] || "box_medium";
+    c.est_volume_cuft = r1(vol);
+    c.est_boxes = vol > 0 ? { [box]: Math.max(1, Math.ceil(vol / BOX_CUFT[box])) } : {};
+  }
+
+  // The box line for a room's personal belongings once the user has said they are part of the move
+  // (resolve.personal_container). The server sizes it from what the things measure; here, 0.8 cu ft each.
+  function personalContainer(id, leftOut) {
+    const n = leftOut.personal_belongings;
+    const boxed = Math.max(0.8 * n, 3 * n / 8);
+    return { id, label: "personal belongings", kind: "other", contents: "mixed", fullness: "full", size: "small",
+             est_item_count: n, personal: true,
+             items: Object.entries(leftOut.personal_belonging_kinds || {}).sort((a, b) => b[1] - a[1]).map(([k, c]) => `${k} x${c}`),
+             est_volume_cuft: r1(boxed), est_boxes: { box_medium: Math.max(1, Math.round(boxed / 3)) },
+             seen_in: [], evidence: null, set_by_speech: [] };
+  }
+
   // An item added on the review page, in the shape resolve.py gives one (source "user_added").
   function addedItem(a) {
     const [l, w, h] = a.dims_in;
@@ -147,15 +186,21 @@
         c.id = pre + c.id;
         c.evidence = ren(c.evidence);
         Object.assign(c, run.contEdits[c.id] || {});
+        containerBoxes(c);
         return c;
       });
+      // "They are part of the move": a box line for them, and off the left-out list (as resolve.py does).
+      const packed = frac === 1 && (run.personal || {})[room.id] && src.left_out.personal_belongings > 0;
+      if (packed) containers.push(personalContainer(pre + "cont_personal", src.left_out));
+      const leftOut = { ...src.left_out, personal_belongings: packed ? 0 : src.left_out.personal_belongings,
+                        personal_belongings_packed: packed ? src.left_out.personal_belongings : 0 };
       const keep = items.filter((i) => MOVING(i.disposition));
       rooms.push({
         room: { id: room.id, name: room.name },
         files: room.files.map((f) => f.name),
         items, containers,
         fixtures: frac < 1 ? [] : src.fixtures,
-        left_out: frac < 1 ? { fixtures: 0, personal_belongings: 0, personal_belonging_kinds: {} } : src.left_out,
+        left_out: frac < 1 ? { fixtures: 0, personal_belongings: 0, personal_belongings_packed: 0, personal_belonging_kinds: {} } : leftOut,
         totals: {
           item_count: keep.reduce((a, i) => a + i.quantity, 0),
           item_lines: keep.length,
@@ -278,6 +323,7 @@
           const id = roomId + "-" + eff.container_id;
           run.contEdits[id] = { ...(run.contEdits[id] || {}), ...eff.changes };
         }
+        if ("personal" in eff) run.personal = { ...(run.personal || {}), [roomId]: eff.personal };
         return build(run, Date.now()).inventory;
       });
     },

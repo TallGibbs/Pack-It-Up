@@ -86,8 +86,11 @@ def _apply(merged: dict, ans: dict) -> str | None:
             for c in room["containers"]:
                 if c["label"] == patch["label"]:
                     c.update(patch["changes"])
-    elif op == "include_personal":
-        pass  # personal belongings stay out either way; recorded for the record
+    elif op == "include_personal":  # "they are part of the move": resolve boxes them instead of leaving them out
+        room = next((r for r in merged["rooms"] if r["id"] == patch.get("room_id")), None)
+        if room is None:
+            return f"no room {patch.get('room_id')}"
+        room["personal_belongings"]["included"] = True
     elif op == "move_to_fixtures":
         room, it = _find_item(merged, patch["item_id"])
         if it is None:
@@ -117,12 +120,17 @@ def reapply_answers(run_id: str) -> int:
     # removed, and "different" twice added two pieces (FAILURES.md 13:10). Edits and added items have
     # no question_id and all still apply, in order.
     latest = latest_per_question(answers)
+    # Until 13:50 on Nov 21 a personal-belongings answer was stored with nothing to do (FAILURES.md 13:10).
+    # Give those the patch they would get today; the room comes from the question.
+    asked_about = {q["id"]: q.get("refers_to") for q in read_json(rd / "questions.json", {"questions": []})["questions"]}
     applied = []
     for ans in answers:
         qid = ans.get("question_id")
         if qid and latest[qid] is not ans:
             applied.append({"id": ans["id"], "kind": ans["kind"], "ok": True, "replaced_by": latest[qid]["id"]})
             continue
+        if ans["kind"] == "include_class" and ans.get("answer") == "no" and (ans.get("patch") or {}).get("op") in (None, "none"):
+            ans = {**ans, "patch": {"op": "include_personal", "room_id": asked_about.get(qid)}}
         err = _apply(merged, ans)
         applied.append({"id": ans["id"], "kind": ans["kind"], "ok": err is None, **({"error": err} if err else {})})
     merged["answers_applied"] = applied
@@ -389,11 +397,12 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
 
         # include_class: personal belongings, once per room
         pb = inv_room["left_out"]
-        if pb["personal_belongings"]:
+        if pb["personal_belongings"] or pb.get("personal_belongings_packed"):  # still raised once packed, so it can be changed back
             kinds = ", ".join(f"{k}s" for k in pb["personal_belonging_kinds"])
             qs.append({"id": _qid("include_class", inv_room["room"]["id"]), "kind": "include_class",
                        "refers_to": inv_room["room"]["id"],
-                       "text": f"We left out {pb['personal_belongings']} personal belongings ({kinds}). Leave them out?",
+                       "text": f"We left out {pb['personal_belongings'] or pb['personal_belongings_packed']} personal "
+                               f"belongings ({kinds}). Leave them out?",
                        "options": {"yes": "leave them out", "no": "they are part of the move"}, "ask": "user",
                        "volume_at_stake": 1.0, "confidence": 0.5, "media": []})
     # Speech first: a question the narrator already answered is shown as answered, with the quote.
@@ -439,6 +448,8 @@ def _patch_for(q: dict, answer: str) -> dict:
         return {"op": "move_to_fixtures", "item_id": q["refers_to"]} if answer == "built_in" else {"op": "none"}
     if kind == "hidden_contents":
         return {"op": "set_container", "label": q["refers_to"], "changes": {"fullness": answer}}
+    if kind == "include_class":  # options: yes = leave them out, no = they are part of the move
+        return {"op": "include_personal", "room_id": q["refers_to"]} if answer == "no" else {"op": "none"}
     if kind == "identify_item":
         if catalog.get(answer.strip()):
             return {"op": "set_item", "item_id": q["refers_to"], "changes": {"catalog_id": answer.strip()}}

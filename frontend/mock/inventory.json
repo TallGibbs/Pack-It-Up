@@ -95,8 +95,8 @@
         }
       ],
       "containers": [
-        {"id": "room_a_cont_01", "label": "credenza drawers", "kind": "cabinet", "contents": "mixed", "fullness": "empty", "contents_unknown": true, "observed_fullness": "not_visible", "note": "contents unknown, assumed empty",
-         "size": "large", "est_item_count": 0, "seen_in": ["photo_2.jpg"], "est_boxes": {"box_medium": 1}, "est_volume_cuft": 3.1,
+        {"id": "room_a_cont_01", "label": "credenza drawers", "kind": "other", "contents": "mixed", "fullness": "empty", "contents_unknown": true, "observed_fullness": "not_visible", "note": "contents unknown, assumed empty",
+         "size": "large", "est_item_count": 0, "seen_in": ["photo_2.jpg"],
          "evidence": {"source": "photo_2.jpg", "sha256": "aaaa000000000003", "timestamp_s": null, "box_2d": [500, 150, 800, 850]}},
         {"id": "room_a_cont_02", "label": "loose decor on open surfaces", "kind": "open_surfaces", "contents": "decor", "fullness": "quarter",
          "size": "small", "est_item_count": 14, "items": ["vase x3", "book x6", "sculpture x1", "cushion x4"], "fragile": true,
@@ -144,8 +144,8 @@
         }
       ],
       "containers": [
-        {"id": "room_b_cont_01", "label": "filing cabinet", "kind": "cabinet", "contents": "papers", "fullness": "full",
-         "size": "medium", "est_item_count": 0, "seen_in": ["photo_3.jpg"], "est_boxes": {"box_small": 3}, "est_volume_cuft": 4.5,
+        {"id": "room_b_cont_01", "label": "filing cabinet", "kind": "other", "contents": "papers_office", "fullness": "full",
+         "size": "small", "est_item_count": 0, "seen_in": ["photo_3.jpg"],
          "evidence": {"source": "photo_3.jpg", "sha256": "bbbb000000000001", "timestamp_s": null, "box_2d": [300, 420, 900, 600]}}
       ],
       "fixtures": [{"label": "wall-mounted TV", "quantity": 1}],
@@ -153,12 +153,12 @@
     }
   ],
   "questions": [
-    {"id": "q_room_a_cont_01_fullness", "kind": "hidden_contents", "refers_to": "credenza drawers", "text": "Are the credenza drawers full?", "options": {"empty": "empty", "half": "half", "full": "full"}, "ask": "decisions_api_then_user", "volume_at_stake": 9.0, "rank_score": 9.0, "status": "open", "shown": true, "model_answer": {"answer": "half", "confidence": 0.41, "rationale": "mock", "via": "decisions_api"}, "suggested": "half", "mock_effects": {"empty": {"container_id": "room_a_cont_01", "changes": {"contents_unknown": false, "fullness": "empty", "est_boxes": {}, "est_volume_cuft": 0}}, "half": {"container_id": "room_a_cont_01", "changes": {"contents_unknown": false, "fullness": "half", "est_boxes": {"box_medium": 2}, "est_volume_cuft": 6.2}}, "full": {"container_id": "room_a_cont_01", "changes": {"contents_unknown": false, "fullness": "full", "est_boxes": {"box_medium": 4}, "est_volume_cuft": 12.4}}}, "room_id": "room_a", "always_show": true},
+    {"id": "q_room_a_cont_01_fullness", "kind": "hidden_contents", "refers_to": "credenza drawers", "always_show": true, "text": "We couldn't see inside the credenza drawers, so we've assumed it's empty. About how full is it?", "options": {"empty": "empty", "quarter": "quarter", "half": "half", "three_quarters": "three quarters", "full": "full"}, "ask": "user", "volume_at_stake": 30, "confidence": 0.3, "rank_score": 21.0, "status": "open", "shown": true, "mock_effects": {"empty": {"container_id": "room_a_cont_01", "changes": {"contents_unknown": false, "fullness": "empty"}}, "quarter": {"container_id": "room_a_cont_01", "changes": {"contents_unknown": false, "fullness": "quarter"}}, "half": {"container_id": "room_a_cont_01", "changes": {"contents_unknown": false, "fullness": "half"}}, "three_quarters": {"container_id": "room_a_cont_01", "changes": {"contents_unknown": false, "fullness": "three_quarters"}}, "full": {"container_id": "room_a_cont_01", "changes": {"contents_unknown": false, "fullness": "full"}}}, "room_id": "room_a"},
     {"id": "q_item_02_count", "kind": "count_check", "refers_to": "item_02", "text": "How many stacks of chairs are there? Some are hidden behind bags.", "options": {"3": "3", "4": "4", "5": "5", "6": "6", "more": "more"}, "ask": "decisions_api_then_user", "volume_at_stake": 21.6, "rank_score": 21.6, "status": "open", "shown": true, "model_answer": {"answer": "5", "confidence": 0.41, "rationale": "mock", "via": "decisions_api"}, "suggested": "5", "mock_effects": {"3": {"item_id": "item_02", "changes": {"quantity": 3}}, "4": {"item_id": "item_02", "changes": {"quantity": 4}}, "5": {"item_id": "item_02", "changes": {"quantity": 5}}, "6": {"item_id": "item_02", "changes": {"quantity": 6}}, "*": {"item_id": "item_02", "changes": {"quantity_from_answer": true}}}, "room_id": "room_a", "free_text": "number"},
     {"id": "q_item_07_unfilmed", "kind": "unfilmed_area", "refers_to": "item_07", "text": "You said “there's a piano in the back room”. Should it come along?", "options": {"yes_pack_it": "yes, pack it", "no_it_stays": "no, it stays"}, "ask": "user", "volume_at_stake": 20.1, "rank_score": 20.1, "status": "open", "shown": true, "mock_effects": {"yes_pack_it": {"item_id": "item_07", "changes": {"disposition": "keep"}}, "no_it_stays": {"item_id": "item_07", "changes": {"disposition": "stays"}}}, "room_id": "room_a"},
     {"id": "q_item_04_identify", "kind": "identify_item", "refers_to": "item_04", "text": "What is this? We saw \"long sideboard with stone top\" but aren't sure.", "options": null, "ask": "user", "volume_at_stake": 14.0, "rank_score": 14.0, "status": "open", "shown": true, "mock_effects": {"*": {"item_id": "item_04", "changes": {"label_from_answer": true, "confidence": 0.95}}}, "room_id": "room_a", "free_text": true},
     {"id": "q_item_03_size", "kind": "size_check", "refers_to": "item_03", "text": "Which is closer to the armchair's size?", "options": {"36_34_30_in": "36 × 34 × 30 in", "30_30_32_in": "30 × 30 × 32 in"}, "ask": "decisions_api_then_user", "volume_at_stake": 4.6, "rank_score": 4.6, "status": "answered", "answer": "36_34_30_in", "answered_by": "decisions_api", "room_id": "room_a"},
     {"id": "q_item_06_keep", "kind": "include_class", "refers_to": "item_06", "text": "Are the potted plants coming?", "options": {"yes": "yes", "no_they_stay": "no, they stay"}, "ask": "user", "volume_at_stake": 40.0, "rank_score": 40.0, "status": "answered", "answer": "no_they_stay", "answered_by": "speech", "quote": "the plants stay here", "room_id": "room_a"},
-    {"id": "q_room_a_personal", "kind": "include_class", "refers_to": "room_a", "text": "Leave out the bags, laptops and jackets? They belong to people, not the room.", "options": {"leave_them_out": "leave them out", "pack_them": "pack them"}, "ask": "user", "volume_at_stake": 6.0, "rank_score": 6.0, "status": "open", "shown": true, "mock_effects": {"leave_them_out": {}, "pack_them": {}}, "room_id": "room_a"}
+    {"id": "q_room_a_personal", "kind": "include_class", "refers_to": "room_a", "text": "We left out 13 personal belongings (laptops, jackets, backpacks). Leave them out?", "options": {"yes": "leave them out", "no": "they are part of the move"}, "ask": "user", "volume_at_stake": 1.0, "confidence": 0.5, "rank_score": 0.5, "status": "open", "shown": true, "mock_effects": {"yes": {"personal": false}, "no": {"personal": true}}, "room_id": "room_a"}
   ]
 }

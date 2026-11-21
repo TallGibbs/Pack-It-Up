@@ -133,6 +133,7 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
     fixtures: dict[str, dict] = {}
     personal: dict[str, int] = defaultdict(int)
     personal_per_file: dict[str, dict] = defaultdict(lambda: defaultdict(int))
+    personal_cuft: dict[str, float] = defaultdict(float)  # per file, for the boxes if the user says they move
     small: dict[str, dict] = {}
     containers: dict[tuple, dict] = {}
     uncertain: list[dict] = []
@@ -167,6 +168,9 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
             elif mc == "personal_belonging":
                 loose_facts += [{**x, "_item_label": it["label"]} for x in it.get("_facts", [])]
                 personal_per_file[p["file"]][canon_key(it["label"])] += it["quantity"]
+                d = it.get("est_dims_in") or []
+                if len(d) == 3 and all(isinstance(v, (int, float)) and v > 0 for v in d):
+                    personal_cuft[p["file"]] += it["quantity"] * d[0] * d[1] * d[2] / 1728
             else:  # small_loose
                 k = it["label"].lower()
                 s = small.setdefault(k, {"label": it["label"], "quantity": 0, "seen_in": [],
@@ -299,7 +303,8 @@ def merge_room(perceptions: list[dict], room: dict) -> dict:
         "scale_refs": sorted({s for p in perceptions for s in p.get("scale_refs", [])}),
         "items": items,
         "fixtures": sorted(fixtures.values(), key=lambda f: f["label"].lower()),
-        "personal_belongings": {"count": sum(personal.values()), "kinds": dict(personal)},
+        "personal_belongings": {"count": sum(personal.values()), "kinds": dict(personal),
+                                "volume_cuft": round(max(personal_cuft.values(), default=0.0), 1)},
         "small_loose": sorted(small.values(), key=lambda s: s["label"].lower()),
         "containers": cont_list,
         "transcripts": {p["file"]: p.get("transcript", []) for p in perceptions if p.get("transcript")},
