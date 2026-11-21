@@ -7,3 +7,4 @@ pillow
 pillow-heif
 imageio-ffmpeg
 python-dotenv
+py3dbp

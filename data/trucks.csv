@@ -1,0 +1,5 @@
+truck_id,name,length_in,width_in,height_in,max_weight_lb,door_width_in,door_height_in,deck_height_in
+uhaul_10,U-Haul 10 ft,119,76,73,2850,71,67,29
+uhaul_15,U-Haul 15 ft,180,92,85,6385,87,77,34
+uhaul_20,U-Haul 20 ft,234,92,85,5700,87,77,35
+uhaul_26,U-Haul 26 ft,314,98,99,12859,93,91,35

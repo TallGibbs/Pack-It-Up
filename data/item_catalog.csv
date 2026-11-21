@@ -56,3 +56,24 @@ box_large,Box large (4.5 cu ft),box,18,18,24,yes,no,no,no,no
 box_xl,Box extra large (6.0 cu ft),box,24,18,24,yes,no,no,no,no
 box_wardrobe,Wardrobe box,box,24,21,46,no,yes,no,no,no
 box_dish_pack,Dish pack,box,18,18,28,light_only,yes,no,yes,no
+folding_table_6ft,Folding table (6 ft),venue,72,30,3,yes,no,no,no,no
+banquet_round,Banquet round table (60 in),venue,60,60,4,no,no,yes,no,yes
+stacking_chair_stack,Stacking chairs (stack of 10),venue,22,21,72,no,yes,no,no,yes
+projector,AV projector (cased),venue,20,16,12,light_only,yes,no,yes,no
+projector_screen,Projector screen on tripod,venue,72,8,8,no,no,no,yes,no
+podium,Speaker podium / lectern,venue,26,22,46,no,yes,no,no,no
+whiteboard_mobile,Rolling whiteboard,venue,72,24,75,no,yes,no,yes,yes
+power_strip_box,Power strip & cable tote,venue,24,16,14,yes,no,no,no,no
+desk_standing,Standing desk (folded/disassembled),office,60,30,4,yes,no,no,no,yes
+plant_large,Large potted plant,living,24,24,60,no,yes,no,yes,no
+sideboard,Sideboard / credenza,living,72,18,32,yes,yes,no,no,yes
+console_table,Console table,living,60,16,30,yes,no,no,no,no
+counter_table,High counter table,dining,96,18,42,no,yes,no,no,yes
+ottoman,Pouf / ottoman,living,20,20,18,light_only,no,no,no,no
+table_lamp,Table lamp,living,16,16,26,no,yes,no,yes,no
+framed_art,Framed artwork,living,36,3,28,no,yes,yes,yes,no
+shelving_unit,Open metal shelving unit,retail,36,16,72,no,yes,no,no,yes
+espresso_machine,Commercial espresso machine,cafe,28,22,20,no,yes,no,yes,yes
+pastry_display,Glass pastry display case,cafe,36,20,24,no,yes,no,yes,yes
+merch_rack,Retail garment / merch rack,retail,48,22,64,no,yes,no,no,no
+pos_kiosk,POS register stand,retail,22,18,44,no,yes,no,yes,no
