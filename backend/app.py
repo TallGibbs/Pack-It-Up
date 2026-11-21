@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.ingest.api import router as ingest_router
@@ -19,6 +20,12 @@ app.include_router(ingest_router)
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    # A phone typing just the laptop's address lands on the capture page instead of a 404.
+    return RedirectResponse("/app/capture.html")
 
 
 # Phone pages (frontend/capture.html, review.html, index.html) on the same port as the API,
