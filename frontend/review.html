@@ -37,6 +37,7 @@
 
 <script src="mock/mock-api.js"></script>
 <script src="ui/api.js"></script>
+<script src="ui/questions.js"></script>
 <script>
 (function () {
   "use strict";
@@ -47,10 +48,9 @@
   const mmss = (t) => (t == null ? "" : `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, "0")}`);
   const MAX_QUESTIONS = 5;
   const OUT = new Set(["sell", "donate", "trash", "stays"]);
+  const SEGS = [["keep", "Move"], ["stays", "Stays"], ["sell", "Sell"], ["trash", "Toss"]];
   const SIZE_SRC = { catalog: "catalog", vision_estimate: "estimate", speech: "you said", category_default: "default" };
   const WT_SRC = { catalog: "catalog", vision_estimate: "estimate", density: "by material", speech: "you said" };
-  const ANSWERED_BY = { decisions_api: "Answered by the Decisions API", generate_json_fallback: "Answered by the model",
-                        speech: "You said", user: "You answered" };
 
   if (MOCK) $("#mock-banner").classList.remove("hidden");
 
@@ -212,85 +212,20 @@
     });
   }
 
-  // Questions as backend/ingest/gaps.py writes them: options is {key: label} (or a plain list),
-  // or null with free_text; refers_to is an item id, a container label or a room id;
-  // shown marks the top few the server wants the user to see.
-  function qOptions(q) {
-    if (Array.isArray(q.options)) return q.options.map((o) => ({ key: String(o), label: String(o) }));
-    if (q.options && typeof q.options === "object") return Object.entries(q.options).map(([key, label]) => ({ key, label: String(label) }));
-    return [];
-  }
-  const isOpen = (q) => (q.status || "open") === "open";
-
-  function questionList() {
-    const qs = inv.questions || [];
-    const openAll = qs.filter(isOpen);
-    const serverPicks = qs.some((q) => "shown" in q);
-    let open = serverPicks ? openAll.filter((q) => q.shown) : openAll.slice(0, MAX_QUESTIONS);
-    open = open.slice(0, MAX_QUESTIONS);
-    const reopenedQs = qs.filter((q) => !isOpen(q) && reopened.has(q.id));
-    const answered = qs.filter((q) => !isOpen(q) && !reopened.has(q.id));
-    return { open: [...reopenedQs, ...open], more: openAll.length - open.length, answered };
-  }
-
-  function questionTarget(q) {
-    const ref = q.item_id || q.refers_to;
-    const it = ref && findItem(ref);
-    if (it) return { ev: it.evidence, label: it.label };
-    const c = (q.container_id && findContainer(q.container_id)) ||
-      (inv.rooms.flatMap((r) => r.containers || []).find((x) => x.label === q.refers_to));
-    if (c) return { ev: c.evidence, label: c.label };
-    return { ev: q.evidence, label: q.kind === "include_class" ? "bags" : q.refers_to || q.text };
-  }
-
-  function optLabel(q, key) {
-    const o = qOptions(q).find((x) => x.key === String(key));
-    return o ? o.label : key;
-  }
+  // Question cards come from ui/questions.js (shared with capture.html).
+  const Q = window.PIU_Q;
+  const isOpen = (q) => Q.isOpen(q) && !Q.MODEL_ONLY.has(q.kind);
 
   function renderQuestions() {
     const host = $("#questions");
-    const { open, more, answered } = questionList();
+    const { open, more, answered } = Q.pick(inv.questions, MAX_QUESTIONS, reopened);
     if (!open.length && !answered.length) { host.innerHTML = ""; return; }
     let html = open.length ? `<h2>${open.length === 1 ? "One question" : `${open.length} quick questions`}</h2>` : "";
-    open.forEach((q) => {
-      const busy = busyQ.has(q.id);
-      const t = questionTarget(q);
-      const opts = qOptions(q);
-      const guess = q.suggested ?? (q.model_answer && q.model_answer.answer);
-      const conf = q.model_answer && q.model_answer.confidence;
-      const body = opts.length
-        ? `<div class="opts">${opts.map((o) =>
-            `<button class="btn${o.key === guess ? " guess" : ""}" type="button" data-opt="${esc(o.key)}" ${busy ? "disabled" : ""}${q.answer === o.key ? ' aria-pressed="true"' : ""}>${esc(o.label)}${
-              o.key === guess ? `<small>best guess${conf != null ? ` · ${Math.round(conf * 100)}%` : ""}</small>` : ""}</button>`).join("")}</div>`
-        : `<form class="opts free" data-free><input type="text" name="a" required placeholder="Type your answer" ${busy ? "disabled" : ""}>
-            <button class="btn primary" ${busy ? "disabled" : ""}>Save</button></form>`;
-      html += `<div class="card q" data-q="${esc(q.id)}">
-        <div class="row">${thumb(t.ev, t.label)}
-          <div><div class="kind">${esc((q.kind || "").replace(/_/g, " "))}</div>
-          <div class="text clamp" data-clamp>${esc(q.user_text || q.text)}</div></div></div>
-        ${body}
-      </div>`;
-    });
+    html += open.map((q) => Q.cardHtml(q, { busy: busyQ.has(q.id), thumbHtml: (ev, label) => thumb(ev, label), inv })).join("");
     if (more > 0) html += `<p class="small muted">${more} smaller question${more > 1 ? "s" : ""} not shown; best guesses used.</p>`;
-    answered.forEach((q) => {
-      const who = ANSWERED_BY[q.answered_by] || "Answered";
-      const said = q.answered_by === "speech" && q.quote ? `: <q>${esc(q.quote)}</q>` : `: <b>${esc(optLabel(q, q.answer))}</b>`;
-      html += `<div class="card q answered" data-q="${esc(q.id)}">
-        <div class="text clamp" data-clamp>${esc(q.user_text || q.text)}</div>
-        <div class="small muted">${esc(who)}${said}
-        <button class="btn link" type="button" data-reopen>Change</button></div></div>`;
-    });
+    html += answered.map(Q.answeredHtml).join("");
     host.innerHTML = html;
-    host.querySelectorAll("[data-q]").forEach((card) => {
-      const q = (inv.questions || []).find((x) => x.id === card.dataset.q);
-      card.querySelectorAll("[data-opt]").forEach((b) => b.addEventListener("click", () => answer(q, b.dataset.opt)));
-      const form = card.querySelector("[data-free]");
-      if (form) form.addEventListener("submit", (e) => { e.preventDefault(); const v = form.a.value.trim(); if (v) answer(q, v); });
-      const re = card.querySelector("[data-reopen]");
-      if (re) re.addEventListener("click", () => { reopened.add(q.id); renderQuestions(); });
-      card.querySelectorAll("[data-clamp]").forEach((el) => el.addEventListener("click", () => el.classList.toggle("clamp")));
-    });
+    Q.bind(host, inv.questions, { onAnswer: answer, onReopen: (q) => { reopened.add(q.id); renderQuestions(); } });
   }
 
   // One sentence can set several fields ("the shelf is full of books": contents and fullness); show it once.
@@ -307,6 +242,7 @@
     const badges = [];
     if (it.heard_only) badges.push(`<span class="badge heard">🎙️ heard, not filmed</span>`);
     if (it.partially_visible) badges.push(`<span class="badge">partly hidden</span>`);
+    if (it.contents_unknown) badges.push(`<span class="badge">contents unknown, assumed empty</span>`);
     if (it.stack_count > 1) badges.push(`<span class="badge">stack of ${esc(it.stack_count)}</span>`);
     if (it.fragile) badges.push(`<span class="badge">fragile</span>`);
     if (it.two_person) badges.push(`<span class="badge">two-person lift</span>`);
@@ -315,11 +251,11 @@
     const said = uniqQuotes(it.set_by_speech).map((s) =>
       `<div class="said">You said <q>${esc(s.quote)}</q> <span class="muted">· ${esc(mmss(s.timestamp_s))} in ${esc(s.source)}</span></div>`).join("");
     const disp = it.disposition || "undecided";
-    const segs = ["keep", "sell", "donate", "trash"];
-    // "stays" (left behind, from speech) and any other server value show as a badge; tapping a segment overrides it
-    if (!segs.includes(disp) && disp !== "undecided") badges.unshift(`<span class="badge heard">${disp === "stays" ? "stays behind" : esc(disp)}</span>`);
-    const seg = segs.map((s) => `<button type="button" data-disp="${s}" aria-pressed="${disp === s}"
-        class="${disp === "undecided" && s === "keep" ? "implied" : ""}">${s[0].toUpperCase() + s.slice(1)}</button>`).join("");
+    // Move / Stays / Sell / Toss (decision 2026-11-21 11:38). Undecided counts as Move; any other
+    // server value (e.g. an older "donate") shows as a badge until a segment is tapped.
+    if (!SEGS.some(([v]) => v === disp) && disp !== "undecided") badges.unshift(`<span class="badge heard">${esc(disp)}</span>`);
+    const seg = SEGS.map(([v, name]) => `<button type="button" data-disp="${v}" aria-pressed="${disp === v}"
+        class="${disp === "undecided" && v === "keep" ? "implied" : ""}">${name}</button>`).join("");
     const st = rowState[it.id];
     const status = st === "saving" ? `<div class="saving">Saving…</div>`
       : st && st.error ? `<div class="saving error"><button class="btn link" type="button" data-retry>Didn't save (${esc(st.error)}). Tap to retry</button></div>` : "";
@@ -381,7 +317,7 @@
           conts.map((c) => {
             const n = boxCount(c);
             const what = c.items && c.items.length ? c.items.join(", ") : c.contents;
-            const full = c.fullness === "not_visible" ? "contents not visible" : c.fullness;
+            const full = c.contents_unknown || c.fullness === "not_visible" ? "closed: contents unknown, assumed empty" : c.fullness;
             const said = uniqQuotes(c.set_by_speech).map((x) => ` <span class="said-inline">you said <q>${esc(x.quote)}</q></span>`).join("");
             return `<li>${esc(c.label)}: ${esc([what, full].filter(Boolean).join(", "))}${n ? ` · <b>about ${n} box${n > 1 ? "es" : ""}</b>` : ""}${said}</li>`;
           }).join("") + `</ul></div>`;

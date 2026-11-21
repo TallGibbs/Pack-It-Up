@@ -219,7 +219,7 @@
         const q = src && fixture.questions.find((x) => roomId + "-" + x.id === questionId);
         if (!q) { const e = new Error(`no question ${questionId}`); e.status = 404; throw e; }
         answer = String(answer).trim();
-        if (q.options && !(answer in q.options)) { const e = new Error(`answer must be one of ${Object.keys(q.options).join(", ")}`); e.status = 400; throw e; }
+        if (answer === "more" || (q.options && !(answer in q.options) && !(q.free_text === "number" && /^\d+$/.test(answer)))) { const e = new Error(`answer must be one of ${Object.keys(q.options).join(", ")}`); e.status = 400; throw e; }
         if (!answer) { const e = new Error("empty answer"); e.status = 400; throw e; }
         run.answers[questionId] = answer;
         const effects = q.mock_effects || {};
@@ -228,6 +228,7 @@
           const id = roomId + "-" + eff.item_id;
           const ch = { ...eff.changes };
           if (ch.label_from_answer) { delete ch.label_from_answer; ch.label = answer; }
+          if (ch.quantity_from_answer) { delete ch.quantity_from_answer; ch.quantity = parseInt(answer, 10) || 1; }
           run.itemEdits[id] = { ...(run.itemEdits[id] || {}), ...ch };
         }
         if (eff.container_id) {

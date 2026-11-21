@@ -111,6 +111,10 @@ label.field { display: block; font-size: 13px; color: var(--muted); margin-botto
 .footer .inner { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
 .footer .inner .grow { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); }
 .footer .inner .grow b { color: var(--ink); font-size: 15px; display: block; }
+.footer .inner.col { flex-direction: column; align-items: stretch; gap: 8px; }
+.footer .btns { display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; }
+body.capture { padding-bottom: 150px; }
+#live-q .q { scroll-margin: 120px; }
 
 /* Review: totals bar */
 .totals {

@@ -7,7 +7,7 @@
 <title>Pack It Up · Film your rooms</title>
 <link rel="stylesheet" href="ui/style.css">
 </head>
-<body>
+<body class="capture">
 <div id="mock-banner" class="mock-banner hidden">Mock mode: nothing leaves this phone. Pick any photos or clips.</div>
 <main>
   <p class="steps"><b>1 Film</b> · 2 Check · 3 Pack</p>
@@ -15,6 +15,8 @@
   <p class="muted">Photos or short clips of each room. We list what's there, then plan the truck.</p>
 
   <div id="rooms"></div>
+
+  <section id="live-q" aria-live="polite"></section>
 
   <button id="add-room" class="btn block" type="button">+ Add another room</button>
 
@@ -33,9 +35,12 @@
 </main>
 
 <div class="footer hidden" id="footer">
-  <div class="inner">
+  <div class="inner col">
     <div class="grow" id="found"><b>Looking…</b>Items appear as each file finishes</div>
-    <a class="btn" id="review-btn" href="#">Review →</a>
+    <div class="btns">
+      <a class="btn" id="review-btn" href="#">Check list</a>
+      <a class="btn" id="plan-btn" href="#">Plan the truck load →</a>
+    </div>
   </div>
 </div>
 
@@ -61,6 +66,7 @@
 
 <script src="mock/mock-api.js"></script>
 <script src="ui/api.js"></script>
+<script src="ui/questions.js"></script>
 <script>
 (function () {
   "use strict";
@@ -80,6 +86,11 @@
   let uploading = false;
   let pollTimer = null;
   let lastRun = null;
+  const Q = window.PIU_Q;
+  const busyQ = new Set();
+  let shownQ = "";        // id + busy state of the question card on screen, to avoid re-rendering under the user's thumb
+  let qScrolled = false;
+  let answeredHere = 0;
 
   // ---------- rooms ----------
   function addRoom() {
@@ -246,6 +257,7 @@
         render(room);
       });
       updateFooter(run);
+      renderLiveQ(run.inventory);
       if (allFinished(run)) return; // stop until the next upload
     } catch (e) {
       $("#found").innerHTML = `<b>Can't reach the server</b><span class="error"></span>`;
@@ -261,22 +273,23 @@
 
   function updateFooter(run) {
     const btn = $("#review-btn");
+    const plan = $("#plan-btn");
     const inv = run.inventory;
     const done = allFinished(run);
     btn.href = link("review.html", { run_id: runId });
+    plan.href = link("index.html", { run_id: runId });
     if (!inv) {
       $("#found").innerHTML = "<b>Looking…</b>Items appear as each file finishes";
-      btn.setAttribute("aria-disabled", "true");
-      btn.textContent = "Review →";
-      btn.classList.remove("primary");
+      [btn, plan].forEach((b) => { b.setAttribute("aria-disabled", "true"); b.classList.remove("primary"); });
+      btn.textContent = "Check list";
       return;
     }
     const n = inv.totals.item_count;
     const nRooms = inv.rooms.length;
-    btn.removeAttribute("aria-disabled");
-    btn.textContent = `Review ${n} items →`;
+    [btn, plan].forEach((b) => b.removeAttribute("aria-disabled"));
+    btn.textContent = "Check list";
     const slow = firstSentAt && Date.now() - firstSentAt > 60000;
-    btn.classList.toggle("primary", done || slow);
+    plan.classList.toggle("primary", done || slow);
     const failed = Object.values(run.status.files || {}).filter((f) => f.perceive === "failed").length;
     const head = done ? `${n} items in ${nRooms} room${nRooms > 1 ? "s" : ""}` : `${n} items found so far`;
     const sub = done ? (failed ? `${failed} file(s) couldn't be read` : "Ready to check")
@@ -284,6 +297,55 @@
     $("#found").innerHTML = "<b></b><span></span>";
     $("#found b").textContent = head;
     $("#found span").textContent = sub;
+  }
+
+  // ---------- the top question, answered right here (decision 2026-11-21 11:38) ----------
+  function thumbHtml(inv, ev, label) {
+    if (ev && !ev.sha256 && ev.source && ev.box_2d) { // containers: borrow the hash of an item from the same file
+      const hit = inv.rooms.flatMap((r) => r.items).find((i) => i.evidence && i.evidence.source === ev.source && i.evidence.sha256);
+      if (hit) ev = { ...ev, sha256: hit.evidence.sha256, kind: ev.kind || hit.evidence.kind };
+    }
+    const ph = window.PIU.placeholder(label, ev && !ev.sha256 ? "audio" : ev && ev.kind);
+    return `<img class="thumb" alt="" src="${Q.esc(api.cropUrl(runId, ev, 160, label))}" onerror="this.onerror=null;this.src='${ph}'">`;
+  }
+
+  function renderLiveQ(inv, force) {
+    const host = $("#live-q");
+    if (!inv) return;
+    const { open } = Q.pick(inv.questions, 1);
+    const q = open[0];
+    const key = q ? q.id + (busyQ.has(q.id) ? ":busy" : "") : "none:" + answeredHere;
+    if (key === shownQ && !force) return;
+    if (!force && host.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return; // typing
+    shownQ = key;
+    if (!q) {
+      host.innerHTML = answeredHere ? `<p class="small muted">✓ Thanks, that's all the questions for now.</p>` : "";
+      return;
+    }
+    host.innerHTML = `<h2>${answeredHere ? "Next question" : "Quick question"}</h2>` +
+      Q.cardHtml(q, { busy: busyQ.has(q.id), inv, thumbHtml: (ev, label) => thumbHtml(inv, ev, label) });
+    Q.bind(host, inv.questions, { onAnswer: answerLive });
+    if (!qScrolled) { qScrolled = true; host.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  }
+
+  async function answerLive(q, value) {
+    busyQ.add(q.id);
+    renderLiveQ(lastRun && lastRun.inventory);
+    try {
+      const inv = await api.answer(runId, q.id, value);
+      busyQ.delete(q.id);
+      answeredHere++;
+      lastRun = { ...(lastRun || {}), inventory: inv };
+      updateFooter(lastRun);
+      renderLiveQ(inv, true);
+    } catch (e) {
+      busyQ.delete(q.id);
+      renderLiveQ(lastRun && lastRun.inventory, true);
+      const err = document.createElement("p");
+      err.className = "error";
+      err.textContent = `Couldn't save that answer: ${e.message}`;
+      $("#live-q").appendChild(err);
+    }
   }
 
   // ---------- QR code for opening this page on a phone (laptop only) ----------
