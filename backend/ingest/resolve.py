@@ -39,19 +39,31 @@ CATEGORY_DEFAULT_DIMS = {
 GENERIC_DEFAULT_DIMS = [24, 24, 24]
 
 BOX_CUFT = 3.0  # box_medium, for open_surfaces estimates
-# Boxes for what a cabinet, shelf or closet holds: the space inside for the model's size class, times
+# Boxes for what a cabinet, shelf or closet holds: the space inside for its kind and size class, times
 # how full it is. Rough on purpose; the review page says "about N boxes". (Until 13:10 on Nov 21 only
 # the loose-decor line had an estimate, so a full bookshelf added no boxes: FAILURES.md.)
-CONTAINER_CUFT = {"small": 6, "medium": 15, "large": 30}
-# ...smaller for kinds that hold less than a shelf or a run of cabinets (small, medium, large), larger for closets.
-KIND_CUFT = {"bathroom_cabinet": (1, 2, 4), "desk": (2, 4, 6), "dresser_drawers": (4, 8, 14),
-             "toy_storage": (4, 8, 15), "other": (4, 10, 20), "closet": (10, 20, 40)}
-INSIDE_SHARE = 0.6  # a container can't hold more than this share of the furniture it is part of
+#
+# One table for both tracks: the figures are George's, from backend/expand.py on `track-b`
+# (CONTAINER_FULL_CUFT and CONTENTS_BOX_SPEC). His solver packs the est_boxes written here and uses
+# his own copy only for a container that has none, so change the two together. Two differences, both
+# measured on Chris's phone run 120009, where his table gave 47 boxes (116 cu ft) next to 114 cu ft
+# of furniture and a full medicine cabinet came to 6 boxes:
+#   - bathroom_cabinet and other are smaller here (his: 4/8/14 and 6/12/24);
+#   - INSIDE_SHARE: a container can't hold more than this share of the listed furniture it is part of.
+CONTAINER_CUFT = {"small": 6, "medium": 15, "large": 30}  # a kind not in KIND_CUFT
+KIND_CUFT = {  # cubic feet inside when full: (small, medium, large)
+    "closet": (12, 24, 42), "kitchen_cabinet": (8, 16, 28), "pantry": (8, 15, 26), "bookshelf": (9, 18, 30),
+    "dresser_drawers": (8, 15, 24), "desk": (4.5, 9, 15), "toy_storage": (6, 13.5, 22.5),
+    "garage_shelving": (12, 24, 42),
+    "bathroom_cabinet": (1, 2, 4), "other": (4, 10, 20),
+}
+INSIDE_SHARE = 0.6
 FULLNESS_FRACTION = {"empty": 0.0, "quarter": 0.25, "half": 0.5, "three_quarters": 0.75, "full": 1.0}
-# Catalog box each kind of contents goes in: books are heavy, so small boxes; anything else, medium.
-BOX_FOR_CONTENTS = {"books": "box_small", "papers_office": "box_small", "tools": "box_small",
+# Catalog box each kind of contents goes in: heavy things in small boxes, light bulky things in large.
+BOX_FOR_CONTENTS = {"books": "box_small", "tools": "box_small", "papers_office": "box_small", "toiletries": "box_small",
                     "dishes_glassware": "box_dish_pack", "clothes_hanging": "box_wardrobe",
-                    "pots_pans": "box_large", "linens": "box_large", "toys": "box_large"}
+                    "pots_pans": "box_medium", "pantry_food": "box_medium", "decor": "box_medium", "mixed": "box_medium",
+                    "linens": "box_large", "clothes_folded": "box_large", "toys": "box_large"}
 NOT_ON_TRUCK = ("trash", "sell", "donate", "stays")  # "stays": the narrator said it is not moving
 PACK_FACTOR = 2.0  # loose items take about twice their own volume once boxed and padded
 
