@@ -368,10 +368,13 @@
   /* Printable QR box label cards */
   .qr-grid { display: grid; grid-template-columns: 1fr; gap: 8px; max-height: 360px; overflow-y: auto; }
   .qr-card {
-    display: grid; grid-template-columns: 72px 1fr; gap: 10px; align-items: center;
+    display: grid; grid-template-columns: 88px 1fr; gap: 10px; align-items: center;
     padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
   }
-  .qr-card canvas { width: 72px; height: 72px; border-radius: 6px; background: #fff; border: 1px solid #ddd; }
+  .qr-card canvas {
+    width: 88px; height: 88px; border-radius: 6px; background: #fff; border: 1px solid #ddd;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+  }
 
   /* Left column layout & Store corner chips */
   .left-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -436,11 +439,13 @@
 
   @media print {
     body.pack-page { background: #fff; color: #000; padding: 0; }
-    .topbar, .verdict, .stage-card, .storyboard-card, #e119-card, #whatif-panel, #arena-panel, #verifier-panel, .tab-bar, .footer, .mock-banner { display: none !important; }
+    .topbar, .verdict, .stage-card, .storyboard-card, #e119-card, #whatif-panel, #arena-panel, #verifier-panel, .tab-bar, #tab-unload, #tab-stores, #tab-crew, #tab-journey, #tab-shop, #btn-print-qr, .companion-strip, .footer, .mock-banner { display: none !important; }
+    #tab-labels { display: block !important; }
     .pack-grid { display: block; }
     .panel-card { border: 0; padding: 0; }
     .qr-grid { max-height: none; overflow: visible; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .qr-card { break-inside: avoid; border: 1.5px solid #000; background: #fff; color: #000; }
+    .qr-card { grid-template-columns: 112px 1fr; break-inside: avoid; border: 1.5px solid #000; background: #fff; color: #000; }
+    .qr-card canvas { width: 112px; height: 112px; border: 0; }
   }
 </style>
 </head>
@@ -1226,61 +1231,356 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
   };
 }
 
-/* ---------- Deterministic QR Matrix & Label Texture Generator ---------- */
-function hash32(str) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
+/* ---------- Real ISO/IEC 18004 Reed-Solomon QR Encoder & Top-Flap Label Generator ---------- */
+const _QR_EXP = new Uint8Array(512);
+const _QR_LOG = new Uint8Array(256);
+(() => {
+  let x = 1;
+  for (let i = 0; i < 255; i++) {
+    _QR_EXP[i] = x;
+    _QR_LOG[x] = i;
+    x <<= 1;
+    if (x & 0x100) x ^= 0x11d;
   }
-  return h;
+  for (let i = 255; i < 512; i++) _QR_EXP[i] = _QR_EXP[i - 255];
+})();
+
+const _QR_ALIGN = {
+  1: [], 2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30], 6: [6, 34],
+  7: [6, 22, 38], 8: [6, 24, 42], 9: [6, 26, 46], 10: [6, 28, 50],
+  11: [6, 30, 54], 12: [6, 32, 58], 13: [6, 34, 62], 14: [6, 26, 46, 66],
+};
+// [ecCwPerBlock, g1Blocks, g1DataCw, g2Blocks, g2DataCw]
+const _QR_BLOCKS_M = {
+  1: [10, 1, 16, 0, 0], 2: [16, 1, 28, 0, 0], 3: [26, 1, 44, 0, 0], 4: [18, 2, 32, 0, 0],
+  5: [24, 2, 43, 0, 0], 6: [16, 4, 27, 0, 0], 7: [18, 4, 31, 0, 0], 8: [22, 2, 38, 2, 39],
+  9: [22, 3, 36, 2, 37], 10: [26, 4, 43, 1, 44], 11: [30, 1, 50, 4, 51], 12: [22, 6, 36, 2, 37],
+  13: [22, 8, 37, 1, 38], 14: [24, 4, 40, 5, 41],
+};
+const _QR_BLOCKS_L = {
+  1: [7, 1, 19, 0, 0], 2: [10, 1, 34, 0, 0], 3: [15, 1, 55, 0, 0], 4: [20, 1, 80, 0, 0],
+  5: [26, 1, 108, 0, 0], 6: [18, 2, 68, 0, 0], 7: [20, 2, 78, 0, 0], 8: [24, 2, 97, 0, 0],
+  9: [30, 2, 116, 0, 0], 10: [18, 2, 68, 2, 69], 11: [20, 4, 81, 0, 0], 12: [24, 2, 92, 2, 93],
+  13: [26, 4, 107, 0, 0], 14: [30, 3, 115, 1, 116],
+};
+const _qrGenCache = new Map();
+const _qrMatrixCache = new Map();
+
+function _gfMul(a, b) {
+  return (a === 0 || b === 0) ? 0 : _QR_EXP[_QR_LOG[a] + _QR_LOG[b]];
 }
 
-function drawQrMatrix(ctx, x0, y0, size, payloadStr) {
-  const N = 21;
-  const cell = size / N;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(x0, y0, size, size);
-  ctx.fillStyle = "#111111";
+function _rsGenPoly(deg) {
+  if (_qrGenCache.has(deg)) return _qrGenCache.get(deg);
+  let poly = [1];
+  for (let i = 0; i < deg; i++) {
+    const nxt = new Array(poly.length + 1).fill(0);
+    const root = _QR_EXP[i];
+    for (let j = 0; j < poly.length; j++) {
+      nxt[j] ^= poly[j];
+      nxt[j + 1] ^= _gfMul(poly[j], root);
+    }
+    poly = nxt;
+  }
+  const tail = poly.slice(1);
+  _qrGenCache.set(deg, tail);
+  return tail;
+}
 
-  const finder = ( r0, c0 ) => {
-    for (let r = 0; r < 7; r++) {
-      for (let c = 0; c < 7; c++) {
-        const on = r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4);
-        if (on) ctx.fillRect(x0 + (c0 + c) * cell, y0 + (r0 + r) * cell, Math.ceil(cell), Math.ceil(cell));
+function _rsRemainder(data, ecLen) {
+  const gen = _rsGenPoly(ecLen);
+  const rem = new Array(ecLen).fill(0);
+  for (const byte of data) {
+    const factor = byte ^ rem[0];
+    rem.shift();
+    rem.push(0);
+    if (factor !== 0) {
+      for (let j = 0; j < ecLen; j++) rem[j] ^= _gfMul(gen[j], factor);
+    }
+  }
+  return rem;
+}
+
+function _qrFormatBits(ecBits, mask) {
+  const data = (ecBits << 3) | mask;
+  let rem = data << 10;
+  for (let i = 4; i >= 0; i--) {
+    if (rem & (1 << (i + 10))) rem ^= 0x537 << i;
+  }
+  return ((data << 10) | rem) ^ 0x5412;
+}
+
+function _qrVersionBits(ver) {
+  let rem = ver << 12;
+  for (let i = 5; i >= 0; i--) {
+    if (rem & (1 << (i + 12))) rem ^= 0x1f25 << i;
+  }
+  return (ver << 12) | rem;
+}
+
+function _qrMaskBit(mask, r, c) {
+  if (mask === 0) return (r + c) % 2 === 0;
+  if (mask === 1) return r % 2 === 0;
+  if (mask === 2) return c % 3 === 0;
+  if (mask === 3) return (r + c) % 3 === 0;
+  if (mask === 4) return (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0;
+  if (mask === 5) return ((r * c) % 2) + ((r * c) % 3) === 0;
+  if (mask === 6) return (((r * c) % 2) + ((r * c) % 3)) % 2 === 0;
+  return (((r + c) % 2) + ((r * c) % 3)) % 2 === 0;
+}
+
+function _qrPenalty(mat) {
+  const n = mat.length;
+  let score = 0;
+  for (let r = 0; r < n; r++) {
+    let run = 1;
+    for (let c = 1; c < n; c++) {
+      if (mat[r][c] === mat[r][c - 1]) run++;
+      else { if (run >= 5) score += 3 + (run - 5); run = 1; }
+    }
+    if (run >= 5) score += 3 + (run - 5);
+  }
+  for (let c = 0; c < n; c++) {
+    let run = 1;
+    for (let r = 1; r < n; r++) {
+      if (mat[r][c] === mat[r - 1][c]) run++;
+      else { if (run >= 5) score += 3 + (run - 5); run = 1; }
+    }
+    if (run >= 5) score += 3 + (run - 5);
+  }
+  for (let r = 0; r < n - 1; r++) {
+    for (let c = 0; c < n - 1; c++) {
+      const v = mat[r][c];
+      if (v === mat[r][c + 1] && v === mat[r + 1][c] && v === mat[r + 1][c + 1]) score += 3;
+    }
+  }
+  const matchPat = (get) => {
+    const p1 = [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0];
+    const p2 = [0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1];
+    let ok1 = true, ok2 = true;
+    for (let k = 0; k < 11; k++) {
+      const v = get(k);
+      if (v !== p1[k]) ok1 = false;
+      if (v !== p2[k]) ok2 = false;
+      if (!ok1 && !ok2) return false;
+    }
+    return true;
+  };
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c <= n - 11; c++) {
+      if (matchPat((k) => mat[r][c + k])) score += 40;
+    }
+  }
+  for (let c = 0; c < n; c++) {
+    for (let r = 0; r <= n - 11; r++) {
+      if (matchPat((k) => mat[r + k][c])) score += 40;
+    }
+  }
+  let dark = 0;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) dark += mat[r][c];
+  const total = n * n;
+  score += Math.floor(Math.abs(dark * 20 - total * 10) / total) * 10;
+  return score;
+}
+
+function encodeQrMatrix(text) {
+  if (_qrMatrixCache.has(text)) return _qrMatrixCache.get(text);
+  let payload = new TextEncoder().encode(String(text || ""));
+  if (payload.length > 450) payload = payload.slice(0, 450);
+
+  let chosen = null;
+  for (const [ecBits, table] of [[0, _QR_BLOCKS_M], [1, _QR_BLOCKS_L]]) {
+    for (let ver = 1; ver <= 14; ver++) {
+      const spec = table[ver];
+      const totalDataCw = spec[1] * spec[2] + spec[3] * spec[4];
+      const ccBits = ver <= 9 ? 8 : 16;
+      const maxBytes = Math.floor((totalDataCw * 8 - 4 - ccBits) / 8);
+      if (payload.length <= maxBytes) { chosen = { ver, ecBits, spec }; break; }
+    }
+    if (chosen) break;
+  }
+  const { ver, ecBits, spec: [ecCw, g1B, g1D, g2B, g2D] } = chosen;
+  const totalDataCw = g1B * g1D + g2B * g2D;
+  const ccBits = ver <= 9 ? 8 : 16;
+
+  const bits = [0, 1, 0, 0];
+  for (let s = ccBits - 1; s >= 0; s--) bits.push((payload.length >> s) & 1);
+  for (const b of payload) {
+    for (let s = 7; s >= 0; s--) bits.push((b >> s) & 1);
+  }
+  const term = Math.min(4, totalDataCw * 8 - bits.length);
+  for (let i = 0; i < term; i++) bits.push(0);
+  while (bits.length % 8 !== 0) bits.push(0);
+
+  const dataCw = [];
+  for (let i = 0; i < bits.length; i += 8) {
+    let v = 0;
+    for (let k = 0; k < 8; k++) v = (v << 1) | bits[i + k];
+    dataCw.push(v);
+  }
+  const pads = [0xec, 0x11];
+  for (let p = 0; dataCw.length < totalDataCw; p++) dataCw.push(pads[p & 1]);
+
+  const dataBlocks = [], ecBlocks = [];
+  let pos = 0;
+  for (const [cnt, dLen] of [[g1B, g1D], [g2B, g2D]]) {
+    for (let i = 0; i < cnt; i++) {
+      const blk = dataCw.slice(pos, pos + dLen);
+      pos += dLen;
+      dataBlocks.push(blk);
+      ecBlocks.push(_rsRemainder(blk, ecCw));
+    }
+  }
+  const interleaved = [];
+  const maxDLen = Math.max(g1D, g2D);
+  for (let col = 0; col < maxDLen; col++) {
+    for (const blk of dataBlocks) if (col < blk.length) interleaved.push(blk[col]);
+  }
+  for (let col = 0; col < ecCw; col++) {
+    for (const eblk of ecBlocks) interleaved.push(eblk[col]);
+  }
+  const streamBits = [];
+  for (const b of interleaved) {
+    for (let s = 7; s >= 0; s--) streamBits.push((b >> s) & 1);
+  }
+
+  const n = 17 + 4 * ver;
+  const base = Array.from({ length: n }, () => new Uint8Array(n));
+  const isFunc = Array.from({ length: n }, () => new Uint8Array(n));
+
+  const placeFinder = (r0, c0) => {
+    for (let dr = -1; dr <= 7; dr++) {
+      for (let dc = -1; dc <= 7; dc++) {
+        const rr = r0 + dr, cc = c0 + dc;
+        if (rr >= 0 && rr < n && cc >= 0 && cc < n) {
+          const on = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6 &&
+            (dr === 0 || dr === 6 || dc === 0 || dc === 6 || (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4));
+          base[rr][cc] = on ? 1 : 0;
+          isFunc[rr][cc] = 1;
+        }
       }
     }
   };
-  finder(0, 0);
-  finder(0, N - 7);
-  finder(N - 7, 0);
+  placeFinder(0, 0);
+  placeFinder(0, n - 7);
+  placeFinder(n - 7, 0);
 
-  let seed = hash32(payloadStr);
-  for (let r = 0; r < N; r++) {
-    for (let c = 0; c < N; c++) {
-      const inFinder = (r < 8 && c < 8) || (r < 8 && c >= N - 8) || (r >= N - 8 && c < 8);
-      if (inFinder) continue;
-      if (r === 6 || c === 6) {
-        if ((r + c) % 2 === 0) ctx.fillRect(x0 + c * cell, y0 + r * cell, Math.ceil(cell), Math.ceil(cell));
-        continue;
+  for (const r of _QR_ALIGN[ver]) {
+    for (const c of _QR_ALIGN[ver]) {
+      if ((r === 6 && c === 6) || (r === 6 && c === n - 7) || (r === n - 7 && c === 6)) continue;
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          const d = Math.max(Math.abs(dr), Math.abs(dc));
+          base[r + dr][c + dc] = (d === 0 || d === 2) ? 1 : 0;
+          isFunc[r + dr][c + dc] = 1;
+        }
       }
-      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      if ((seed & 3) < 2) ctx.fillRect(x0 + c * cell, y0 + r * cell, Math.ceil(cell), Math.ceil(cell));
+    }
+  }
+  for (let i = 8; i < n - 8; i++) {
+    if (!isFunc[6][i]) { base[6][i] = i % 2 === 0 ? 1 : 0; isFunc[6][i] = 1; }
+    if (!isFunc[i][6]) { base[i][6] = i % 2 === 0 ? 1 : 0; isFunc[i][6] = 1; }
+  }
+  for (let i = 0; i < 9; i++) {
+    if (i !== 6) { isFunc[8][i] = 1; isFunc[i][8] = 1; }
+  }
+  for (let i = 0; i < 8; i++) {
+    isFunc[n - 1 - i][8] = 1;
+    isFunc[8][n - 8 + i] = 1;
+  }
+  base[n - 8][8] = 1;
+  isFunc[n - 8][8] = 1;
+  if (ver >= 7) {
+    for (let a = 0; a < 6; a++) {
+      for (let k = 0; k < 3; k++) {
+        isFunc[n - 11 + k][a] = 1;
+        isFunc[a][n - 11 + k] = 1;
+      }
+    }
+  }
+
+  let bitIdx = 0, upward = true;
+  for (let col = n - 1; col >= 1; col -= 2) {
+    if (col === 6) col--;
+    for (let step = 0; step < n; step++) {
+      const r = upward ? (n - 1 - step) : step;
+      for (let dc = 0; dc < 2; dc++) {
+        const cc = col - dc;
+        if (!isFunc[r][cc]) {
+          base[r][cc] = bitIdx < streamBits.length ? streamBits[bitIdx++] : 0;
+        }
+      }
+    }
+    upward = !upward;
+  }
+
+  const tlCoords = [
+    [8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8],
+    [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8],
+  ];
+  let bestMat = null, bestPen = Infinity;
+  for (let mask = 0; mask < 8; mask++) {
+    const cand = base.map((row) => Array.from(row));
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (!isFunc[r][c] && _qrMaskBit(mask, r, c)) cand[r][c] ^= 1;
+      }
+    }
+    const fmt = _qrFormatBits(ecBits, mask);
+    for (let idx = 0; idx < 15; idx++) {
+      const [rr, cc] = tlCoords[idx];
+      cand[rr][cc] = (fmt >> (14 - idx)) & 1;
+    }
+    for (let idx = 0; idx < 7; idx++) cand[n - 1 - idx][8] = (fmt >> (14 - idx)) & 1;
+    for (let idx = 0; idx < 8; idx++) cand[8][n - 8 + idx] = (fmt >> (7 - idx)) & 1;
+    cand[n - 8][8] = 1;
+    if (ver >= 7) {
+      const vbits = _qrVersionBits(ver);
+      for (let i = 0; i < 18; i++) {
+        const b = (vbits >> i) & 1;
+        const a = Math.floor(i / 3), k = i % 3;
+        cand[n - 11 + k][a] = b;
+        cand[a][n - 11 + k] = b;
+      }
+    }
+    const pen = _qrPenalty(cand);
+    if (pen < bestPen) { bestPen = pen; bestMat = cand; }
+  }
+  _qrMatrixCache.set(text, bestMat);
+  return bestMat;
+}
+
+function drawQrMatrix(ctx, x0, y0, size, payloadStr) {
+  const mat = encodeQrMatrix(payloadStr);
+  const n = mat.length;
+  const quiet = 4;
+  const totalMods = n + quiet * 2;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(x0, y0, size, size);
+
+  const modPx = Math.max(1, Math.floor(size / totalMods));
+  const ox = x0 + Math.floor((size - modPx * totalMods) / 2) + quiet * modPx;
+  const oy = y0 + Math.floor((size - modPx * totalMods) / 2) + quiet * modPx;
+
+  ctx.fillStyle = "#111111";
+  for (let r = 0; r < n; r++) {
+    const row = mat[r];
+    const py = oy + r * modPx;
+    for (let c = 0; c < n; c++) {
+      if (row[c]) ctx.fillRect(ox + c * modPx, py, modPx, modPx);
     }
   }
 }
 
 function qrPayloadText(it) {
+  const corner = it.dest_corner ? ` (${it.dest_corner})` : "";
   return [
-    `PACK-IT-UP`,
-    `BOX:${it.box_short_name || it.id}`,
-    `MOUNT:TOP-FLAPS`,
-    `ROOM:${it.room_name || ""}`,
-    `DEST:Stop ${it.dock_stop || "-"} ${it.dest_zone_name || "Penn Station"}`,
+    `PACK-IT-UP | BOX:${it.box_short_name || it.id}`,
+    `DEST:Stop ${it.dock_stop || "-"} ${it.dest_zone_name || "Penn Station"}${corner}`,
     `TRUCK:T${(it.truck_index ?? 0) + 1} Load#${it.load_seq} Unload#${it.unload_seq || "-"}`,
-    it.fragile ? `HANDLING:FRAGILE-UPRIGHT` : `HANDLING:STD`,
+    `ROOM:${it.room_name || ""} | HANDLING:${it.fragile ? "FRAGILE-UPRIGHT" : "STD"} | MOUNT:TOP-FLAPS`,
     `IN:${(it.contents || it.label || "").slice(0, 90)}`,
-  ].join(" | ");
+  ].join("\n");
 }
 
 const boxTextureCache = new Map();
@@ -1289,27 +1589,27 @@ function makeBoxFaceTexture(it, baseHex) {
   if (boxTextureCache.has(key)) return boxTextureCache.get(key);
 
   const c = document.createElement("canvas");
-  c.width = 128;
-  c.height = 128;
+  c.width = 384;
+  c.height = 384;
   const ctx = c.getContext("2d");
 
   ctx.fillStyle = baseHex;
-  ctx.fillRect(0, 0, 128, 128);
+  ctx.fillRect(0, 0, 384, 384);
   ctx.strokeStyle = "rgba(0,0,0,0.28)";
-  ctx.lineWidth = 4;
-  ctx.strokeRect(2, 2, 124, 124);
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, 374, 374);
 
-  // Kraft tape seam across top flaps + white shipping label with QR code on TOP face
+  // Kraft tape seam across top flaps + white shipping label with real scannable QR code on TOP face
   ctx.fillStyle = "rgba(255,248,225,0.35)";
-  ctx.fillRect(0, 58, 128, 12);
+  ctx.fillRect(0, 174, 384, 36);
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(18, 16, 92, 96);
-  drawQrMatrix(ctx, 32, 22, 64, qrPayloadText(it));
+  ctx.fillRect(48, 36, 288, 312);
+  drawQrMatrix(ctx, 64, 42, 256, qrPayloadText(it));
 
   ctx.fillStyle = it.fragile ? "#c62828" : "#111827";
-  ctx.font = "bold 13px system-ui, sans-serif";
+  ctx.font = "bold 34px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText((it.box_short_name || "BOX").slice(0, 10), 64, 103);
+  ctx.fillText((it.box_short_name || "BOX").slice(0, 12), 192, 326);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -2203,7 +2503,7 @@ function renderPanels() {
   const qrHost = $("#qr-list");
   qrHost.innerHTML = boxes.map((b, idx) =>
     `<div class="qr-card" data-box-id="${esc(b.id)}">
-      <canvas width="126" height="126" data-qr-idx="${idx}"></canvas>
+      <canvas width="360" height="360" data-qr-idx="${idx}"></canvas>
       <div>
         <div style="font-weight:700;font-size:14px">${esc(b.box_short_name || b.id)} <span class="lift-tag">⬆️ Top Flap</span> ${b.fragile ? `<span class="lift-tag fragile">FRAGILE</span>` : ""}</div>
         <div class="small"><b>Stop ${esc(b.dock_stop)}:</b> ${esc(b.dest_zone_name)} (${esc(b.dest_corner || "Stock")})</div>
@@ -2215,7 +2515,7 @@ function renderPanels() {
 
   $$("[data-qr-idx]", qrHost).forEach((cv) => {
     const b = boxes[Number(cv.dataset.qrIdx)];
-    if (b) drawQrMatrix(cv.getContext("2d"), 6, 6, 114, qrPayloadText(b));
+    if (b) drawQrMatrix(cv.getContext("2d"), 0, 0, 360, qrPayloadText(b));
   });
 }
 

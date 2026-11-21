@@ -341,8 +341,8 @@ def _penalty_score(grid: list[list[int]]) -> int:
     return score
 
 
-def encode_qr_matrix(text: str) -> list[list[int]]:
-    """Encode UTF-8 `text` into a 2D QR Code bit matrix (`1` = dark, `0` = light)."""
+def encode_qr_matrix(text: str) -> list[list[bool]]:
+    """Encode UTF-8 `text` into a 2D QR Code bit matrix (`True` = dark, `False` = light)."""
     raw = text.encode("utf-8")
     ver = _pick_version(len(raw))
     size = 21 + 4 * (ver - 1)
@@ -420,7 +420,7 @@ def encode_qr_matrix(text: str) -> list[list[int]]:
             best_grid = cand
 
     assert best_grid is not None
-    return best_grid
+    return [[bool(v) for v in row] for row in best_grid]
 
 
 def qr_svg(text: str, *, border: int = 4) -> str:
