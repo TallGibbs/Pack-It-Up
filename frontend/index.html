@@ -283,9 +283,85 @@
   }
   .qr-card canvas { width: 72px; height: 72px; border-radius: 6px; background: #fff; border: 1px solid #ddd; }
 
+  /* Source Room Video Stills -> Truck -> Destination Room/Corner Storyboard */
+  .left-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .storyboard-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 13px 14px;
+  }
+  .sb-head {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px; margin-bottom: 10px;
+  }
+  .sb-head h2 { margin: 0; font-size: 15.5px; }
+  .sb-flow {
+    display: grid; grid-template-columns: 1fr; gap: 10px; align-items: stretch;
+  }
+  @media (min-width: 720px) {
+    .sb-flow { grid-template-columns: minmax(0, 1fr) 138px minmax(0, 1.15fr); align-items: center; }
+  }
+  .sb-col-title {
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--muted); margin-bottom: 6px;
+  }
+  .still-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 8px; }
+  .still-card {
+    border: 1px solid var(--line); border-radius: 11px; overflow: hidden;
+    background: var(--bg); cursor: pointer; transition: border-color .15s, transform .12s;
+  }
+  .still-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .still-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .still-frame {
+    position: relative; width: 100%; aspect-ratio: 16 / 9; background: #111827; overflow: hidden;
+  }
+  .still-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .still-tag {
+    position: absolute; left: 6px; bottom: 5px; right: 6px;
+    display: flex; justify-content: space-between; align-items: center; gap: 4px;
+    font-size: 10.5px; font-weight: 650; color: #f8fafc;
+    background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(4px);
+    padding: 2px 6px; border-radius: 6px;
+  }
+  .still-body { padding: 7px 9px; font-size: 12px; }
+  .still-body b { display: block; font-size: 12.5px; color: var(--ink); line-height: 1.25; }
+  .corner-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+  .corner-chip {
+    font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 5px;
+    background: var(--card); border: 1px solid var(--line); color: var(--muted);
+  }
+  .sb-truck-hub {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 12px 8px; border-radius: 12px;
+    background: var(--accent-soft); border: 1px dashed var(--accent); gap: 4px;
+  }
+  .sb-truck-hub .hub-icon { font-size: 24px; line-height: 1; }
+  .sb-truck-hub b { font-size: 13px; color: var(--accent); }
+  .sb-truck-hub span { font-size: 11.5px; color: var(--muted); }
+
+  /* 2-up video stills inside 3D Inspector + Store tab thumbnails */
+  .ins-stills {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 7px 0 6px;
+  }
+  .ins-still-box {
+    border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.16);
+    background: #0f172a;
+  }
+  .ins-still-box img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block; }
+  .ins-still-cap {
+    font-size: 10px; color: #cbd5e1; padding: 3px 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .zone-still-wrap {
+    display: grid; grid-template-columns: 112px 1fr; gap: 9px; align-items: center; margin-top: 6px;
+  }
+  .zone-still-wrap img {
+    width: 112px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 7px;
+    border: 1px solid var(--line); background: #111827; display: block;
+  }
+
   @media print {
     body.pack-page { background: #fff; color: #000; padding: 0; }
-    .topbar, .verdict, .stage-card, #whatif-panel, #verifier-panel, .tab-bar, .footer, .mock-banner { display: none !important; }
+    .topbar, .verdict, .stage-card, .storyboard-card, #whatif-panel, #verifier-panel, .tab-bar, .footer, .mock-banner { display: none !important; }
     .pack-grid { display: block; }
     .panel-card { border: 0; padding: 0; }
     .qr-grid { max-height: none; overflow: visible; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -324,57 +400,84 @@
   <p class="error hidden" id="err-box"></p>
 
   <div class="pack-grid">
-    <!-- LEFT: Interactive Three.js 3D Viewport + Step Scrubber -->
-    <section class="stage-card" aria-label="3D Packing View">
-      <div class="stage-toolbar">
-        <div class="pill-group" role="group" aria-label="3D Scene Mode">
-          <button type="button" id="scene-trucks" aria-pressed="true">🚚 U-Haul Fleet (3D)</button>
-          <button type="button" id="scene-zones">🏛️ Penn Station Stores (3D)</button>
-        </div>
-        <div class="pill-group" role="group" aria-label="Color coding">
-          <button type="button" data-color="stop" aria-pressed="true">By Penn Stop</button>
-          <button type="button" data-color="room" aria-pressed="false">By Room</button>
-          <button type="button" data-color="handling" aria-pressed="false">By Rules</button>
-        </div>
-      </div>
-
-      <div class="canvas-wrap" id="canvas-wrap">
-        <canvas id="three-canvas"></canvas>
-        <div class="canvas-hud" id="camera-chips"></div>
-
-        <div class="inspector hidden" id="item-inspector">
-          <button class="close-x" type="button" id="ins-close" aria-label="Close">×</button>
-          <div class="ins-title" id="ins-title">Item</div>
-          <div class="ins-meta" id="ins-meta"></div>
-          <div class="ins-badges" id="ins-badges"></div>
-        </div>
-
-        <div class="legend-bar">
-          <div class="legend-items" id="legend-items"></div>
-        </div>
-      </div>
-
-      <!-- Load / Unload Playback Scrubber -->
-      <div class="scrubber">
-        <div class="scrub-row">
-          <div class="scrub-btns">
-            <button type="button" class="btn" id="btn-play">▶ Play</button>
-            <button type="button" class="btn" id="btn-prev" aria-label="Previous step">−</button>
-            <button type="button" class="btn" id="btn-next" aria-label="Next step">+</button>
-            <button type="button" class="btn" id="btn-all">Show All</button>
+    <!-- LEFT: Interactive Three.js 3D Viewport + Video Stills Storyboard -->
+    <div class="left-col">
+      <section class="stage-card" aria-label="3D Packing View">
+        <div class="stage-toolbar">
+          <div class="pill-group" role="group" aria-label="3D Scene Mode">
+            <button type="button" id="scene-trucks" aria-pressed="true">🚚 U-Haul Fleet</button>
+            <button type="button" id="scene-venue" aria-pressed="false">🏛️ Penn Station Venue (3D)</button>
+            <button type="button" id="scene-zones" aria-pressed="false">📦 By Store / Room</button>
           </div>
-          <div class="pill-group" role="group" aria-label="Playback Direction">
-            <button type="button" id="dir-load" aria-pressed="true">Load Truck (1→N)</button>
-            <button type="button" id="dir-unload" aria-pressed="false">Unload @ Penn (LIFO)</button>
+          <div class="pill-group" role="group" aria-label="Color coding">
+            <button type="button" data-color="stop" aria-pressed="true">By Penn Stop</button>
+            <button type="button" data-color="room" aria-pressed="false">By Room</button>
+            <button type="button" data-color="handling" aria-pressed="false">By Rules</button>
           </div>
-          <span class="step-readout" id="step-readout">Step 0 / 0</span>
         </div>
-        <div class="scrub-slider-wrap">
-          <input type="range" id="step-slider" min="0" max="0" value="0" aria-label="Loading step">
+
+        <div class="canvas-wrap" id="canvas-wrap">
+          <canvas id="three-canvas"></canvas>
+          <div class="canvas-hud" id="camera-chips"></div>
+
+          <div class="inspector hidden" id="item-inspector">
+            <button class="close-x" type="button" id="ins-close" aria-label="Close">×</button>
+            <div class="ins-title" id="ins-title">Item</div>
+            <div class="ins-stills" id="ins-stills"></div>
+            <div class="ins-meta" id="ins-meta"></div>
+            <div class="ins-badges" id="ins-badges"></div>
+          </div>
+
+          <div class="legend-bar">
+            <div class="legend-items" id="legend-items"></div>
+          </div>
         </div>
-        <div class="now-loading" id="now-loading">Drag to orbit · Scroll/pinch to zoom · Tap any box or piece to inspect</div>
-      </div>
-    </section>
+
+        <!-- Load / Unload Playback Scrubber -->
+        <div class="scrubber">
+          <div class="scrub-row">
+            <div class="scrub-btns">
+              <button type="button" class="btn" id="btn-play">▶ Play</button>
+              <button type="button" class="btn" id="btn-prev" aria-label="Previous step">−</button>
+              <button type="button" class="btn" id="btn-next" aria-label="Next step">+</button>
+              <button type="button" class="btn" id="btn-all">Show All</button>
+            </div>
+            <div class="pill-group" role="group" aria-label="Playback Direction">
+              <button type="button" id="dir-load" aria-pressed="true">Load Truck (1→N)</button>
+              <button type="button" id="dir-unload" aria-pressed="false">Unload @ Penn (LIFO)</button>
+            </div>
+            <span class="step-readout" id="step-readout">Step 0 / 0</span>
+          </div>
+          <div class="scrub-slider-wrap">
+            <input type="range" id="step-slider" min="0" max="0" value="0" aria-label="Loading step">
+          </div>
+          <div class="now-loading" id="now-loading">Drag to orbit · Scroll/pinch to zoom · Tap any box or piece to inspect</div>
+        </div>
+      </section>
+
+      <!-- Video Stills Storyboard: Source Rooms -> Truck -> Destination Rooms & Corners -->
+      <section class="storyboard-card" id="storyboard-card" aria-label="Source to Truck to Destination Video Stills">
+        <div class="sb-head">
+          <h2>🎥 Room-to-Truck-to-Destination Video Stills</h2>
+          <div class="pill-group" id="sb-truck-tabs" role="group" aria-label="Filter storyboard by truck"></div>
+        </div>
+        <div class="sb-flow">
+          <div>
+            <div class="sb-col-title">1. Filmed Source Rooms</div>
+            <div class="still-list" id="sb-source-stills"></div>
+          </div>
+          <div class="sb-truck-hub" id="sb-truck-hub">
+            <div class="hub-icon">🚚</div>
+            <b>Truck Fleet</b>
+            <span>Loading → Unloading</span>
+          </div>
+          <div>
+            <div class="sb-col-title">2. Destination Rooms &amp; Corners (Tap for 3D Venue)</div>
+            <div class="still-list" id="sb-dest-stills"></div>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <!-- RIGHT: Judge What-If Re-Solve + Verifier + Unload / Stores / QR Tabs -->
     <aside>
@@ -462,9 +565,16 @@
 
 <script src="mock/mock-api.js"></script>
 <script src="ui/api.js"></script>
+<script src="ui/commerce.js"></script>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import {
+  buildPennVenueScene,
+  annotateStagedCorners,
+  captureVenueCornerStills,
+  makeSimulatedVideoStill,
+} from "./ui/penn-venue-3d.js";
 
 const { api, link, MOCK, API_BASE, params } = window.PIU;
 const $ = (s, el = document) => el.querySelector(s);
@@ -573,6 +683,7 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
           two_person: Boolean(it.two_person) || wt > 50,
           stackable: it.fragile ? "no" : String(it.stackable || "no"),
           stack_count: Number(it.stack_count || 1),
+          evidence: it.evidence || (rb.files?.[0] ? { source: rb.files[0], kind: /\.(mp4|mov|m4v)$/i.test(rb.files[0]) ? "video" : "image", timestamp_s: 2.5 } : null),
           dest_zone: z.zone_id, dest_zone_name: z.name, dock_stop: z.dock_stop,
         });
       }
@@ -604,6 +715,7 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
             must_stay_upright: Boolean(spec.upright || c.fragile),
             load_on_edge: false, two_person: false,
             stackable: c.fragile ? "light_only" : spec.stackable, stack_count: 1,
+            evidence: c.evidence || (rb.files?.[0] ? { source: rb.files[0], kind: "image" } : null),
             dest_zone: z.zone_id, dest_zone_name: z.name, dock_stop: z.dock_stop,
           });
         }
@@ -944,10 +1056,14 @@ const pointer = new THREE.Vector2();
 
 /* ---------- Application State ---------- */
 let plan = null;
-let sceneMode = "trucks";     // "trucks" | "zones"
+let sceneMode = "trucks";     // "trucks" | "venue" | "zones"
 let colorMode = "stop";       // "stop" | "room" | "handling"
 let playDir = "load";         // "load" | "unload"
 let focusBinIndex = -1;       // -1 = all bins, >=0 = specific truck or store index
+let showVenueRoof = true;     // toggle Moynihan arched glass skylight roof in "venue" mode
+let storyboardTruckIdx = -1;  // -1 = all trucks, >=0 = specific truck in video storyboard
+let highlightRoomId = null;   // optional source room highlight from clicking a room video still
+let venueCornerStills = {};   // zone_id -> offscreen 3D corner cam dataURL
 let currentStep = 0;          // 0..orderedMeshes.length
 let playing = false;
 let lastTickMs = 0;
@@ -956,8 +1072,58 @@ let addPiano = false;
 let downsizeLast = false;
 let roomColorMap = {};
 let violatingIds = new Set();
-let meshEntries = [];         // [{ mesh, edges, item, binOffset, targetY, seqOrder }]
-let binTargets = [];          // [{ label, center: THREE.Vector3, radius }]
+let meshEntries = [];         // [{ mesh, edges, item, worldPos?, targetY, seqIndex }]
+let binTargets = [];          // [{ label, center: THREE.Vector3, camPos?, radius }]
+
+function getSourceStillUrls(roomName, ev, detections = [], highlightBox = null) {
+  const accentHex = "#3b82f6";
+  const sim = makeSimulatedVideoStill({
+    roomName,
+    source: (ev && ev.source) || "room_clip.mp4",
+    timestampS: ev && ev.timestamp_s != null ? ev.timestamp_s : 3.2,
+    accentHex,
+    detections,
+    highlightBox,
+  });
+  // Use real Track A video frame / crop endpoint when a real sha256 exists on a server run
+  const isMockSha = !ev || !ev.sha256 || /^(aaaa|bbbb)0000/.test(String(ev.sha256));
+  if (!MOCK && !isMockSha && plan?.run_id && !["sample_venue", "mock-demo"].includes(plan.run_id)) {
+    const q = new URLSearchParams({ size: "480" });
+    if (ev.timestamp_s != null) q.set("t", String(ev.timestamp_s));
+    if (highlightBox && highlightBox.length === 4) q.set("box", highlightBox.join(","));
+    return {
+      src: `${API_BASE}/media/${encodeURIComponent(plan.run_id)}/${ev.sha256.slice(0, 16)}/crop?${q}`,
+      fallback: sim,
+      tag: `${ev.kind === "video" ? "🎥" : "📷"} ${ev.source}${ev.timestamp_s != null ? ` · ${Math.floor(ev.timestamp_s / 60)}:${String(Math.round(ev.timestamp_s % 60)).padStart(2, "0")}` : ""}`,
+    };
+  }
+  return {
+    src: sim,
+    fallback: sim,
+    tag: `${ev?.kind === "video" || /\.(mp4|mov|m4v)$/i.test(ev?.source || "") ? "🎥" : "📷"} ${ev?.source || "room_scan.mp4"}${ev?.timestamp_s != null ? ` · 0:${String(Math.round(ev.timestamp_s)).padStart(2, "0")}` : ""}`,
+  };
+}
+
+function getDestStillUrls(zoneId, destStillObj, zoneName = "Destination") {
+  const fallback = venueCornerStills[zoneId] || makeSimulatedVideoStill({
+    roomName: zoneName,
+    source: "nypenn_concourse.mp4",
+    timestampS: 4.5,
+    accentHex: "#10b981",
+  });
+  if (!MOCK && destStillObj && destStillObj.url) {
+    return {
+      src: `${API_BASE}${destStillObj.url}`,
+      fallback,
+      tag: `${destStillObj.kind === "video" ? "🎥" : "📷"} ${destStillObj.source}${destStillObj.timestamp_s != null ? ` · 0:${String(Math.round(destStillObj.timestamp_s)).padStart(2, "0")}` : ""}`,
+    };
+  }
+  return {
+    src: fallback,
+    fallback,
+    tag: `🏛️ 3D Corner Cam`,
+  };
+}
 
 function resizeRenderer() {
   const w = wrapEl.clientWidth || 640;
@@ -1111,91 +1277,107 @@ function rebuildScene(resetCamera = false) {
   if (!plan) return;
   clearWorld();
 
-  const bins = sceneMode === "trucks" ? (plan.trucks || []) : (plan.zones || []).filter((z) => z.item_count > 0 || focusBinIndex >= 0);
-  let cursorZ = 0;
-
-  // Assign global animation sequence across visible bins
-  const orderedRecords = [];
-
-  bins.forEach((bin, bIdx) => {
-    const [L, W, H] = bin.dims_in;
-    if (bIdx > 0) {
-      const prevW = bins[bIdx - 1].dims_in[1];
-      cursorZ += prevW / 2 + W / 2 + 84;
-    }
-    const offset = new THREE.Vector3(0, 0, cursorZ);
-    const isTruck = sceneMode === "trucks";
-    const title = isTruck ? `Truck ${bin.index + 1}: ${bin.name || bin.truck_id}` : `Stop ${bin.dock_stop}: ${bin.name}`;
-    const sub = `${bin.items.length} pcs · ${fmt(bin.weight_lb)} lb · ${fmt(bin.fill_pct, 1)}% vol`;
-
-    buildContainerShell(bin.dims_in, offset, title, sub, bin.door_in, isTruck);
-    binTargets.push({
-      label: isTruck ? `Truck ${bin.index + 1}` : `Stop ${bin.dock_stop}`,
-      center: new THREE.Vector3(0, H * 0.42, cursorZ),
-      radius: Math.max(L, W, H),
+  if (sceneMode === "venue") {
+    buildPennVenueScene({
+      plan,
+      worldGroup,
+      meshEntries,
+      binTargets,
+      playDir,
+      itemColorHex,
+      violatingIds,
+      makeBoxFaceTexture,
+      makeTextSprite,
+      showRoof: showVenueRoof,
+      fmt,
     });
+  } else {
+    const bins = sceneMode === "trucks" ? (plan.trucks || []) : (plan.zones || []).filter((z) => z.item_count > 0 || focusBinIndex >= 0);
+    let cursorZ = 0;
 
-    const itemsSorted = (bin.items || []).slice().sort((a, b) =>
-      playDir === "load" ? (a.load_seq - b.load_seq) : ((a.unload_seq || 0) - (b.unload_seq || 0))
-    );
-    itemsSorted.forEach((it) => orderedRecords.push({ it, bin, offset }));
-  });
+    // Assign global animation sequence across visible bins
+    const orderedRecords = [];
 
-  orderedRecords.forEach(({ it, bin, offset }, globalIdx) => {
-    const [L, W] = bin.dims_in;
-    const [x, y, z] = it.pos_in;
-    const [dx, dy, dz] = it.size_in;
-    const pad = 0.35;
-    const gx = Math.max(dx * 0.85, dx - pad);
-    const gy = Math.max(dz * 0.85, dz - pad);
-    const gz = Math.max(dy * 0.85, dy - pad);
+    bins.forEach((bin, bIdx) => {
+      const [L, W, H] = bin.dims_in;
+      if (bIdx > 0) {
+        const prevW = bins[bIdx - 1].dims_in[1];
+        cursorZ += prevW / 2 + W / 2 + 84;
+      }
+      const offset = new THREE.Vector3(0, 0, cursorZ);
+      const isTruck = sceneMode === "trucks";
+      const title = isTruck ? `Truck ${bin.index + 1}: ${bin.name || bin.truck_id}` : `Stop ${bin.dock_stop}: ${bin.name}`;
+      const sub = `${bin.items.length} pcs · ${fmt(bin.weight_lb)} lb · ${fmt(bin.fill_pct, 1)}% vol`;
 
-    const hex = itemColorHex(it);
-    const geo = new THREE.BoxGeometry(gx, gy, gz);
-
-    let mat;
-    if (it.is_box) {
-      const qrTex = makeBoxFaceTexture(it, hex);
-      const sideMat = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.65, metalness: 0.05 });
-      const qrMat = new THREE.MeshStandardMaterial({ map: qrTex, roughness: 0.55, metalness: 0.04 });
-      // BoxGeometry faces: +X (rear door facing!), -X, +Y (top), -Y, +Z, -Z
-      mat = [qrMat, qrMat, sideMat, sideMat, sideMat, sideMat];
-    } else {
-      mat = new THREE.MeshStandardMaterial({
-        color: hex,
-        roughness: 0.52,
-        metalness: 0.1,
-        transparent: true,
-        opacity: 0.94,
+      buildContainerShell(bin.dims_in, offset, title, sub, bin.door_in, isTruck);
+      binTargets.push({
+        label: isTruck ? `Truck ${bin.index + 1}` : `Stop ${bin.dock_stop}`,
+        center: new THREE.Vector3(0, H * 0.42, cursorZ),
+        radius: Math.max(L, W, H),
       });
-    }
 
-    const mesh = new THREE.Mesh(geo, mat);
-    const targetX = offset.x + (x + dx / 2 - L / 2);
-    const targetY = offset.y + (z + dz / 2);
-    const targetZ = offset.z + (y + dy / 2 - W / 2);
-    mesh.position.set(targetX, targetY, targetZ);
-    mesh.userData = { itemId: it.id };
-
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geo),
-      new THREE.LineBasicMaterial({
-        color: violatingIds.has(it.id) ? 0xffb4b4 : 0x0f172a,
-        transparent: true,
-        opacity: 0.55,
-      })
-    );
-    mesh.add(edges);
-    worldGroup.add(mesh);
-
-    meshEntries.push({
-      mesh,
-      edges,
-      item: it,
-      targetY,
-      seqIndex: globalIdx + 1,
+      const itemsSorted = (bin.items || []).slice().sort((a, b) =>
+        playDir === "load" ? (a.load_seq - b.load_seq) : ((a.unload_seq || 0) - (b.unload_seq || 0))
+      );
+      itemsSorted.forEach((it) => orderedRecords.push({ it, bin, offset }));
     });
-  });
+
+    orderedRecords.forEach(({ it, bin, offset }, globalIdx) => {
+      const [L, W] = bin.dims_in;
+      const [x, y, z] = it.pos_in;
+      const [dx, dy, dz] = it.size_in;
+      const pad = 0.35;
+      const gx = Math.max(dx * 0.85, dx - pad);
+      const gy = Math.max(dz * 0.85, dz - pad);
+      const gz = Math.max(dy * 0.85, dy - pad);
+
+      const hex = itemColorHex(it);
+      const geo = new THREE.BoxGeometry(gx, gy, gz);
+
+      let mat;
+      if (it.is_box) {
+        const qrTex = makeBoxFaceTexture(it, hex);
+        const sideMat = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.65, metalness: 0.05 });
+        const qrMat = new THREE.MeshStandardMaterial({ map: qrTex, roughness: 0.55, metalness: 0.04 });
+        // BoxGeometry faces: +X (rear door facing!), -X, +Y (top), -Y, +Z, -Z
+        mat = [qrMat, qrMat, sideMat, sideMat, sideMat, sideMat];
+      } else {
+        mat = new THREE.MeshStandardMaterial({
+          color: hex,
+          roughness: 0.52,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.94,
+        });
+      }
+
+      const mesh = new THREE.Mesh(geo, mat);
+      const targetX = offset.x + (x + dx / 2 - L / 2);
+      const targetY = offset.y + (z + dz / 2);
+      const targetZ = offset.z + (y + dy / 2 - W / 2);
+      mesh.position.set(targetX, targetY, targetZ);
+      mesh.userData = { itemId: it.id };
+
+      const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({
+          color: violatingIds.has(it.id) ? 0xffb4b4 : 0x0f172a,
+          transparent: true,
+          opacity: 0.55,
+        })
+      );
+      mesh.add(edges);
+      worldGroup.add(mesh);
+
+      meshEntries.push({
+        mesh,
+        edges,
+        item: it,
+        targetY,
+        seqIndex: globalIdx + 1,
+      });
+    });
+  }
 
   renderCameraChips();
   updateLegend();
@@ -1211,15 +1393,25 @@ function rebuildScene(resetCamera = false) {
 
 function renderCameraChips() {
   const host = $("#camera-chips");
-  if (binTargets.length <= 1) {
-    host.innerHTML = "";
-    return;
+  let html = "";
+  if (sceneMode === "venue") {
+    html += `<button type="button" class="hud-chip" id="tog-venue-roof" aria-pressed="${showVenueRoof}">✨ Skylight Vault</button>`;
   }
-  let html = `<button type="button" class="hud-chip" data-cam="-1" aria-pressed="${focusBinIndex === -1}">All (${binTargets.length})</button>`;
-  binTargets.forEach((b, idx) => {
-    html += `<button type="button" class="hud-chip" data-cam="${idx}" aria-pressed="${focusBinIndex === idx}">${esc(b.label)}</button>`;
-  });
+  if (binTargets.length > 1) {
+    const allLabel = sceneMode === "venue" ? "Aerial Station" : `All (${binTargets.length})`;
+    html += `<button type="button" class="hud-chip" data-cam="-1" aria-pressed="${focusBinIndex === -1}">${esc(allLabel)}</button>`;
+    binTargets.forEach((b, idx) => {
+      html += `<button type="button" class="hud-chip" data-cam="${idx}" aria-pressed="${focusBinIndex === idx}">${esc(b.label)}</button>`;
+    });
+  }
   host.innerHTML = html;
+  const roofBtn = $("#tog-venue-roof", host);
+  if (roofBtn) {
+    roofBtn.addEventListener("click", () => {
+      showVenueRoof = !showVenueRoof;
+      rebuildScene(false);
+    });
+  }
   $$("[data-cam]", host).forEach((btn) => {
     btn.addEventListener("click", () => {
       focusBinIndex = Number(btn.dataset.cam);
@@ -1234,8 +1426,15 @@ function focusCamera(idx) {
   if (idx >= 0 && idx < binTargets.length) {
     const t = binTargets[idx];
     controls.target.copy(t.center);
-    const d = t.radius * 1.35;
-    camera.position.set(t.center.x + d * 0.95, t.center.y + d * 0.68, t.center.z + d * 0.92);
+    if (t.camPos) {
+      camera.position.copy(t.camPos);
+    } else {
+      const d = t.radius * 1.35;
+      camera.position.set(t.center.x + d * 0.92, t.center.y + d * 0.72, t.center.z + d * 0.92);
+    }
+  } else if (sceneMode === "venue") {
+    controls.target.set(-10, 38, 10);
+    camera.position.set(-490, 440, 560);
   } else {
     const first = binTargets[0];
     const last = binTargets[binTargets.length - 1];
@@ -1255,21 +1454,26 @@ function applyStepVisibility() {
 
   let activeEntry = null;
   meshEntries.forEach((entry) => {
-    const visible = playDir === "load"
-      ? entry.seqIndex <= currentStep
-      : entry.seqIndex <= currentStep;
+    const visible = entry.seqIndex <= currentStep;
     entry.mesh.visible = visible;
     if (entry.seqIndex === currentStep) activeEntry = entry;
 
     const isSelected = selectedItemId && entry.item.id === selectedItemId;
-    entry.edges.material.color.setHex(isSelected ? 0xffffff : violatingIds.has(entry.item.id) ? 0xff8080 : 0x0f172a);
-    entry.edges.material.opacity = isSelected ? 1.0 : 0.55;
+    const isRoomMatch = highlightRoomId && entry.item.room_id === highlightRoomId;
+    entry.edges.material.color.setHex(
+      isSelected ? 0xffffff : isRoomMatch ? 0xfacc15 : violatingIds.has(entry.item.id) ? 0xff8080 : 0x0f172a
+    );
+    entry.edges.material.opacity = isSelected || isRoomMatch ? 1.0 : entry.isVenue ? 0.24 : 0.55;
   });
 
   if (activeEntry && currentStep < total) {
     const it = activeEntry.item;
     const verb = playDir === "load" ? `Load #${it.load_seq}` : `Unload #${it.unload_seq}`;
-    $("#now-loading").innerHTML = `<b>${esc(verb)}: ${esc(it.label)}</b> · ${fmt(it.weight_lb)} lb → Stop ${esc(it.dock_stop)} (${esc(it.dest_zone_name)})`;
+    $("#now-loading").innerHTML = `<b>${esc(verb)}: ${esc(it.label)}</b> · ${fmt(it.weight_lb)} lb → Stop ${esc(it.dock_stop)} (${esc(it.dest_zone_name)} · ${esc(it.dest_corner || "Floor")})`;
+  } else if (highlightRoomId) {
+    const rmName = (plan?.rooms || []).find((r) => r.id === highlightRoomId)?.name || highlightRoomId;
+    const cnt = meshEntries.filter((m) => m.item.room_id === highlightRoomId).length;
+    $("#now-loading").innerHTML = `Highlighting <b>${cnt}</b> pieces sourced from <b>${esc(rmName)}</b> · Tap background to clear`;
   } else if (total > 0) {
     $("#now-loading").innerHTML = `Showing all <b>${total}</b> packed pieces &amp; boxes · Tap any item in 3D or in the list`;
   }
@@ -1281,7 +1485,7 @@ function applyStepVisibility() {
 
 function selectItemById(itemId, flyTo = false) {
   selectedItemId = itemId;
-  const entry = meshEntries.find((e) => e.item.id === itemId);
+  const entry = meshEntries.find((e) => (e.item.id === itemId) || (e.item.piece_id && e.item.piece_id === itemId));
   const box = $("#item-inspector");
   if (!entry) {
     box.classList.add("hidden");
@@ -1293,13 +1497,28 @@ function selectItemById(itemId, flyTo = false) {
   }
   const it = entry.item;
   $("#ins-title").textContent = it.box_short_name ? `📦 ${it.box_short_name} · ${it.label}` : it.label;
+
+  // 2-up video stills: Source Room Video Frame -> Destination Room/Corner Still
+  const srcMedia = getSourceStillUrls(it.room_name || "Source Room", it.evidence, [], it.evidence?.box_2d || null);
+  const zObj = (plan?.zones || []).find((z) => z.zone_id === it.dest_zone) || {};
+  const dstMedia = getDestStillUrls(it.dest_zone, zObj.dest_still, it.dest_zone_name);
+  $("#ins-stills").innerHTML = `
+    <div class="ins-still-box">
+      <img src="${esc(srcMedia.src)}" alt="Source room frame" onerror="this.onerror=null;this.src='${esc(srcMedia.fallback)}'">
+      <div class="ins-still-cap">From: ${esc(it.room_name)}</div>
+    </div>
+    <div class="ins-still-box">
+      <img src="${esc(dstMedia.src)}" alt="Destination corner frame" onerror="this.onerror=null;this.src='${esc(dstMedia.fallback)}'">
+      <div class="ins-still-cap">To: ${esc(it.dest_corner || "Floor")}</div>
+    </div>
+  `;
+
   const dims = it.size_in.map((v) => fmt(v, 0)).join(" × ");
-  const pos = it.pos_in.map((v) => fmt(v, 0)).join(", ");
   $("#ins-meta").innerHTML = [
     `Size: <b>${esc(dims)} in</b> · <b>${fmt(it.weight_lb, 1)} lb</b>`,
     `Truck ${(it.truck_index ?? 0) + 1} · Load #${esc(it.load_seq)} · Unload #${esc(it.unload_seq || "–")}`,
-    `From: ${esc(it.room_name)} → <b>Stop ${esc(it.dock_stop)}: ${esc(it.dest_zone_name)}</b>`,
-    it.contents ? `Contents: ${esc(it.contents)}` : `Pos (x,y,z): [${esc(pos)}] in`,
+    `Dest: <b>Stop ${esc(it.dock_stop)} · ${esc(it.dest_zone_name)}</b> (${esc(it.dest_corner || "Center Floor")})`,
+    it.contents ? `Contents: ${esc(it.contents)}` : `Clip: ${esc(srcMedia.tag)}`,
   ].join("<br>");
 
   const badges = [];
@@ -1313,7 +1532,7 @@ function selectItemById(itemId, flyTo = false) {
   box.classList.remove("hidden");
 
   if (flyTo) {
-    controls.target.copy(entry.mesh.position);
+    controls.target.copy(entry.worldPos || entry.mesh.position);
     controls.update();
   }
   applyStepVisibility();
@@ -1321,7 +1540,7 @@ function selectItemById(itemId, flyTo = false) {
 
 $("#ins-close").addEventListener("click", () => selectItemById(null));
 
-/* Pointer tap-to-inspect (distinguish click from camera drag) */
+/* Pointer tap-to-inspect (supports multi-part 3D furniture groups) */
 let downPt = null;
 canvasEl.addEventListener("pointerdown", (e) => { downPt = { x: e.clientX, y: e.clientY }; });
 canvasEl.addEventListener("pointerup", (e) => {
@@ -1331,13 +1550,171 @@ canvasEl.addEventListener("pointerup", (e) => {
   pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
   const visibleMeshes = meshEntries.filter((m) => m.mesh.visible).map((m) => m.mesh);
-  const hits = raycaster.intersectObjects(visibleMeshes, false);
+  const hits = raycaster.intersectObjects(visibleMeshes, true);
   if (hits.length) {
-    selectItemById(hits[0].object.userData.itemId, false);
-  } else {
-    selectItemById(null);
+    let cur = hits[0].object;
+    while (cur && !cur.userData?.itemId) cur = cur.parent;
+    if (cur?.userData?.itemId) {
+      selectItemById(cur.userData.itemId, false);
+      return;
+    }
   }
+  highlightRoomId = null;
+  selectItemById(null);
 });
+
+/* ---------- Video Stills Storyboard: Source Rooms -> Truck -> Destination Rooms/Corners ---------- */
+function renderStoryboard() {
+  if (!plan) return;
+  const trucks = plan.trucks || [];
+  if (storyboardTruckIdx >= trucks.length) storyboardTruckIdx = -1;
+
+  // Truck filter pills
+  const tabsHost = $("#sb-truck-tabs");
+  if (trucks.length <= 1) {
+    tabsHost.innerHTML = `<button type="button" aria-pressed="true">Truck 1</button>`;
+  } else {
+    let th = `<button type="button" data-sb-t="-1" aria-pressed="${storyboardTruckIdx === -1}">All (${trucks.length})</button>`;
+    trucks.forEach((t) => {
+      th += `<button type="button" data-sb-t="${t.index}" aria-pressed="${storyboardTruckIdx === t.index}">Truck ${t.index + 1}</button>`;
+    });
+    tabsHost.innerHTML = th;
+    $$("[data-sb-t]", tabsHost).forEach((b) => {
+      b.addEventListener("click", () => {
+        storyboardTruckIdx = Number(b.dataset.sbT);
+        renderStoryboard();
+      });
+    });
+  }
+
+  const activeTrucks = storyboardTruckIdx >= 0 ? trucks.filter((t) => t.index === storyboardTruckIdx) : trucks;
+
+  // Aggregate source rooms feeding the active truck(s)
+  const srcMap = new Map();
+  const dstMap = new Map();
+  let totalItems = 0, totalWt = 0;
+
+  activeTrucks.forEach((t) => {
+    totalItems += (t.items || []).length;
+    totalWt += Number(t.weight_lb || 0);
+
+    // Build source_rooms on the fly if solveInBrowser produced the plan
+    const sRooms = t.source_rooms || (() => {
+      const m = {};
+      (t.items || []).forEach((it) => {
+        const rid = it.room_id || "room_1";
+        if (!m[rid]) m[rid] = { room_id: rid, room_name: it.room_name || rid, item_count: 0, box_count: 0, weight_lb: 0, evidence: it.evidence, sample_detections: [] };
+        m[rid].item_count++;
+        if (it.is_box) m[rid].box_count++;
+        m[rid].weight_lb += Number(it.weight_lb || 0);
+      });
+      return Object.values(m);
+    })();
+
+    sRooms.forEach((sr) => {
+      if (!srcMap.has(sr.room_id)) {
+        srcMap.set(sr.room_id, { ...sr, item_count: 0, box_count: 0, weight_lb: 0 });
+      }
+      const acc = srcMap.get(sr.room_id);
+      acc.item_count += sr.item_count;
+      acc.box_count += sr.box_count || 0;
+      acc.weight_lb += sr.weight_lb || 0;
+    });
+
+    (t.dest_zones || []).forEach((dz) => {
+      if (!dstMap.has(dz.zone_id)) {
+        dstMap.set(dz.zone_id, { ...dz, item_count: 0, corners: {} });
+      }
+      const acc = dstMap.get(dz.zone_id);
+      acc.item_count += dz.item_count;
+      Object.entries(dz.corners || {}).forEach(([ck, cv]) => {
+        acc.corners[ck] = (acc.corners[ck] || 0) + cv;
+      });
+    });
+  });
+
+  // Hub summary
+  const hubTitle = storyboardTruckIdx >= 0
+    ? `Truck ${storyboardTruckIdx + 1}`
+    : `${trucks.length} Truck${trucks.length === 1 ? "" : "s"}`;
+  const hubModel = activeTrucks[0]?.name || "U-Haul 26 ft";
+  $("#sb-truck-hub").innerHTML = `
+    <div class="hub-icon">🚚</div>
+    <b>${esc(hubTitle)}</b>
+    <span>${esc(hubModel)}</span>
+    <span><b>${fmt(totalItems)} pcs</b> · ${fmt(totalWt)} lb</span>
+    <span style="font-size:11px;color:var(--accent)">──▶ LIFO Unload</span>
+  `;
+
+  // Source room video stills
+  const srcArr = Array.from(srcMap.values()).sort((a, b) => b.item_count - a.item_count);
+  $("#sb-source-stills").innerHTML = srcArr.map((sr) => {
+    const media = getSourceStillUrls(sr.room_name, sr.evidence, sr.sample_detections || []);
+    const isAct = highlightRoomId === sr.room_id;
+    return `<div class="still-card${isAct ? " active" : ""}" data-src-room="${esc(sr.room_id)}">
+      <div class="still-frame">
+        <img src="${esc(media.src)}" loading="lazy" alt="${esc(sr.room_name)}" onerror="this.onerror=null;this.src='${esc(media.fallback)}'">
+        <div class="still-tag"><span>${esc(media.tag)}</span><span>${fmt(sr.item_count)} pcs</span></div>
+      </div>
+      <div class="still-body">
+        <b>${esc(sr.room_name)}</b>
+        <span class="muted">${fmt(sr.weight_lb)} lb${sr.box_count ? ` · ${sr.box_count} boxes` : ""} · Tap to highlight</span>
+      </div>
+    </div>`;
+  }).join("") || `<p class="small muted">No source rooms.</p>`;
+
+  $$("[data-src-room]", $("#sb-source-stills")).forEach((card) => {
+    card.addEventListener("click", () => {
+      const rid = card.dataset.srcRoom;
+      highlightRoomId = highlightRoomId === rid ? null : rid;
+      if (highlightRoomId) {
+        colorMode = "room";
+        $$("[data-color]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.color === "room")));
+      }
+      renderStoryboard();
+      rebuildScene(false);
+    });
+  });
+
+  // Destination room & corner stills
+  const dstArr = Array.from(dstMap.values()).sort((a, b) => a.dock_stop - b.dock_stop);
+  $("#sb-dest-stills").innerHTML = dstArr.map((dz) => {
+    const media = getDestStillUrls(dz.zone_id, dz.dest_still, dz.name);
+    const stopColor = STOP_COLORS[dz.dock_stop] || "#3b82f6";
+    const topCorners = Object.entries(dz.corners || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([cName, cnt]) => `<span class="corner-chip">${esc(cName)} (${cnt})</span>`)
+      .join("");
+    return `<div class="still-card" data-dst-zone="${esc(dz.zone_id)}" data-dst-stop="${esc(dz.dock_stop)}">
+      <div class="still-frame">
+        <img src="${esc(media.src)}" loading="lazy" alt="${esc(dz.name)}" onerror="this.onerror=null;this.src='${esc(media.fallback)}'">
+        <div class="still-tag">
+          <span style="color:${stopColor}">● Stop ${esc(dz.dock_stop)}</span>
+          <span>${fmt(dz.item_count)} pcs</span>
+        </div>
+      </div>
+      <div class="still-body">
+        <b>${esc(dz.name)}</b>
+        <div class="corner-chips">${topCorners}</div>
+      </div>
+    </div>`;
+  }).join("") || `<p class="small muted">No destination zones.</p>`;
+
+  $$("[data-dst-zone]", $("#sb-dest-stills")).forEach((card) => {
+    card.addEventListener("click", () => {
+      const stopNum = Number(card.dataset.dstStop);
+      sceneMode = "venue";
+      syncSceneButtons();
+      rebuildScene(false);
+      // In venue mode binTargets has [Walkthrough Cam, Loading Dock, Stop 1..6]
+      const targetIdx = binTargets.findIndex((b) => b.label === `Stop ${stopNum}`);
+      focusBinIndex = targetIdx >= 0 ? targetIdx : -1;
+      renderCameraChips();
+      focusCamera(focusBinIndex);
+    });
+  });
+}
 
 /* ---------- Render Side Panels ---------- */
 function renderPanels() {
@@ -1405,12 +1782,12 @@ function renderPanels() {
     vList.innerHTML = "";
   }
 
-  // Tab 1: Unload Order at NY Penn Station (with lifting guidance tags!)
+  // Tab 1: Unload Order at NY Penn Station (with lifting guidance tags + destination corner!)
   const unloadItems = (plan.trucks || []).flatMap((t) =>
     (t.items || []).slice().sort((a, b) => (a.unload_seq || 0) - (b.unload_seq || 0)).map((it) => ({ ...it, truckName: t.name || t.truck_id }))
   );
   $("#unload-list").innerHTML = unloadItems.map((it) => {
-    const tags = [`<span class="lift-tag stop">Stop ${esc(it.dock_stop)} · ${esc(it.dest_zone_name)}</span>`];
+    const tags = [`<span class="lift-tag stop">Stop ${esc(it.dock_stop)} · ${esc(it.dest_zone_name)} (${esc(it.dest_corner || "Floor")})</span>`];
     if (it.two_person || it.weight_lb > 50) tags.push(`<span class="lift-tag heavy">👥 Two-person lift · ${fmt(it.weight_lb)} lb</span>`);
     else tags.push(`<span class="lift-tag">${fmt(it.weight_lb)} lb</span>`);
     if (it.fragile) tags.push(`<span class="lift-tag fragile">🍷 Fragile</span>`);
@@ -1421,7 +1798,7 @@ function renderPanels() {
       <div class="step-num">${esc(it.unload_seq)}</div>
       <div>
         <div class="step-title">${esc(it.label)}</div>
-        <div class="step-sub">Truck ${(it.truck_index ?? 0) + 1} (Load #${esc(it.load_seq)}) · From ${esc(it.room_name)}</div>
+        <div class="step-sub">Truck ${(it.truck_index ?? 0) + 1} (Load #${esc(it.load_seq)}) · Sourced from ${esc(it.room_name)}</div>
         <div class="lift-tags">${tags.join("")}</div>
       </div>
     </li>`;
@@ -1429,26 +1806,34 @@ function renderPanels() {
 
   $$(".step-row", $("#unload-list")).forEach((row) => {
     row.addEventListener("click", () => {
-      if (sceneMode !== "trucks") {
-        sceneMode = "trucks";
-        syncSceneButtons();
-        rebuildScene(false);
-      }
       selectItemById(row.dataset.itemId, true);
     });
   });
 
-  // Tab 2: Penn Station Stores
+  // Tab 2: Penn Station Stores (with Destination Corner Stills + Source Room provenance!)
   const zones = plan.zones || [];
   $("#stores-list").innerHTML = zones.map((z, zIdx) => {
     const color = STOP_COLORS[z.dock_stop] || "#3b82f6";
-    return `<div class="zone-card" data-zone-idx="${zIdx}">
+    const media = getDestStillUrls(z.zone_id, z.dest_still, z.name);
+    const cornersHtml = (z.corners_summary || [])
+      .slice(0, 3)
+      .map((c) => `<span class="corner-chip">${esc(c.corner)} (${c.count})</span>`)
+      .join("");
+    const fromRooms = (z.sourced_from_rooms || [])
+      .map((r) => `${r.room_name} (${r.count})`)
+      .join(", ");
+    return `<div class="zone-card" data-zone-stop="${esc(z.dock_stop)}" data-zone-idx="${zIdx}">
       <div class="zone-head">
         <span><b style="color:${color}">Stop ${esc(z.dock_stop)}</b> · ${esc(z.name)}</span>
         <span class="small muted">${fmt(z.item_count)} pcs</span>
       </div>
-      <div class="small muted" style="margin-top:3px">
-        Door ${fmt(z.door_in?.[0])}×${fmt(z.door_in?.[1])}" · Floor ${fmt(z.floor_pct, 1)}% · Vol ${fmt(z.fill_pct, 1)}% · ${fmt(z.weight_lb)} / ${fmt(z.max_weight_lb)} lb
+      <div class="zone-still-wrap">
+        <img src="${esc(media.src)}" loading="lazy" alt="${esc(z.name)}" onerror="this.onerror=null;this.src='${esc(media.fallback)}'">
+        <div>
+          <div class="small muted">Door ${fmt(z.door_in?.[0])}×${fmt(z.door_in?.[1])}" · Floor ${fmt(z.floor_pct, 1)}% · ${fmt(z.weight_lb)} lb</div>
+          ${fromRooms ? `<div class="small muted" style="margin-top:2px">From: <b>${esc(fromRooms)}</b></div>` : ""}
+          <div class="corner-chips">${cornersHtml}</div>
+        </div>
       </div>
       <div class="zone-bar"><i style="width:${Math.min(100, z.floor_pct || 0)}%;background:${color}"></i></div>
     </div>`;
@@ -1456,10 +1841,14 @@ function renderPanels() {
 
   $$("[data-zone-idx]", $("#stores-list")).forEach((el) => {
     el.addEventListener("click", () => {
-      sceneMode = "zones";
-      focusBinIndex = -1;
+      const stopNum = Number(el.dataset.zoneStop);
+      sceneMode = "venue";
       syncSceneButtons();
-      rebuildScene(true);
+      rebuildScene(false);
+      const targetIdx = binTargets.findIndex((b) => b.label === `Stop ${stopNum}`);
+      focusBinIndex = targetIdx >= 0 ? targetIdx : -1;
+      renderCameraChips();
+      focusCamera(focusBinIndex);
     });
   });
 
@@ -1472,7 +1861,7 @@ function renderPanels() {
       <canvas width="126" height="126" data-qr-idx="${idx}"></canvas>
       <div>
         <div style="font-weight:700;font-size:14px">${esc(b.box_short_name || b.id)} ${b.fragile ? `<span class="lift-tag fragile">FRAGILE</span>` : ""}</div>
-        <div class="small"><b>Stop ${esc(b.dock_stop)}:</b> ${esc(b.dest_zone_name)}</div>
+        <div class="small"><b>Stop ${esc(b.dock_stop)}:</b> ${esc(b.dest_zone_name)} (${esc(b.dest_corner || "Stock")})</div>
         <div class="small muted">Truck ${(b.truck_index ?? 0) + 1} · Load #${esc(b.load_seq)} / Unload #${esc(b.unload_seq)} · ${fmt(b.weight_lb)} lb</div>
         <div class="small muted">In box: ${esc((b.contents || b.label || "").slice(0, 75))}</div>
       </div>
@@ -1483,6 +1872,8 @@ function renderPanels() {
     const b = boxes[Number(cv.dataset.qrIdx)];
     if (b) drawQrMatrix(cv.getContext("2d"), 6, 6, 114, qrPayloadText(b));
   });
+
+  renderStoryboard();
 }
 
 /* ---------- Solve Fetcher (Python FastAPI /solve -> Browser Mock Fallback) ---------- */
@@ -1547,6 +1938,18 @@ async function loadAndSolve(resetCam = false) {
     const roomIds = Array.from(new Set((plan.trucks || []).flatMap((t) => (t.items || []).map((i) => i.room_id))));
     roomIds.forEach((rid, idx) => { roomColorMap[rid] = ROOM_PALETTE[idx % ROOM_PALETTE.length]; });
 
+    // Annotate staged destination corners + capture offscreen 3D room/corner stills
+    annotateStagedCorners(plan);
+    venueCornerStills = captureVenueCornerStills({
+      plan,
+      playDir: "unload",
+      itemColorHex,
+      violatingIds,
+      makeBoxFaceTexture,
+      makeTextSprite,
+      fmt,
+    });
+
     renderPanels();
     rebuildScene(resetCam);
   } catch (e) {
@@ -1560,11 +1963,15 @@ async function loadAndSolve(resetCam = false) {
 /* ---------- UI Event Wiring ---------- */
 function syncSceneButtons() {
   $("#scene-trucks").setAttribute("aria-pressed", String(sceneMode === "trucks"));
+  $("#scene-venue").setAttribute("aria-pressed", String(sceneMode === "venue"));
   $("#scene-zones").setAttribute("aria-pressed", String(sceneMode === "zones"));
 }
 
 $("#scene-trucks").addEventListener("click", () => {
   sceneMode = "trucks"; focusBinIndex = -1; syncSceneButtons(); rebuildScene(true);
+});
+$("#scene-venue").addEventListener("click", () => {
+  sceneMode = "venue"; focusBinIndex = -1; syncSceneButtons(); rebuildScene(true);
 });
 $("#scene-zones").addEventListener("click", () => {
   sceneMode = "zones"; focusBinIndex = -1; syncSceneButtons(); rebuildScene(true);
