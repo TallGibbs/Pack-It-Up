@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pack It Up · Phone Pitch Cards</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #182028;
+      --border: #2b3846;
+      --text: #f3f6f9;
+      --muted: #9fb0c2;
+      --chris: #38bdf8;
+      --george: #a78bfa;
+      --accent: #34d399;
+      --warn: #fbbf24;
+      --danger: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 460px;
+      margin-inline: auto;
+      padding: 12px 14px 36px;
+      line-height: 1.38;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(15, 20, 25, 0.96);
+      backdrop-filter: blur(8px);
+      padding: 8px 0 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .timer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .timer-clock {
+      font-size: 1.5rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+    }
+    .timer-clock.warn { color: var(--warn); }
+    .timer-clock.over { color: var(--danger); }
+    .timer-btns { display: flex; gap: 6px; }
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.active {
+      background: #243242;
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .tabs button {
+      padding: 8px 4px;
+      font-size: 0.84rem;
+      text-align: center;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .card.chris { border-left: 4px solid var(--chris); }
+    .card.george { border-left: 4px solid var(--george); }
+    .card.prep { border-left: 4px solid var(--warn); }
+    .beat-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .speaker {
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .speaker.chris { color: var(--chris); }
+    .speaker.george { color: var(--george); }
+    .speaker.prep { color: var(--warn); }
+    .time {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    h2 {
+      margin: 0 0 6px;
+      font-size: 1.04rem;
+      font-weight: 700;
+    }
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+    li {
+      margin-bottom: 6px;
+      font-size: 0.96rem;
+    }
+    li:last-child { margin-bottom: 0; }
+    strong { color: #fff; }
+    .quote {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .hidden { display: none !important; }
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-bottom: 8px;
+      font-size: 0.94rem;
+    }
+    .check-item input {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="timer-row">
+      <div>
+        <span id="clock" class="timer-clock">3:00</span>
+        <span id="beatHint" style="font-size:0.8rem;color:var(--muted);margin-left:6px;">Tap Start for 3m demo</span>
+      </div>
+      <div class="timer-btns">
+        <button id="startBtn" onclick="toggleTimer()">Start</button>
+        <button onclick="resetTimer()">Reset</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button id="tab-chris" onclick="setFilter('chris')">Chris</button>
+      <button id="tab-george" class="active" onclick="setFilter('george')">George</button>
+      <button id="tab-both" onclick="setFilter('both')">3:00 Flow</button>
+      <button id="tab-prep" onclick="setFilter('prep')">Q&amp;A / 5PM</button>
+    </div>
+  </div>
+
+  <!-- 0:00 - 0:12 CHRIS HOOK -->
+  <section class="card chris" data-who="chris">
+    <div class="beat-head">
+      <span class="speaker chris">Chris · Hook Part 1</span>
+      <span class="time">0:00 – 0:12</span>
+    </div>
+    <h2>Truck Too Big → Things Slid &amp; Broke</h2>
+    <ul>
+      <li>Last move: got a truck <strong>too big</strong> — open floor gaps meant <strong>things slid around &amp; broke</strong>.</li>
+      <li>Bedroom calculators guess blind; nobody checks how items brace or stack.</li>
+      <li><em>Hand to George → NYC street size side.</em></li>
+    </ul>
+  </section>
+
+  <!-- 0:12 - 0:25 GEORGE HOOK -->
+  <section class="card george" data-who="george">
+    <div class="beat-head">
+      <span class="speaker george">George · Hook Part 2</span>
+      <span class="time">0:12 – 0:25</span>
+    </div>
+    <h2>WNY, NJ → UES: Smaller Truck = NYC Maneuverability</h2>
+    <ul>
+      <li>My short hop from <strong>West New York, NJ → Upper East Side</strong>: a <strong>smaller right-sized truck</strong> makes tight NYC turns &amp; streets way easier.</li>
+      <li><strong>Too big</strong> = broken cargo + stuck in Manhattan; <strong>too small</strong> = left on curb.</li>
+      <li><strong>Live proof:</strong> Film <em>this room</em> now → pack it into <strong>6 NY Penn Station stores</strong>.</li>
+    </ul>
+  </section>
+
+  <!-- 0:25 - 0:55 CHRIS CAPTURE -->
+  <section class="card chris" data-who="chris">
+    <div class="beat-head">
+      <span class="speaker chris">Chris · Live Capture</span>
+      <span class="time">0:25 – 0:55</span>
+    </div>
+    <h2>Phone Video + Audio + Decisions Card</h2>
+    <ul>
+      <li>Upload judging-room clip on phone; narrate aloud: <span class="quote">"these chairs stack, plants stay"</span>.</li>
+      <li><strong>Gemini 4 Hydrogen</strong> pulls items, sizes &amp; spoken rules in parallel.</li>
+      <li>Tap <strong>1 live Decision 1 question</strong> (high-confidence ones auto-settled in ~200 ms, 0 output tokens).</li>
+      <li>Tap <strong>"Plan the truck load →"</strong> <em>(pass to George)</em>.</li>
+    </ul>
+  </section>
+
+  <!-- 0:55 - 1:55 GEORGE 3D + VERIFIER -->
+  <section class="card george" data-who="george">
+    <div class="beat-head">
+      <span class="speaker george">George · 3D Pack &amp; Penn Station</span>
+      <span class="time">0:55 – 1:55</span>
+    </div>
+    <h2>Right-Sized 3D Fleet + 0 Violations + LIFO Unload</h2>
+    <ul>
+      <li><strong>Right-sized U-Haul</strong> (downsizes 26→20→15→10 ft): snug so nothing slides, compact for NYC streets.</li>
+      <li><strong>Physics Verifier:</strong> <strong>0 violations</strong> — ≥75% base support, 0 overlaps, upright/edge rules, 40–60% CoG balance.</li>
+      <li><strong>Neon + Managed Agents</strong> compete on strategies to eliminate violations.</li>
+      <li><strong>Penn Station 6 Stores:</strong> LIFO dock order (Stop 1 Merch Kiosk at rear door → Stop 6 Concourse by cab) + doorway checks.</li>
+      <li>Scan <strong>offline QR box label</strong> on phone + show <strong>Nano Banana 2.1</strong> arrival render <em>(illustrative badge)</em>.</li>
+    </ul>
+  </section>
+
+  <!-- 1:55 - 2:25 GEORGE WHAT-IF + JUDGE -->
+  <section class="card george" data-who="george">
+    <div class="beat-head">
+      <span class="speaker george">George · Live Judge Edit</span>
+      <span class="time">1:55 – 2:25</span>
+    </div>
+    <h2>Judge "What-If" + Final Move Plan Judge</h2>
+    <ul>
+      <li>Ask a judge: <span class="quote">"Add an upright piano, or force a 10-ft truck?"</span></li>
+      <li>1-tap re-solve → <strong>Move Plan Judge (Decision 1)</strong> scores safety, LIFO &amp; readiness in 1 pass, escalating issues to <strong>Neon</strong>.</li>
+    </ul>
+  </section>
+
+  <!-- 2:25 - 2:45 CHRIS PROOF -->
+  <section class="card chris" data-who="chris">
+    <div class="beat-head">
+      <span class="speaker chris">Chris · Proof It Works</span>
+      <span class="time">2:25 – 2:45</span>
+    </div>
+    <h2>Baseline Table + Real Failure Fix</h2>
+    <ul>
+      <li><strong>Single-call LLM baseline</strong> overlaps &amp; floats boxes; our solver + verifier = <strong>0 violations</strong>.</li>
+      <li><strong>Unprepared Malin hand-count</strong> + honest <code>FAILURES.md</code> fix (closed cabinets assumed empty &amp; asked; open-frame weight factor).</li>
+    </ul>
+  </section>
+
+  <!-- 2:45 - 3:00 GEORGE CLOSE -->
+  <section class="card george" data-who="george">
+    <div class="beat-head">
+      <span class="speaker george">George · 15s Close</span>
+      <span class="time">2:45 – 3:00</span>
+    </div>
+    <h2>Every Gemini 4 Model Has One Clear Job</h2>
+    <ul>
+      <li><strong>Hydrogen:</strong> watches video &amp; hears spoken instructions.</li>
+      <li><strong>Neon + Managed Agents:</strong> optimize packing strategies in sandboxes.</li>
+      <li><strong>Nano Banana 2.1:</strong> previews destination arrival.</li>
+      <li><strong>Decision 1:</strong> gates uncertain items &amp; judges the final move plan.</li>
+    </ul>
+  </section>
+
+  <!-- Q&A + 5PM PREP -->
+  <section class="card prep" data-who="prep">
+    <div class="beat-head">
+      <span class="speaker prep">2:00 Q&amp;A Pocket Answers</span>
+      <span class="time">Judges</span>
+    </div>
+    <h2>Fast Answers</h2>
+    <ul>
+      <li><strong>Built today vs brought in?</strong> 100% of code committed after 10:30 AM; starter catalog CSV &amp; Penn Station photos disclosed in <code>README.md</code>.</li>
+      <li><strong>Why multiple models?</strong> Hydrogen = parallel video/audio speed; Decision 1 = calibrated 0-output-token gates; Neon = multi-step constraint repair.</li>
+      <li><strong>Is the arrival image the plan?</strong> No — Three.js + <code>verify.py</code> coordinates are exact; image is badged illustrative.</li>
+      <li><strong>Odd-shaped items?</strong> Bounding cuboids with <code>must_stay_upright</code>, <code>load_on_edge</code>, <code>disassemble</code>, and <code>light_only</code> flags.</li>
+    </ul>
+  </section>
+
+  <section class="card prep" data-who="prep">
+    <div class="beat-head">
+      <span class="speaker prep">Pre-5:00 PM Countdown</span>
+      <span class="time">4:15 – 5:00</span>
+    </div>
+    <h2>Submission Checklist</h2>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:15 PM:</strong> Record 1-min screen + voice video (today's code only).</span></label>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:35 PM:</strong> Test video link in private/incognito window.</span></label>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:40 PM:</strong> Check repo is public, no <code>.env</code> or media committed, Chris + George both added.</span></label>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:45 PM:</strong> Run 2 timed 3:00 rehearsals on a fresh clip.</span></label>
+    <label class="check-item"><input type="checkbox"> <span><strong>4:55 PM:</strong> Submit before 5:00 PM sharp!</span></label>
+  </section>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    let currentFilter = params.get("who") || "george";
+    let remainSec = 180;
+    let timerId = null;
+
+    function setFilter(who) {
+      currentFilter = who;
+      document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+      const btn = document.getElementById("tab-" + who);
+      if (btn) btn.classList.add("active");
+      document.querySelectorAll("section.card").forEach(sec => {
+        const tag = sec.getAttribute("data-who");
+        const show = (who === "both" && (tag === "chris" || tag === "george")) || tag === who;
+        sec.classList.toggle("hidden", !show);
+      });
+    }
+
+    function renderClock() {
+      const el = document.getElementById("clock");
+      const hint = document.getElementById("beatHint");
+      const abs = Math.abs(remainSec);
+      const m = Math.floor(abs / 60);
+      const s = String(abs % 60).padStart(2, "0");
+      el.textContent = (remainSec < 0 ? "-" : "") + m + ":" + s;
+      el.className = "timer-clock" + (remainSec < 0 ? " over" : remainSec <= 30 ? " warn" : "");
+      const elapsed = 180 - remainSec;
+      if (!timerId && elapsed === 0) hint.textContent = "Tap Start for 3m demo";
+      else if (elapsed < 25) hint.textContent = "Hook: Chris slide + George WNY→UES";
+      else if (elapsed < 55) hint.textContent = "Chris: Phone upload + Decision card";
+      else if (elapsed < 115) hint.textContent = "George: 3D truck + Penn LIFO + QR";
+      else if (elapsed < 145) hint.textContent = "George: Judge what-if + Plan Judge";
+      else if (elapsed < 165) hint.textContent = "Chris: Baseline + FAILURES.md";
+      else if (elapsed <= 180) hint.textContent = "George: 4-model closing line!";
+      else hint.textContent = "Time! Move to 2m Q&A";
+    }
+
+    function toggleTimer() {
+      const btn = document.getElementById("startBtn");
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+        btn.textContent = "Resume";
+        return;
+      }
+      btn.textContent = "Pause";
+      timerId = setInterval(() => {
+        remainSec -= 1;
+        renderClock();
+      }, 1000);
+    }
+
+    function resetTimer() {
+      if (timerId) clearInterval(timerId);
+      timerId = null;
+      remainSec = 180;
+      document.getElementById("startBtn").textContent = "Start";
+      renderClock();
+    }
+
+    setFilter(currentFilter);
+    renderClock();
+  </script>
+</body>
+</html>

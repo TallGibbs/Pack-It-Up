@@ -168,6 +168,21 @@ COACH_SCHEMA: dict[str, Any] = {
     },
 }
 
+PRESENTER_CARDS: dict[str, Any] = {
+    "phone_page": "/app/pitch.html",
+    "markdown_notes": "plan/PITCH_NOTES.md",
+    "chris": [
+        "0:00–0:12 Hook (Part 1): Rented a truck TOO BIG -> open floor gaps -> things slid around & broke.",
+        "0:25–0:55 Live Capture: Film judging room + say 'these chairs stack, plants stay' -> Hydrogen extracts items/speech -> answer 1 Decision 1 card -> tap 'Plan the truck load'.",
+        "2:25–2:45 Proof It Works: Single-call LLM baseline overlaps/floats boxes vs our 0-violation solver + Malin hand-count + FAILURES.md fixes.",
+    ],
+    "george": [
+        "0:12–0:25 Hook (Part 2): Short hop from West New York, NJ -> Upper East Side — a smaller right-sized truck makes tight NYC streets & turns way easier; moving this room into 6 NY Penn Station stores.",
+        "0:55–1:55 3D Fleet & Penn Station: Downsized U-Haul (snug so nothing slides, compact for NYC) + 0-violation physics verifier (>=75% support, 40–60% CoG) + Neon/Agents + 6-store LIFO dock order + offline QR label + Nano Banana arrival.",
+        "1:55–2:25 & 2:45–3:00 Judge What-If + Close: Add piano / 10-ft truck live -> Move Plan Judge (Decision 1 -> Neon); close with 1 job per model (Hydrogen sees/hears, Neon+Agents plan, Nano Banana previews, Decision 1 gates & judges).",
+    ],
+}
+
 
 def _read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
@@ -263,6 +278,7 @@ def collect_hackathon_evidence(
         "hand_count_eval": (repo_root / "eval" / "score_inventory.py").exists() and (repo_root / "eval" / "hand_counts" / "malin.json").exists(),
         "results_table": (repo_root / "eval" / "RESULTS.md").exists(),
         "baseline_eval": any((repo_root / "eval").glob("baseline*.py")) if (repo_root / "eval").exists() else False,
+        "pitch_cue_cards": (repo_root / "plan" / "PITCH_NOTES.md").exists() and (repo_root / "frontend" / "pitch.html").exists(),
     }
 
     # Check Step 1 Move Plan Judge output if available
@@ -457,9 +473,10 @@ def _deterministic_coaching(ev: dict[str, Any], r1_score: float) -> dict[str, An
             "How do you know the 3D load works? -> Deterministic physics verifier (`verify.py`: >=75% base support, 3D overlap, upright/edge rules, 40-60% CoG, Penn Station doorway clearances) + Move Plan Judge.",
         ],
         "pitch_highlights": [
+            "Open with the two-sided truck sizing story: Chris's oversized truck (things slid & broke) + George's short WNY, NJ -> UES move (smaller right-sized truck maneuvers NYC streets cleanly).",
             "Lead with the packed 3D truck fleet and Penn Station store unload sequence, never a static dashboard.",
             "Narrate one fact aloud while filming ('these chairs stack' or 'the plants stay') so judges see audio update the plan.",
-            "Invite a judge at 2:00 to toggle an item or switch truck size and watch verifier + Move Plan Judge re-check live.",
+            "Invite a judge at 1:55 to toggle an item or switch truck size and watch verifier + Move Plan Judge re-check live.",
         ],
         "via": "deterministic_evidence_fallback",
     }
@@ -583,6 +600,7 @@ def judge_hackathon_rubric(
         "criteria": criteria,
         "routing": status_ans,
         "coaching": coaching,
+        "presenter_cards": PRESENTER_CARDS,
         "evidence": evidence,
     }
 

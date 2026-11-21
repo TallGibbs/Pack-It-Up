@@ -325,6 +325,9 @@ def test_step2_hackathon_rubric_judge_weights_and_separation(monkeypatch, tmp_pa
     assert res["round_1_score_100"] == 78.8
     assert res["round_2_score_100"] == 75.0
     assert res["evidence"]["has_step1_plan_judgment"] is True
+    assert res["evidence"]["components"]["pitch_cue_cards"] is True
+    assert len(res["presenter_cards"]["chris"]) == 3
+    assert len(res["presenter_cards"]["george"]) == 3
     assert len(res["coaching"]["pre_5pm_checklist"]) >= 1
 
 
