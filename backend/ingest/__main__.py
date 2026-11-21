@@ -10,6 +10,8 @@ from pathlib import Path
 
 from .common import new_run_id
 from .intake import collect_folder, intake
+from .merge import merge
+from .perceive import perceive_all
 
 
 def main(argv=None) -> int:
@@ -17,7 +19,7 @@ def main(argv=None) -> int:
     ap.add_argument("folder", type=Path, help="folder of photos and clips for one room")
     ap.add_argument("--room", help="room name (default: folder name)")
     ap.add_argument("--run-id", help="add to an existing run (multi-room move)")
-    ap.add_argument("--until", default="intake", choices=["intake"], help="stop after this stage")
+    ap.add_argument("--until", default="merge", choices=["intake", "perceive", "merge"], help="stop after this stage")
     args = ap.parse_args(argv)
 
     files = collect_folder(args.folder)
@@ -32,6 +34,16 @@ def main(argv=None) -> int:
         print(f"  {f['name']:<16} {f['kind']:<6} {f['bytes'] / 1e6:5.1f} MB  {extra}  {f['sha256'][:12]}")
     for s in manifest["skipped"]:
         print(f"  skipped {s['name']}: {s['reason']}")
+    if args.until == "intake":
+        return 0
+    perceive_all(run_id)
+    if args.until == "perceive":
+        return 0
+    merged = merge(run_id)
+    for room in merged["rooms"]:
+        print(f"\n{room['name']} (merged from {len(room['files'])} files)")
+        for it in room["items"]:
+            print(f"  {it['quantity']:>3} x {it['label'][:50]:<50} {it['catalog_id']}")
     return 0
 
 

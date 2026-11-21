@@ -4,6 +4,7 @@ Writes runs/<run_id>/perception/<file>.json for each file.
 """
 from __future__ import annotations
 
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -47,6 +48,14 @@ def build_prompt(entry: dict) -> str:
             .replace("{timestamp_rule}", ts_rule))
 
 
+def clean_label(label: str) -> str:
+    """Keep labels short: the model sometimes leaks its reasoning into them."""
+    label = " ".join(label.split()).rstrip(".")
+    if len(label) > 60:
+        label = re.split(r"\s*\(|\s-\s|;", label)[0].strip() or label[:60]
+    return label[:80]
+
+
 def media_for(rd: Path, entry: dict) -> Media:
     return Media(rd / entry["path"], entry["kind"], entry["mime"], entry["sha256"])
 
@@ -65,6 +74,7 @@ def perceive_file(run_id: str, entry: dict, job_name: str = "perceive") -> dict:
         raise
     known = catalog.load()
     for it in out["items"]:
+        it["label"] = clean_label(it["label"])
         if it["catalog_id"] != "unknown" and it["catalog_id"] not in known:
             it.setdefault("notes", f"model gave unknown catalog id {it['catalog_id']!r}")
             it["catalog_id"] = "unknown"
