@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "gemini-skills": {
+      "source": {
+        "source": "github",
+        "repo": "google-gemini/gemini-skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "gemini-skills@gemini-skills": true
+  }
+}

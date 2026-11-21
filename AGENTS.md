@@ -37,7 +37,7 @@ Before writing or changing any Gemini API code (in practice, anything in `backen
 | `gemini-omni-flash-api` | Video generation (not in our plan) |
 
 How to get them:
-- **Claude Code:** `/plugin marketplace add google-gemini/gemini-skills`, then `/plugin install gemini-skills@gemini-skills`.
+- **Claude Code:** this repo's `.claude/settings.json` registers the marketplace and enables the plugin, so Claude Code offers to install it when you trust the folder. By hand: `/plugin marketplace add google-gemini/gemini-skills`, then `/plugin install gemini-skills@gemini-skills`.
 - **Antigravity:** bundled. Settings → Customizations → Build with Google Plugins, or `agy plugin install https://github.com/google-gemini/gemini-skills`.
 - **Other agents:** `npx skills add google-gemini/gemini-skills --skill gemini-api-dev`. Install into your own agent setup; don't commit the skill files here.
 - **No install possible:** read [skills/gemini-api-dev/SKILL.md](https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-api-dev/SKILL.md) before writing model code.
