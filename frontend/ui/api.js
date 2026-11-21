@@ -44,15 +44,33 @@
     return page + (s ? "?" + s : "");
   }
 
+  // The server's `detail` is a sentence for our own errors, but a list of {msg, loc} for a request
+  // FastAPI rejected itself (422); that list used to reach the page as "[object Object]".
+  function detailText(detail, fallback) {
+    if (typeof detail === "string" && detail) return detail;
+    if (Array.isArray(detail) && detail.length) return detail.map((d) => (d && d.msg) || "").filter(Boolean).join("; ") || fallback;
+    return fallback;
+  }
+
+  // True when the API is this laptop or a LAN address. Any other address reaches it through
+  // Cloudflare (the demo tunnel), which refuses a request body over 100 MB.
+  const API_HOST = (() => { try { return new URL(API_BASE).hostname; } catch (e) { return location.hostname; } })();
+  const LOCAL_API = /^(localhost|127\.|\[::1\]|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)|\.(local|localhost|test)$/i.test(API_HOST);
+
   async function json(method, path, body) {
-    const res = await fetch(API_BASE + path, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : {},
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    let res;
+    try {
+      res = await fetch(API_BASE + path, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (e) { // fetch's own text is "Load failed" on iPhone, "Failed to fetch" elsewhere
+      throw new Error("no connection");
+    }
     if (!res.ok) {
-      let detail = res.statusText;
-      try { detail = (await res.json()).detail || detail; } catch (e) { /* not json */ }
+      let detail = res.statusText || `error ${res.status}`;
+      try { detail = detailText((await res.json()).detail, detail); } catch (e) { /* not json */ }
       const err = new Error(detail);
       err.status = res.status;
       throw err;
@@ -64,6 +82,8 @@
     // POST /upload with XHR, because fetch has no upload progress.
     upload(files, room, runId, onProgress) {
       return new Promise((resolve, reject) => {
+        files = (files || []).filter(Boolean);
+        if (!files.length) return reject(new Error("No file to send. Choose it again.")); // never a request with no files (FAILURES.md 12:05)
         const fd = new FormData();
         files.forEach((f) => fd.append("files", f, f.name));
         fd.append("room", room);
@@ -75,9 +95,11 @@
           let data = null;
           try { data = JSON.parse(xhr.responseText); } catch (e) { /* not json */ }
           if (xhr.status >= 200 && xhr.status < 300 && data) resolve(data);
-          else reject(new Error((data && data.detail) || `upload failed (${xhr.status || "network"})`));
+          else if (xhr.status === 413) reject(new Error("Too big to send in one go (100 MB limit). Use a shorter clip."));
+          else reject(new Error(detailText(data && data.detail, `Upload failed (${xhr.status || "network"}).`)));
         };
-        xhr.onerror = () => reject(new Error("Couldn't reach the server. Is the phone on the same network, or using the tunnel address?"));
+        // Airplane mode, a dropped signal, or the server stopped: the same words fit all three.
+        xhr.onerror = () => reject(new Error("No connection. Check your signal, then tap Retry."));
         xhr.send(fd);
       });
     },
@@ -113,7 +135,9 @@
   // ---------- thumbnails ----------
   // Evidence is {source, sha256, kind, timestamp_s, box_2d}. With no file hash there is nothing to
   // crop: the item was only heard on a soundtrack (mic tile), or the user added it (initials tile).
-  const tileKind = (ev) => (ev && ev.kind !== "user" && !ev.sha256 ? "audio" : ev && ev.kind);
+  // A box means it was seen, even if the file's hash is missing (older inventories: a cupboard in a
+  // room with no listed items got the mic tile).
+  const tileKind = (ev) => (ev && ev.kind !== "user" && !ev.sha256 && !ev.box_2d ? "audio" : ev && ev.kind);
 
   // Container evidence carries the file name but not its hash; borrow the hash from an item seen in the same file.
   function withSha(inv, ev) {
@@ -133,6 +157,7 @@
   window.PIU = {
     MOCK,
     API_BASE,
+    LOCAL_API,
     params,
     $,
     esc,

@@ -95,6 +95,7 @@ label.field { display: block; font-size: 13px; color: var(--muted); margin-botto
 .files .state { color: var(--muted); font-size: 13px; text-align: right; white-space: nowrap; }
 .files .state.done { color: var(--ok); }
 .files .state.failed { color: var(--bad); white-space: normal; }
+.files li.failed .state { grid-column: 2 / 4; text-align: left; } /* own line: a long reason squeezed the name to "I…" */
 .files .bar { grid-column: 2 / 4; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
 .files .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
 .files .bar.busy i { width: 35%; animation: slide 1.1s ease-in-out infinite; }
@@ -139,6 +140,9 @@ body.capture { padding-bottom: 150px; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 .q.answered { background: var(--card); border-color: var(--line); padding: 10px 14px; }
 .q.answered .text { font-weight: 500; font-size: 14px; }
+.q.answered .clamp { -webkit-line-clamp: 2; }
+/* Answered questions fold away: seven of them open put the first item several screens down on a phone. */
+.answered-list > summary { color: var(--accent); font-weight: 500; font-size: 14px; min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 .kind { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 
 /* Item rows */

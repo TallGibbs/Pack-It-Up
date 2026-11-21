@@ -24,6 +24,7 @@
   let inFlight = 0;
   let pollTimer = null;
   let lastTotals = {};
+  let answeredOpen = false; // the folded list of answered questions stays as the user left it across re-renders
 
   $("#add-more").href = link("capture.html", { run_id: runId }); // back to the same move, not a new one
 
@@ -168,8 +169,13 @@
     let html = open.length ? `<h2>${open.length === 1 ? "One question" : `${open.length} quick questions`}</h2>` : "";
     html += open.map((q) => Q.cardHtml(q, { busy: busyQ.has(q.id), thumbHtml: (ev, label) => thumb(ev, label), inv })).join("");
     if (more > 0) html += `<p class="small muted">${more} smaller question${more > 1 ? "s" : ""} not shown; best guesses used.</p>`;
-    html += answered.map(Q.answeredHtml).join("");
+    if (answered.length) {
+      html += `<details class="answered-list"${answeredOpen ? " open" : ""}><summary>${answered.length} answered · see or change</summary>` +
+        answered.map(Q.answeredHtml).join("") + `</details>`;
+    }
     host.innerHTML = html;
+    const folded = host.querySelector(".answered-list");
+    if (folded) folded.addEventListener("toggle", () => (answeredOpen = folded.open));
     Q.bind(host, inv.questions, { onAnswer: answer, onReopen: (q) => { reopened.add(q.id); renderQuestions(); } });
   }
 

@@ -257,7 +257,8 @@
 
   function whoHtml(q) {
     if (q.user_changed) return `<span class="who changed">you changed it</span>`;
-    if (q.answered_by === "user") return `<span class="who user">you confirmed</span>`;
+    // "confirmed" only when the model had answered too; a question only the user was asked is "answered"
+    if (q.answered_by === "user") return `<span class="who user">${q.model_answer_label != null ? "you confirmed" : "you answered"}</span>`;
     if (q.answered_by === "decisions_api") return `<span class="who api">applied${q.low_confidence ? " (best guess)" : ""}</span>`;
     if (q.answered_by === "generate_json_fallback") return `<span class="who api">fallback model</span>`;
     return `<span class="who wait">waiting for you</span>`;
@@ -451,7 +452,7 @@
     $("archived-note").classList.toggle("hidden", !r.archived);
     const live = data.timeline.bars.filter((b) => b.cache !== "hit");
     $("tl-note").textContent = data.timeline.bars.length
-      ? `${fmt(data.timeline.span_s, 0)} s from first call to last; ${fmt(live.length)} live call${live.length === 1 ? "" : "s"}. Hover a bar for the file and time.`
+      ? `${fmt(data.timeline.span_s, 0)} s from first call to last; ${fmt(live.length)} live call${live.length === 1 ? "" : "s"}. Hover or tap a bar for the file and time.`
       : "";
     $("timeline").innerHTML = timelineSvg(data.timeline);
     $("decisions").innerHTML = decisionsHtml(data.decisions);

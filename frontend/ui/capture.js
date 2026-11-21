@@ -2,10 +2,14 @@
 // the top open question, and coming back to a move. Needs ui/api.js and ui/questions.js first.
 (function () {
   "use strict";
-  const { api, link, MOCK, params, $, isVideo, thumbHtml, totalBoxes } = window.PIU;
+  const { api, link, MOCK, params, $, isVideo, thumbHtml, totalBoxes, LOCAL_API } = window.PIU;
   const ACCEPT_EXT = /\.(jpe?g|png|heic|heif|webp|mp4|mov|m4v)$/i;
-  const TUNNEL = /trycloudflare\.com$/i.test(location.hostname);
-  const WARN_MB = TUNNEL ? 90 : 200;
+  // Through the demo address every upload passes Cloudflare, which refuses a request over 100 MB
+  // (the phone would only see "upload failed (413)"). So there: no file over MAX_MB, and files are
+  // sent in groups of at most MAX_MB. On the laptop or a LAN address there is no limit, only a warning.
+  const MAX_MB = LOCAL_API || MOCK ? Infinity : 95;
+  const WARN_MB = 200;
+  const mb = (bytes) => Math.round(bytes / 1e6);
 
   if (MOCK) $("#mock-banner").classList.remove("hidden");
 
@@ -31,6 +35,8 @@
     const el = $("#room-tpl").content.firstElementChild.cloneNode(true);
     const room = { el, name: "", locked: false, files: [] };
     const input = $(".room-name", el);
+    // The filming tips sit in the newest card only; repeated in every card they push the file rows off a small screen.
+    rooms.forEach((r) => r.el.querySelectorAll(".hint").forEach((h) => h.remove()));
     input.placeholder = rooms.length ? "Kitchen" : "Living room";
     input.value = "Room " + (rooms.length + 1);
     input.addEventListener("focus", () => { if (/^Room \d+$/.test(input.value)) input.select(); });
@@ -68,6 +74,7 @@
     const input = $(".room-name", room.el);
     input.value = name;
     input.readOnly = true;
+    room.el.querySelectorAll(".hint").forEach((h) => h.remove()); // read once; now the file rows need the space
   }
 
   function roomName(room) {
@@ -92,20 +99,26 @@
 
   function pick(room, files) {
     if (!files.length) return;
-    const ok = files.filter((f) => /^(image|video)\//.test(f.type) || ACCEPT_EXT.test(f.name));
+    const media = files.filter((f) => /^(image|video)\//.test(f.type) || ACCEPT_EXT.test(f.name));
+    const empty = media.filter((f) => !f.size); // e.g. a photo still in iCloud that never downloaded
+    const tooBig = media.filter((f) => f.size > MAX_MB * 1e6);
+    const ok = media.filter((f) => f.size && f.size <= MAX_MB * 1e6);
     const warn = $(".size-warn", room.el);
     const msgs = [];
-    if (ok.length < files.length) msgs.push(`${files.length - ok.length} file(s) skipped: only photos and videos.`);
-    const big = ok.filter((f) => f.size > WARN_MB * 1e6);
-    if (big.length) msgs.push(`${big.map((f) => f.name).join(", ")} ${big.length > 1 ? "are" : "is"} over ${WARN_MB} MB and may be slow` +
-      (TUNNEL ? " or rejected by the tunnel (100 MB limit). Shorter clips work better." : ". Shorter clips work better."));
+    const list = (fs) => fs.map((f) => f.name).join(", ");
+    if (media.length < files.length) msgs.push(`${files.length - media.length} file(s) skipped: only photos and videos.`);
+    if (empty.length) msgs.push(`${list(empty)} came through empty and ${empty.length > 1 ? "were" : "was"} skipped. Choose ${empty.length > 1 ? "them" : "it"} again.`);
+    if (tooBig.length) msgs.push(`${tooBig.map((f) => `${f.name} is ${mb(f.size)} MB`).join(", ")}: too big to send (limit ${MAX_MB} MB). ` +
+      `Film a shorter clip, under 45 seconds, and add that.`); // phone clips arrive at 1.2 to 1.8 MB per second
+    const slow = ok.filter((f) => f.size > WARN_MB * 1e6);
+    if (slow.length) msgs.push(`${list(slow)} ${slow.length > 1 ? "are" : "is"} over ${WARN_MB} MB and may be slow. Shorter clips work better.`);
     warn.textContent = msgs.join(" ");
     warn.classList.toggle("hidden", !msgs.length);
     if (!ok.length) return;
 
     lockRoom(room, roomName(room));
 
-    const batch = ok.map((f) => {
+    const rows = ok.map((f) => {
       const name = uniqueName(f.name || "upload");
       const file = name === f.name ? f : new File([f], name, { type: f.type, lastModified: f.lastModified });
       const row = { name, file, kind: isVideo(name, f.type) ? "video" : "image",
@@ -113,7 +126,14 @@
       room.files.push(row);
       return row;
     });
-    queue.push({ room, rows: batch });
+    // One request per group of at most MAX_MB: three 40 MB clips picked together go as three uploads.
+    let group = [], size = 0;
+    rows.forEach((r) => {
+      if (group.length && size + r.file.size > MAX_MB * 1e6) { queue.push({ room, rows: group }); group = []; size = 0; }
+      group.push(r);
+      size += r.file.size;
+    });
+    queue.push({ room, rows: group });
     render(room);
     pump();
   }
@@ -174,6 +194,7 @@
     room.files.forEach((r) => {
       const st = fileProgress(r);
       const li = document.createElement("li");
+      if (st.cls === "failed") li.className = "failed"; // the reason goes on its own line, so the name stays readable
       li.innerHTML = `<span aria-hidden="true">${r.kind === "video" ? "🎥" : "📷"}</span>
         <span class="name"></span><span class="state ${st.cls}"></span>`;
       $(".name", li).textContent = r.name;
@@ -226,7 +247,7 @@
       if (allFinished(run)) { polling = false; return; } // stop until the next upload
     } catch (e) {
       $("#found").innerHTML = `<b>Can't reach the server</b><span class="error"></span>`;
-      $("#found .error").textContent = e.message;
+      $("#found .error").textContent = `${e.message}; trying again…`;
     }
     polling = false;
     pollTimer = setTimeout(poll, 1000);
@@ -266,10 +287,11 @@
     [btn, plan].forEach((b) => b.removeAttribute("aria-disabled"));
     btn.textContent = "Check list";
     const slow = firstSentAt && Date.now() - firstSentAt > 60000;
-    plan.classList.toggle("primary", done || slow);
+    const nothing = !inv.totals.item_count && !totalBoxes(inv); // every file was skipped or unreadable
+    plan.classList.toggle("primary", (done || slow) && !nothing);
     const failed = Object.values(run.status.files || {}).filter((f) => f.perceive === "failed").length;
-    const head = done ? `${foundText(inv)} in ${plural(nRooms, "room")}` : `${foundText(inv)} found so far`;
-    const sub = done ? (failed ? `${failed} file(s) couldn't be read` : "Ready to check")
+    const head = done ? (nothing ? "Nothing found yet" : `${foundText(inv)} in ${plural(nRooms, "room")}`) : `${foundText(inv)} found so far`;
+    const sub = done ? (failed ? `${failed} file(s) couldn't be read` : nothing ? "Add a photo or clip of a room" : "Ready to check")
                      : slow ? "Still working; you can review what's ready" : "Still looking…";
     $("#found").innerHTML = "<b></b><span></span>";
     $("#found b").textContent = head;
@@ -353,6 +375,7 @@
   // loaded, because new file names must not repeat ones the run already has.
   async function resume(id) {
     notice("Loading your move…");
+    $("#add-room").disabled = true; // a room added now would start a second move
     let run;
     try {
       run = await api.getRun(id);
@@ -363,6 +386,7 @@
       return;
     }
     notice("");
+    $("#add-room").disabled = false;
     showRun(run);
     adoptRun(id);
     addRoom();
@@ -376,6 +400,7 @@
     window.PIU.forgetRun();
     try { history.replaceState(null, "", link("capture.html")); } catch (e) { /* file:// */ }
     notice(why);
+    $("#add-room").disabled = false;
     addRoom();
   }
 
