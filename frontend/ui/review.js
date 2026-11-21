@@ -37,6 +37,7 @@
   window.PIU.rememberRun(runId);
   $("#handoff").href = link("index.html", { run_id: runId });
   $("#step-pack").href = link("index.html", { run_id: runId }); // the steps line goes forward as well as back
+  $("#to-usage").href = link("models.html", { run_id: runId }); // this move's model calls, tokens and estimated cost
 
   // ---------- data ----------
   async function load() {

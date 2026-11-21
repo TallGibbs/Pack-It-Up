@@ -10,6 +10,8 @@ from pathlib import Path
 
 from backend.ingest.common import ROOT, RUNS_DIR
 
+from . import pricing
+
 # Outside .cache/ (which people wipe to force fresh model calls) and runs/ (which gets cleaned up), so the
 # history survives both. Git-ignored: it holds item labels and question text from real footage.
 DB_PATH = Path(os.environ.get("PACK_ANALYSIS_DB", ROOT / ".history" / "analysis.db"))
@@ -208,12 +210,15 @@ def _jobs(con: sqlite3.Connection, where: str, args: tuple) -> list[dict]:
                ROUND(MAX(CASE WHEN cache = 'miss' THEN latency_s END), 2) AS max_latency_s,
                ROUND(SUM(CASE WHEN cache = 'miss' THEN latency_s ELSE 0 END), 1) AS total_latency_s,
                SUM(COALESCE(tokens_in, 0)) AS tokens_in, SUM(COALESCE(tokens_out, 0)) AS tokens_out,
+               SUM(COALESCE(thoughts, 0)) AS thoughts,
                COUNT(DISTINCT run_id) AS runs
         FROM calls WHERE {where} GROUP BY job, model, provider""", args).fetchall()
     out = []
     for r in rows:
         d = dict(r)
         d["role"], d["does"] = ROLES.get(d["job"], (d["job"], ""))
+        c = pricing.cost_usd(d["model"], d["tokens_in"], d["tokens_out"], d["thoughts"])
+        d["cost_usd"] = None if c is None else round(c, 4)  # estimate at list prices; see pricing.py
         out.append(d)
     out.sort(key=lambda d: (ORDER.index(d["job"]) if d["job"] in ORDER else 99, d["job"]))
     return out
@@ -266,9 +271,10 @@ def run_summary(run_id: str) -> dict | None:
         decisions = [dict(r) for r in con.execute(
             "SELECT * FROM decisions WHERE run_id = ? ORDER BY model_confidence IS NULL, model_confidence", (run_id,))]
         perception = [dict(r) for r in con.execute("SELECT * FROM perception WHERE run_id = ? ORDER BY file", (run_id,))]
+        jobs = _jobs(con, "run_id = ?", (run_id,))
         return {"run": {k: run[k] for k in run.keys() if k != "sig"},
                 "configured": _configured(),
-                "jobs": _jobs(con, "run_id = ?", (run_id,)),
+                "jobs": jobs, "cost": pricing.summarize(jobs),
                 "decision_stats": _decision_stats(con, "run_id = ?", (run_id,)),
                 "decisions": decisions, "perception": perception, "timeline": timeline}
     finally:
@@ -280,7 +286,8 @@ def overall() -> dict:
     con = connect()
     try:
         n = con.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
-        return {"runs": n, "configured": _configured(), "jobs": _jobs(con, "1 = 1", ()),
+        jobs = _jobs(con, "1 = 1", ())
+        return {"runs": n, "configured": _configured(), "jobs": jobs, "cost": pricing.summarize(jobs),
                 "decision_stats": _decision_stats(con, "1 = 1", ())}
     finally:
         con.close()
@@ -310,10 +317,15 @@ def trends() -> list[dict]:
               (SELECT prompt_version FROM perception p WHERE p.run_id = r.run_id AND prompt_version IS NOT NULL
                  GROUP BY prompt_version ORDER BY COUNT(*) DESC LIMIT 1) AS prompt_version
             FROM runs r ORDER BY COALESCE(r.created, r.run_id), r.run_id""").fetchall()
+        cost: dict[str, float] = {}  # estimated dollars per run, at list prices
+        for c in con.execute("""SELECT run_id, model, SUM(COALESCE(tokens_in, 0)) AS tin, SUM(COALESCE(tokens_out, 0)) AS tout,
+                                       SUM(COALESCE(thoughts, 0)) AS th FROM calls GROUP BY run_id, model"""):
+            cost[c["run_id"]] = cost.get(c["run_id"], 0.0) + (pricing.cost_usd(c["model"], c["tin"], c["tout"], c["th"]) or 0.0)
         out = []
         for r in rows:
             d = dict(r)
             d["kept"] = round(1 - d["user_changed"] / d["user_checked"], 3) if d["user_checked"] else None
+            d["cost_usd"] = round(cost.get(d["run_id"], 0.0), 4)
             out.append(d)
         return out
     finally:

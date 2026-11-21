@@ -1,0 +1,34 @@
+# Gemini API list prices: US dollars per 1 million tokens, paid tier, Standard.
+# Copied by hand from Google's pricing page on the date below. Used only to estimate what a move's
+# model calls would cost (backend/analysis/pricing.py); nothing here changes which model runs.
+#
+# `output` covers answer tokens and thinking tokens: the page bills thinking as output.
+# A model missing from this file shows on the page as "no price on file" and adds nothing to the total.
+
+source = "https://ai.google.dev/gemini-api/docs/pricing"
+as_of = "2026-11-21"
+
+[models."gemini-4-hydrogen"]
+input = 1.50
+output = 7.50
+
+[models."gemini-4-argon"]
+# Through November 30, 2026. The page lists 4.00 in and 20.00 out from December 1, 2026.
+input = 2.00
+output = 10.00
+
+[models."gemini-4-neon"]
+# Managed-agent calls run on this model and are billed at this rate; the sandbox itself is
+# "not billed during the preview period".
+input = 3.00
+output = 15.00
+
+[models."gemini-decision-1"]
+# Decisions API: input only. "Each request bills shared input tokens once, regardless of question count."
+input = 0.10
+output = 0.0
+
+[models."gemini-nano-banana-2.1"]
+# Image output tokens (a 1K image is 1,120 tokens, about $0.034). Text output is 7.50; our image job returns an image.
+input = 1.50
+output = 30.00

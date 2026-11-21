@@ -24,7 +24,7 @@ import re
 import threading
 import time
 
-from . import store
+from . import pricing, store
 
 log = logging.getLogger("pack.analysis.databricks")
 logging.getLogger("databricks.sql").setLevel(logging.ERROR)  # hides a pyarrow notice we don't need (no Arrow fetches)
@@ -238,7 +238,8 @@ def _read_back(cfg: dict) -> dict:
                    SUM(CASE WHEN cache = 'miss' THEN 1 ELSE 0 END) AS live_calls,
                    COUNT(DISTINCT run_id) AS runs, COUNT(DISTINCT job) AS jobs,
                    ROUND(AVG(CASE WHEN cache = 'miss' AND valid = 1 THEN latency_s END), 2) AS avg_latency_s,
-                   SUM(COALESCE(tokens_in, 0)) AS tokens_in, SUM(COALESCE(tokens_out, 0)) AS tokens_out
+                   SUM(COALESCE(tokens_in, 0)) AS tokens_in, SUM(COALESCE(tokens_out, 0)) AS tokens_out,
+                   SUM(COALESCE(thoughts, 0)) AS thoughts
             FROM {ns}.`calls` WHERE job != 'hello' GROUP BY model ORDER BY calls DESC, model""")
         models = _rows(cur)
         cur.execute(f"""
@@ -296,6 +297,10 @@ def summary() -> dict:
            "local": _local_counts()}
     if data:
         out.update(data)
+        cost = pricing.summarize(data["models"])  # priced here, on each request, so a price edit shows at once
+        per_model = {m["model"]: m["cost_usd"] for m in cost["by_model"]}
+        out["models"] = [{**m, "cost_usd": per_model.get(m["model"])} for m in data["models"]]
+        out["cost_usd"] = cost["total_usd"]
         out["age_s"] = round(now - snap["data_at"])
         out["in_step"] = all(data["totals"][k] == out["local"][k] for k in ("runs", "calls"))
     return out
