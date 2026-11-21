@@ -1,8 +1,8 @@
 # Results
 
-Built by `python eval/results_table.py` on Nov 21 2026 at 14:50 from the 24 moves in `runs/` that have an inventory. Do not edit by hand; run the script again.
+Built by `python eval/results_table.py` on Nov 21 2026 at 15:31 from the 26 moves in `runs/` that have an inventory. Do not edit by hand; run the script again.
 
-**The test set.** Every move on the demo laptop: photos and clips uploaded today, Nov 21 2026, while we built and tested. Most are rooms at the hackathon venue; we did not record where each was filmed. The 24 moves come from 14 different sets of files: moves with the same letter under "Set" are repeat runs of the same footage (prompt changes during the build, or a file sent twice), so they are not independent. Where a line says "one per set", it counts only the latest move of each set.
+**The test set.** Every move on the demo laptop: photos and clips uploaded today, Nov 21 2026, while we built and tested. Most are rooms at the hackathon venue; we did not record where each was filmed. The 26 moves come from 16 different sets of files: moves with the same letter under "Set" are repeat runs of the same footage (prompt changes during the build, or a file sent twice), so they are not independent. Where a line says "one per set", it counts only the latest move of each set.
 
 ## 1. Packing: a stock packer against ours, scored by the same checker
 
@@ -10,13 +10,13 @@ The baseline is `py3dbp`, an open-source 3D bin packer, used as it comes (`packe
 
 | | Stock packer | Ours |
 |---|---|---|
-| Plans with no rule broken | 4 of 24 | 22 of 24 |
-| The same, one per set | 3 of 14 | 13 of 14 |
-| Rules broken, all moves | 298 | 2 |
-| Rules broken per move, mean | 12.4 | 0.1 |
+| Plans with no rule broken | 4 of 26 | 26 of 26 |
+| The same, one per set | 3 of 16 | 16 of 16 |
+| Rules broken, all moves | 298 | 0 |
+| Rules broken per move, mean | 11.5 | 0.0 |
 
-Rules the stock packer broke: support 142, no_stack 116, upright 15, light_only_on_top 12, weight_balance 11, zone_distribution 2.
-Rules ours broke: zone_distribution 2.
+Rules the stock packer broke: support 142, no_stack 116, upright 15, weight_balance 13, light_only_on_top 12.
+Ours broke none.
 
 | Move | Set | Rooms | Pieces | Load (cu ft) | Stock: trucks | Stock: rules broken | Ours: trucks | Ours: rules broken | Ours: score |
 |---|---|---|---|---|---|---|---|---|---|
@@ -31,10 +31,10 @@ Rules ours broke: zone_distribution 2.
 | 111600 | C | 1 | 43 | 421 | 1 | 0 | 1 | 0 | 83.1 |
 | 113646 | A | 1 | 59 | 811 | 1 | 7 | 1 | 0 | 92.9 |
 | 114124 | A | 1 | 59 | 811 | 1 | 7 | 1 | 0 | 92.9 |
-| 115436 | D | 1 | 17 | 142 | 1 | 2 | 1 | 1 | 62.4 |
+| 115436 | D | 1 | 17 | 142 | 1 | 1 | 1 | 0 | 74.4 |
 | 120009 | E | 2 | 66 | 252 | 1 | 1 | 1 | 0 | 82.3 |
 | 120427 | F | 1 | 7 | 46 | 1 | 1 | 1 | 0 | 83.0 |
-| 124056 | G | 1 | 14 | 58 | 1 | 2 | 1 | 1 | 67.7 |
+| 124056 | G | 1 | 14 | 58 | 1 | 1 | 1 | 0 | 79.7 |
 | 130657 | H | 1 | 12 | 45 | 1 | 1 | 1 | 0 | 84.3 |
 | 130913 | I | 1 | 16 | 251 | 1 | 1 | 1 | 0 | 77.0 |
 | 132950 | J | 1 | 39 | 551 | 1 | 0 | 1 | 0 | 87.2 |
@@ -44,6 +44,8 @@ Rules ours broke: zone_distribution 2.
 | 140739 | N | 1 | 11 | 93 | 1 | 1 | 1 | 0 | 76.7 |
 | 144333 | I | 1 | 32 | 444 | 1 | 0 | 1 | 0 | 83.9 |
 | 144416 | D | 1 | 6 | 85 | 1 | 1 | 1 | 0 | 74.6 |
+| 145728 | O | 1 | 7 | 169 | 1 | 1 | 1 | 0 | 82.2 |
+| 151249 | P | 1 | 4 | 12 | 1 | 1 | 1 | 0 | 82.7 |
 
 The stock packer always reports one truck because it stacks without the rules; the load does not travel that way. Trucks are U-Haul 26 ft.
 
@@ -98,8 +100,10 @@ How people pick a truck today: U-Haul's site names a truck by home size (10 ft: 
 | 140739 | N | 1 | 1 × 10 ft | 93 | 1 | 1 × 10 ft | right |
 | 144333 | I | 1 | 1 × 10 ft | 444 | 4 | 1 × 26 ft | too small |
 | 144416 | D | 1 | 1 × 10 ft | 85 | 1 | 1 × 10 ft | right |
+| 145728 | O | 1 | 1 × 10 ft | 169 | 2 | 1 × 15 ft | too small |
+| 151249 | P | 1 | 1 × 10 ft | 12 | 1 | 1 × 10 ft | right |
 
-Over the 24 moves the rule's truck was too small on 17, right on 7; one per set (14), too small on 7, right on 7. Most of these are venue rooms (a lounge, a workspace, a conference room), not bedrooms, so this shows that a room count says little about a load; it is not a test of the rule on homes.
+Over the 26 moves the rule's truck was too small on 18, right on 8; one per set (16), too small on 8, right on 8. Most of these are venue rooms (a lounge, a workspace, a conference room), not bedrooms, so this shows that a room count says little about a load; it is not a test of the rule on homes.
 
 ## 4. Inventory against a count made in person
 
@@ -132,5 +136,7 @@ So the confidence separated the answers that could be applied from the ones a pe
 - Homes. Most moves are venue rooms.
 - Independent samples. Repeat runs of the same footage are separate rows in tables 1 and 3; the "one per set" lines count each set once.
 - A neutral checker. The rules are ours and the stock packer was not built for them; the table shows what a packer without the rules does, not that it is a bad packer.
+- A checker that stood still. At 15:30 on Nov 21 we changed one rule: a move under 30 pieces now needs two stocked Penn Station stores, not three (`zone_distribution`, FAILURES.md 15:17). Before that change, 2 of our 24 plans broke it (moves 115436 and 124056, 17 and 14 pieces). The plans did not change; the rule did.
+- Table 2 after that change. The Neon rounds in `eval/neon_rounds.json` were scored before it, so move 124056 shows 67.7 there and 79.7 in table 1. Run `--neon` again to refresh them.
 - A single-model-call baseline (one model asked for the whole plan with coordinates). Not built.
 - Whether the sizes are right. Item sizes are model estimates or catalog values; nobody measured the furniture.

@@ -207,8 +207,8 @@
         </dl>
       </div>`);
     // Jobs set up in models.toml but not called here: shown dimmed so the full line-up is visible.
-    // Not shown when idle: the connection check, backups, and jobs that build the submission video rather than run in the app.
-    const NOT_APP = ["hello", "narrate", "video_open"];
+    // Not shown when idle: the connection check, backups, and jobs that build the submission video and slide deck rather than run in the app.
+    const NOT_APP = ["hello", "narrate", "video_open", "slides"];
     const idle = Object.entries(configured || {}).filter(([job]) => !seen.has(job) && !NOT_APP.includes(job) && !job.endsWith("_fallback"))
       .map(([job, c]) => `
       <div class="card job idle" style="--c:${color(job)}">

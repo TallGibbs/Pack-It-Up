@@ -253,6 +253,8 @@ def build(moves: list[dict]) -> str:
           "- Homes. Most moves are venue rooms.",
           "- Independent samples. Repeat runs of the same footage are separate rows in tables 1 and 3; the \"one per set\" lines count each set once.",
           "- A neutral checker. The rules are ours and the stock packer was not built for them; the table shows what a packer without the rules does, not that it is a bad packer.",
+          "- A checker that stood still. At 15:30 on Nov 21 we changed one rule: a move under 30 pieces now needs two stocked Penn Station stores, not three (`zone_distribution`, FAILURES.md 15:17). Before that change, 2 of our 24 plans broke it (moves 115436 and 124056, 17 and 14 pieces). The plans did not change; the rule did.",
+          "- Table 2 after that change. The Neon rounds in `eval/neon_rounds.json` were scored before it, so move 124056 shows 67.7 there and 79.7 in table 1. Run `--neon` again to refresh them.",
           "- A single-model-call baseline (one model asked for the whole plan with coordinates). Not built.",
           "- Whether the sizes are right. Item sizes are model estimates or catalog values; nobody measured the furniture.", ""]
     return "\n".join(L)
