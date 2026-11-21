@@ -165,3 +165,9 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Decision:** The event key in `.env` (`GEMINI_API_KEY`) is the only key used today. No personal key. That key already reaches all four Gemini 4 models and the Decisions API (`gemini-decision-1`, api_version `v1alpha`).
 - **Note:** The unused key-profile switch (`GEMINI_KEY_PROFILE`) stays in `backend/llm/gemini.py`; it does nothing unless set.
 - **By:** Chris.
+
+## 2026-11-21 12:00 · Fixed demo address on Chris's domain
+- **Decision:** The demo runs at https://packitup.temperedanalytics.com/, a named Cloudflare tunnel (`pack-it-up`) on Chris's `temperedanalytics.com` to the API on the demo laptop. The temporary trycloudflare.com tunnel stays as a fallback.
+- **Why:** The Hackathon wifi blocks phone-to-laptop traffic, and a quick tunnel's address changes whenever it restarts, which would break the QR codes on the slides and cards. A fixed name survives restarts.
+- **Limits:** It works only while the laptop runs the API and the tunnel. Anyone with the address can use the app and see uploads; there is no login.
+- **By:** Chris.
