@@ -5,7 +5,8 @@ GET /analysis/runs/{run_id}     -> jobs, Decisions API answers, per-file percept
 GET /analysis/summary           -> the same job and decision totals across all runs
 GET /analysis/trends            -> one row per run, oldest first: speed, confidence, answers kept
 
-GET /analysis/databricks        -> is the Databricks copy on, when it last ran, its last error
+GET /analysis/databricks        -> is the Databricks copy on, when it last ran, its last error's type
+GET /analysis/databricks/summary -> totals per model, read back from the Databricks tables (kept a minute)
 
 Runs whose folder was deleted stay in the database, marked `archived`.
 """
@@ -50,4 +51,9 @@ def trends():
 
 @router.get("/databricks")
 def databricks_status():
-    return databricks.status()
+    return databricks.public_status()
+
+
+@router.get("/databricks/summary")
+def databricks_summary():
+    return databricks.summary()

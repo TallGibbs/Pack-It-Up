@@ -9,6 +9,10 @@ Off unless `.env` has DATABRICKS_HOST, DATABRICKS_HTTP_PATH and DATABRICKS_TOKEN
 trouble never reaches the page: the loop records the error and tries again later. Databricks is storage
 only here; no model runs on it.
 
+The page also reads the copy back (`summary()`): totals per model across every run, queried from the Delta
+tables, so what it shows under "History in Databricks" comes from Databricks and not from this laptop. That
+query runs in the background and is kept for a minute; a page request never waits on the warehouse.
+
     python -m backend.analysis --push      # copy now and print what was sent
 """
 from __future__ import annotations
@@ -42,12 +46,15 @@ TABLES = {
 }
 BATCH = 100          # rows per INSERT statement
 INTERVAL_S = 60      # background loop period
+SUMMARY_TTL_S = 60   # a read-back is served this long; the next page request after that starts a fresh one
 _NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 state = {"enabled": False, "last_check": None, "last_push": None, "last_error": None, "last_error_at": None,
          "runs_pushed": 0, "pending": None, "target": None}
 _push_lock = threading.Lock()
 _started = False
+_summary = {"data": None, "data_at": 0.0, "tried_at": 0.0, "error": None, "refreshing": False}
+_summary_lock = threading.Lock()
 
 
 def _cfg() -> dict | None:
@@ -195,4 +202,100 @@ def start_background() -> None:
 def status() -> dict:
     out = {k: v for k, v in state.items()}
     out["enabled"] = enabled()
+    return out
+
+
+def public_status() -> dict:
+    """status() for a public page: the error's type only. Connector messages can name the workspace."""
+    out = status()
+    if out.get("last_error"):
+        out["last_error"] = out["last_error"].split(":", 1)[0]
+    return out
+
+
+# ---------- read the copy back ----------
+
+def _plain(v):
+    if isinstance(v, dt.datetime):  # pushed_at is stored as UTC without a zone
+        return v.replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+    if isinstance(v, (int, float, str)) or v is None:
+        return v
+    return float(v)  # Decimal
+
+
+def _rows(cur) -> list[dict]:
+    names = [d[0] for d in cur.description]
+    return [{n: _plain(v) for n, v in zip(names, r)} for r in cur.fetchall()]
+
+
+def _read_back(cfg: dict) -> dict:
+    """Two queries on the Delta tables: one row per model, and the table sizes."""
+    ns = f"`{cfg['catalog']}`.`{cfg['schema']}`"
+    t0 = time.monotonic()
+    with _connect(cfg) as dbx, dbx.cursor() as cur:
+        cur.execute(f"""
+            SELECT model, COUNT(*) AS calls,
+                   SUM(CASE WHEN cache = 'miss' THEN 1 ELSE 0 END) AS live_calls,
+                   COUNT(DISTINCT run_id) AS runs, COUNT(DISTINCT job) AS jobs,
+                   ROUND(AVG(CASE WHEN cache = 'miss' AND valid = 1 THEN latency_s END), 2) AS avg_latency_s,
+                   SUM(COALESCE(tokens_in, 0)) AS tokens_in, SUM(COALESCE(tokens_out, 0)) AS tokens_out
+            FROM {ns}.`calls` WHERE job != 'hello' GROUP BY model ORDER BY calls DESC, model""")
+        models = _rows(cur)
+        cur.execute(f"""
+            SELECT (SELECT COUNT(*) FROM {ns}.`runs`) AS runs, (SELECT COUNT(*) FROM {ns}.`calls`) AS calls,
+                   (SELECT COUNT(*) FROM {ns}.`decisions`) AS decisions,
+                   (SELECT MAX(pushed_at) FROM {ns}.`runs`) AS last_copy""")
+        totals = _rows(cur)[0]
+    return {"models": models, "totals": totals, "query_s": round(time.monotonic() - t0, 2)}
+
+
+def _refresh(cfg: dict) -> None:
+    try:
+        data = _read_back(cfg)
+        with _summary_lock:
+            _summary.update(data=data, data_at=time.time(), error=None)
+    except Exception as e:  # asleep, offline, tables not made yet: the page says so and the next request retries
+        log.warning("Databricks read-back failed: %s", f"{type(e).__name__}: {e}"[:300])
+        with _summary_lock:
+            _summary["error"] = type(e).__name__
+    finally:
+        with _summary_lock:
+            _summary["tried_at"] = time.time()
+            _summary["refreshing"] = False
+
+
+def _local_counts() -> dict:
+    con = store.connect()
+    try:
+        return {"runs": con.execute("SELECT COUNT(*) FROM runs").fetchone()[0],
+                "calls": con.execute("SELECT COUNT(*) FROM calls").fetchone()[0]}
+    finally:
+        con.close()
+
+
+def summary() -> dict:
+    """Totals per model, read from Databricks, for the page. Returns at once with what it has
+    (`state`: off, loading, ready or error) and refreshes in the background when that is over a minute old."""
+    _load_env()
+    try:
+        cfg = _cfg()
+    except ValueError:
+        cfg = None
+    if cfg is None:
+        return {"state": "off"}
+    now = time.time()
+    with _summary_lock:
+        if not _summary["refreshing"] and now - _summary["tried_at"] > SUMMARY_TTL_S:
+            _summary["refreshing"] = True
+            threading.Thread(target=_refresh, args=(cfg,), name="databricks-read", daemon=True).start()
+        snap = dict(_summary)
+    data = snap["data"]
+    out = {"state": "ready" if data else "error" if snap["error"] else "loading",
+           "target": f"{cfg['catalog']}.{cfg['schema']}", "refreshing": snap["refreshing"], "error": snap["error"],
+           "copy": {"last_check": state["last_check"], "pending": state["pending"], "failing": bool(state["last_error"])},
+           "local": _local_counts()}
+    if data:
+        out.update(data)
+        out["age_s"] = round(now - snap["data_at"])
+        out["in_step"] = all(data["totals"][k] == out["local"][k] for k in ("runs", "calls"))
     return out

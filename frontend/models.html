@@ -15,6 +15,8 @@
   .live { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
   .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
   .live.off i { background: var(--line); }
+  a.live { text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; color: var(--ink); }
+  a.live.bad i { background: var(--warn); }
 
   .jobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 12px 0; }
   .job { margin: 0; border-top: 4px solid var(--c, var(--accent)); display: flex; flex-direction: column; gap: 6px; }
@@ -88,6 +90,7 @@
     <label class="sr-only" for="run">Run</label>
     <select id="run"><option value="">Loading runs…</option></select>
     <span class="grow"></span>
+    <a class="live off hidden" id="dbx-badge" href="#dbx-sec" title="The model-use history is copied to Databricks and read back from there"><i></i><span id="dbx-badge-text">Databricks</span></a>
     <span class="live off" id="live" title="Refreshes every few seconds while this tab is open"><i></i><span>Live</span></span>
     <a class="btn link" id="to-review" href="#">Check list →</a>
   </div>
@@ -124,9 +127,17 @@
     <div class="card scroll" id="perception"></div>
   </section>
 
+  <section id="dbx-sec" class="hidden">
+    <h2>History in Databricks</h2>
+    <p class="small muted" id="dbx-note" aria-live="polite"></p>
+    <div class="stats" id="dbx-stats"></div>
+    <div class="card scroll hidden" id="dbx-models"></div>
+  </section>
+
   <p class="small muted" style="margin:24px 0 40px">
     Source: <code>runs/&lt;run_id&gt;/calls.jsonl</code>, <code>questions.json</code> and the perception files,
-    copied into <code>.history/analysis.db</code> on this laptop. A run stays there after its folder is deleted. <b>Cached</b> calls replay the answer to an identical earlier call
+    copied into <code>.history/analysis.db</code> on this laptop, and from there to Databricks every minute when that is set up.
+    A run stays in both after its folder is deleted. <b>Cached</b> calls replay the answer to an identical earlier call
     (same file, prompt and model) and take no time. Model IDs come from <code>backend/llm/models.toml</code>.
   </p>
 </main>
@@ -422,6 +433,58 @@
     } catch (e) { /* the totals above still show; trends retry on the next poll */ }
   }
 
+  // ---------- history in Databricks: the same totals, read back from the copy ----------
+  let dbxState = "off", dbxJson = "", tick = 0;
+  const clock = (d, secs) => d.toLocaleTimeString([], secs ? { hour: "2-digit", minute: "2-digit", second: "2-digit" } : { hour: "2-digit", minute: "2-digit" });
+
+  function renderDbx(d) {
+    const on = d.state !== "off";
+    show("dbx-sec", on);
+    $("dbx-badge").classList.toggle("hidden", !on);
+    if (!on) return;
+    const ready = d.state === "ready";
+    const where = `<code>${esc(d.target)}</code>`;
+    $("dbx-badge").classList.toggle("off", !ready);
+    $("dbx-badge").classList.toggle("bad", d.state === "error" || (ready && d.copy.failing));
+    show("dbx-models", ready);
+    if (!ready) {
+      $("dbx-badge-text").textContent = d.state === "error" ? "Databricks: no answer" : "Databricks: reading…";
+      $("dbx-stats").innerHTML = "";
+      $("dbx-note").innerHTML = d.state === "error"
+        ? `Couldn't read ${where} just now (${esc(d.error)}). Everything above comes from this laptop and is unaffected. Trying again within a minute.`
+        : `Asking Databricks for the totals in ${where}. The first answer can take a few seconds.`;
+      return;
+    }
+    const t = d.totals;
+    const copied = t.last_copy ? clock(new Date(t.last_copy)) : "–";
+    $("dbx-badge-text").textContent = `Databricks: ${fmt(t.runs)} runs, copied ${copied}`;
+    const step = d.in_step
+      ? `It matches this laptop: ${fmt(d.local.runs)} runs, ${fmt(d.local.calls)} calls.`
+      : `This laptop now has ${fmt(d.local.runs)} runs and ${fmt(d.local.calls)} calls; new and changed runs are copied within a minute.`;
+    $("dbx-note").innerHTML = `These numbers were read from the tables in ${where} at ${clock(new Date(Date.now() - d.age_s * 1000), true)}
+      (the query took ${fmt(d.query_s, 1)} s), not from this laptop. ${step}
+      ${d.copy.failing ? "The last copy attempt failed; it retries on its own." : ""} Databricks stores the history only; no model runs there.`;
+    $("dbx-stats").innerHTML = [[fmt(t.runs), "runs kept"], [fmt(t.calls), "model calls kept"],
+      [fmt(t.decisions), "questions kept"], [copied, "last copy"]]
+      .map(([b, s]) => `<div class="stat"><b>${b}</b><span>${esc(s)}</span></div>`).join("");
+    $("dbx-models").innerHTML = d.models.length ? `<table class="t"><thead><tr><th>Model</th><th class="n">Jobs</th><th class="n">Calls</th>
+      <th class="n">Cached</th><th class="n">Runs</th><th class="n">Avg time (live)</th><th class="n">Tokens in</th><th class="n">Tokens out</th></tr></thead><tbody>` +
+      d.models.map((m) => `<tr><td><span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">${esc(m.model)}</span></td>
+        <td class="n">${fmt(m.jobs)}</td><td class="n">${fmt(m.calls)}</td><td class="n">${fmt(m.calls - m.live_calls)}</td><td class="n">${fmt(m.runs)}</td>
+        <td class="n">${m.avg_latency_s == null ? "–" : fmt(m.avg_latency_s, 1) + " s"}</td>
+        <td class="n">${fmt(m.tokens_in)}</td><td class="n">${fmt(m.tokens_out)}</td></tr>`).join("") + `</tbody></table>`
+      : `<p class="empty">No calls copied yet.</p>`;
+  }
+
+  async function loadDbx() {
+    let d;
+    try { d = await get("/analysis/databricks/summary"); }
+    catch (e) { d = { state: "off" }; } // an API without this route, or a dropped request: leave the panel out
+    dbxState = d.state;
+    const s = JSON.stringify({ ...d, age_s: d.age_s == null ? null : Math.round(d.age_s / 60) });
+    if (s !== dbxJson) { dbxJson = s; renderDbx(d); }
+  }
+
   // ---------- loading ----------
   let current = null, lastJson = "", timer = null;
 
@@ -475,7 +538,12 @@
     clearTimeout(timer);
     const on = !document.hidden;
     $("live").classList.toggle("off", !on);
-    if (on) timer = setTimeout(async () => { await load(true); poll(); }, 4000);
+    if (on) timer = setTimeout(async () => {
+      await load(true);
+      // the Databricks read-back changes once a minute: ask every 20 s, or every time while the first one is on its way
+      if (dbxState === "loading" || ++tick % 5 === 0) await loadDbx();
+      poll();
+    }, 4000);
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) load(true); poll(); });
 
@@ -496,6 +564,7 @@
       history.replaceState(null, "", "?" + q.toString());
       load();
     });
+    loadDbx(); // not awaited: the page never waits on Databricks
     await load();
     poll();
   }

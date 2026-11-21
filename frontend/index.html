@@ -399,6 +399,7 @@
     <div class="nav-actions">
       <span class="small muted" id="engine-badge">Loading solver…</span>
       <a id="btn-edit-inv" class="btn sm" href="review.html">← Edit inventory</a>
+      <a id="nav-models" class="btn sm" href="models.html" title="Which model did which job, live">Models</a>
     </div>
   </div>
 
@@ -616,6 +617,7 @@ if (rawRunId && rawRunId !== "sample_venue") window.PIU.rememberRun(rawRunId);
 
 $("#nav-capture").href = link("capture.html");
 $("#nav-review").href = link("review.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
+$("#nav-models").href = link("models.html", { run_id: rawRunId !== "sample_venue" ? rawRunId : "all" });
 $("#btn-edit-inv").href = link("review.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
 
 /* ---------- Palettes ---------- */
