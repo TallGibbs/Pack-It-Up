@@ -4,6 +4,14 @@ Film your home on any phone and get labelled boxes, a truck size, and a load ord
 
 Built at the Cerebral Valley × Google DeepMind **Gemini 4 NYC hackathon** (Nov 21, 2026), Problem Statement Two: Element 119.
 
+## Demo video and slides
+
+- **1-minute demo video:** https://youtu.be/u_4H0JKHQrY
+- **Judging slides:** [frontend/slides/index.html](frontend/slides/index.html), 8 slides. Open them through the running app at `/app/slides/` (for example https://packitup.temperedanalytics.com/app/slides/ while the demo laptop runs); arrow keys move between slides. The app screenshots they show are captured at build time and not committed.
+- **Try it on your phone:** https://packitup.temperedanalytics.com (works while the demo laptop runs the API and the tunnel).
+
+Both were made by Gemini, not hand-written: the slides' copy and design by Gemini 4 Carbon (`python -m scripts.slides.build`, from the facts in [scripts/slides/brief.md](scripts/slides/brief.md)); the video's narration lines and cards by Gemini 4 Carbon, its voice by Gemini text-to-speech (`gemini-3.8-flash-tts`), and its 4-second opening by Gemini Omni 1.2 Flash, labelled as generated on screen (`python -m scripts.video.build`, plan in [plan/VIDEO_SCRIPT.md](plan/VIDEO_SCRIPT.md)). Every app shot in both is a screen capture of Pack It Up running on Nov 21, 2026. The rule is in [AGENTS.md](AGENTS.md), "Demo and presentation outputs are made by Gemini".
+
 ## Status
 
 In progress. Track A (ingestion: photos and clips to a resolved inventory with sizes, weights and questions) runs end to end; see [backend/ingest/README.md](backend/ingest/README.md). Track B (solver, checker, 3D view, the Gemini 4 Neon planner loop) was joined into `main` at 13:55 and runs from the same inventory. What we measured is in [eval/RESULTS.md](eval/RESULTS.md).
