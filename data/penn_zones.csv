@@ -1,0 +1,7 @@
+zone_id,name,zone_type,length_in,width_in,height_in,door_width_in,door_height_in,max_weight_lb,dock_stop,categories,keywords
+penn_merch_kiosk,Concourse Pop-Up Merch Kiosk,merch_kiosk,120,84,90,34,80,1800,1,retail;kids,kiosk;merch;pos;swag;tote;stroller;toy;sign
+penn_cafe,Trackside Espresso & Cafe Storefront,cafe_store,168,120,96,42,84,3500,2,cafe;kitchen;dining,espresso;coffee;pastry;bar stool;stool;microwave;refrigerator;dish;food;pot;counter
+penn_bookshop,Hudson News & Bookshop Unit,bookshop_store,180,132,96,48,84,4200,3,specialty_books;decor,bookshelf;shelving;book;art;frame;mirror;lamp;decor;vase;print
+penn_tech_hub,Moynihan Tech & Work Hub Store,tech_store,216,156,102,64,86,5500,4,office;electronics,desk;monitor;office chair;filing;whiteboard;cable;power strip;tv;computer;paper
+penn_lounge,Moynihan Ticketed Waiting Lounge,lounge_store,240,180,108,72,88,7000,5,living;bedroom,sofa;loveseat;sectional;armchair;recliner;coffee table;end table;rug;plant;ottoman;pouf;sideboard;console;linen
+penn_concourse,Main LIRR Concourse Hall,concourse,420,260,144,120,120,25000,6,venue;specialty;outdoor;garage;laundry,banquet;folding table;stacking chair;chair stack;podium;projector;piano;treadmill;communal

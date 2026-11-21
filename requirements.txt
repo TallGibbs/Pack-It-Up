@@ -8,3 +8,4 @@ pillow-heif
 imageio-ffmpeg
 python-dotenv
 databricks-sql-connector>=4,<5
+py3dbp
