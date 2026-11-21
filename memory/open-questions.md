@@ -20,6 +20,13 @@ Move an item to [decisions.md](decisions.md) once it is decided, and delete it h
 - **A real narrated clip** for the audio check; the passing check used a text-to-speech stand-in. Film it in the Camera app and add it with Choose files. (Chris)
 - **Accuracy work is on hold** (decision 11:55): one run per prompt can't separate prompt v3 from run-to-run variation; recall on Malin is 67-75% against the in-person count.
 
+## Left by the review session (14:00)
+- **The box table lives in three places:** `backend/ingest/resolve.py`, George's `backend/expand.py` on `track-b`, and `frontend/mock/mock-api.js`. Change them together. George has not seen the two exceptions (smaller bathroom cabinets and `other`; a container holds at most 60% of the furniture it is part of). (George, Chris)
+- **Box weights are not in the pound total.** The review page's "lb" counts furniture only; George's table has a packed weight per box. (Track A, after the join)
+- **Not tried on a phone:** everything this session merged was checked on copies of moves, on the live server with a test move, or in a desktop browser at 375 px. (Chris)
+- **From the 13:10 review, not started:** `?api=` on the real pages; `GET /analysis/runs` lists every move's id to anyone; a move interrupted by an API restart stays "still working" for good; two phones adding to one move can clash on file names; tap targets under 44 px, no visible focus on the two pick buttons, and progress not announced to screen readers. (Track A)
+- **Branches that can be deleted on GitHub:** `feature/review-server-fixes`, `feature/edit-checks`, `feature/box-table`, `feature/belongings-mock`. All four are in `main`. (Chris)
+
 ## Ideas proposed, not decided
 - **Lifting guidance on unload steps:** tags such as "two-person lift" or "over 50 lb", using the catalog's `two_person` flag and weights. About 30 minutes in B8. Suggested as core.
 - **Truck-mode reminder:** one checklist line on the final plan screen telling drivers to use a truck-aware nav setting. About 5 minutes. Check which apps really have a truck mode before naming one.

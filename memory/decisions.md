@@ -196,3 +196,11 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Both tracks should give the same boxes, and George's solver packs whatever `est_boxes` ingest writes. His table alone gave 47 boxes (116 cu ft) on Chris's phone run 120009 next to 114 cu ft of furniture, with a full medicine cabinet at 6 boxes; with the exceptions it is 19. On the kitchen run and two Malin runs the result is the same as his table (10, 9, 9).
 - **Limits:** George has not seen the two exceptions. The table now exists in both files; change them together.
 - **By:** Chris, on the review session's recommendation. Replaces the box sizes in the 13:27 entry.
+
+## 2026-11-21 13:52 · Personal belongings can be packed
+- **Decision:** Answering the personal-belongings question "they are part of the move" adds a `personal belongings` box line to that room and takes them off the left-out list; "leave them out" puts them back. Before, the answer was recorded and ignored.
+- **Why:** The page asked a question whose answer changed nothing (run 120009: Chris's answer, and the 2 helmets still left out).
+- **Limits:** Sized from what the things measure in the footage, no padding, at least one box per eight things; the review session's figures. An answer stored before 13:52 takes effect the next time its move is rebuilt.
+- **By:** Chris, on the review session's recommendation.
+- **See:** [backend/ingest/README.md](../backend/ingest/README.md), FAILURES.md 13:55 row
+
