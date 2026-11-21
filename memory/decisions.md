@@ -160,3 +160,8 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 ## 2026-11-21 11:55 · Try a personal Gemini API key next to the event key
 - **Decision:** Chris creates his own AI Studio key and tests whether it reaches the Gemini 4 models and the Decisions API, because he has no admin control over the event account. The code holds both: `GEMINI_API_KEY` (event) and `GEMINI_API_KEY_PERSONAL`, chosen with `GEMINI_KEY_PROFILE=PERSONAL`. The event key stays the default until the test says otherwise.
 - **By:** Chris.
+
+## 2026-11-21 12:00 · Event key only (replaces 11:55 "Try a personal Gemini API key")
+- **Decision:** The event key in `.env` (`GEMINI_API_KEY`) is the only key used today. No personal key. That key already reaches all four Gemini 4 models and the Decisions API (`gemini-decision-1`, api_version `v1alpha`).
+- **Note:** The unused key-profile switch (`GEMINI_KEY_PROFILE`) stays in `backend/llm/gemini.py`; it does nothing unless set.
+- **By:** Chris.
