@@ -336,12 +336,22 @@ _ORIOR_KEYWORDS = ("orior", "travertine", "marble", "stone", "boucle", "bouclé"
 
 
 def _apply_orior_venue_policy(inv: dict[str, Any], strategy: dict[str, Any]) -> dict[str, Any] | None:
-    """Malin × Orior rule: bespoke Irish-crafted lounge & stone furniture never moves between Malin clubs."""
-    if not strategy.get("orior_curated_stays"):
+    """Apply Orior White-Glove Care (`orior_white_glove`) or in-situ hold (`orior_curated_stays`).
+
+    In real life, The Malin's bespoke Orior pieces (Newry, Ireland) are custom-curated per club
+    and never move between locations. For our proof-of-concept simulation of a curated venue move,
+    `orior_white_glove` keeps every piece in the move while enforcing Orior-grade white-glove rules:
+    zero top-stacking (`stackable='no'`), upright two-person handling, and +2" pad/crate clearance.
+    """
+    white_glove = bool(strategy.get("orior_white_glove"))
+    curated_stays = bool(strategy.get("orior_curated_stays"))
+    if not white_glove and not curated_stays:
         return None
-    cloned_counts = 0
-    kept_cuft = 0.0
-    kept_labels: list[str] = []
+
+    affected_units = 0
+    affected_cuft = 0.0
+    sample_labels: list[str] = []
+
     for rb in inv.get("rooms", []):
         for it in rb.get("items", []):
             disp = str(it.get("disposition") or "undecided").lower()
@@ -355,19 +365,52 @@ def _apply_orior_venue_policy(inv: dict[str, Any], strategy: dict[str, Any]) -> 
                 or mat in ("stone", "upholstered")
                 or any(k in lbl for k in _ORIOR_KEYWORDS)
             )
-            if is_orior and not str(it.get("id") or "").startswith("judge_"):
-                qty = max(1, int(it.get("quantity") or 1))
-                vol = float((it.get("size") or {}).get("volume_cuft_total") or 0.0)
+            if not is_orior or str(it.get("id") or "").startswith("judge_"):
+                continue
+
+            qty = max(1, int(it.get("quantity") or 1))
+            sz = it.setdefault("size", {})
+            vol = float(sz.get("volume_cuft_total") or 0.0)
+            affected_units += qty
+            affected_cuft += vol
+            sample_labels.append(str(it.get("label") or cid))
+
+            if curated_stays and not white_glove:
                 it["disposition"] = "stays"
-                cloned_counts += qty
-                kept_cuft += vol
-                kept_labels.append(str(it.get("label") or cid))
+            else:
+                # Orior White-Glove Care: keep in simulation, forbid stacking anything on top,
+                # require upright 2-person handling, and add 2" breathable pad/crate clearance.
+                it["stackable"] = "no"
+                it["fragile"] = True
+                it["must_stay_upright"] = True
+                it["two_person"] = True
+                dims = sz.get("dims_in")
+                if isinstance(dims, list) and len(dims) == 3:
+                    padded = [round(float(dims[0]) + 2.0, 1), round(float(dims[1]) + 2.0, 1), round(float(dims[2]) + 1.0, 1)]
+                    sz["dims_in"] = padded
+                    v_each = catalog.volume_cuft(padded[0], padded[1], padded[2])
+                    sz["volume_cuft_each"] = v_each
+                    sz["volume_cuft_total"] = round(v_each * qty, 2)
+
+    if curated_stays and not white_glove:
+        return {
+            "policy": "malin_orior_curated_stays",
+            "kept_in_venue_units": affected_units,
+            "kept_in_venue_cuft": round(affected_cuft, 1),
+            "sample_items": list(dict.fromkeys(sample_labels))[:5],
+            "note": "In-situ mode: bespoke curated pieces remain in place while packing event gear only.",
+        }
+
     return {
-        "policy": "malin_orior_curated_stays",
-        "kept_in_venue_units": cloned_counts,
-        "kept_in_venue_cuft": round(kept_cuft, 1),
-        "sample_items": list(dict.fromkeys(kept_labels))[:5],
-        "note": "The Malin (parent: Orior, Newry, Ireland) curates bespoke stone & upholstery per club and never moves furniture between locations—packing event & production gear only.",
+        "policy": "orior_white_glove",
+        "white_glove_units": affected_units,
+        "white_glove_cuft": round(affected_cuft, 1),
+        "sample_items": list(dict.fromkeys(sample_labels))[:5],
+        "note": (
+            "Proof-of-concept tribute to Orior (Newry, Ireland) & The Malin: while these custom pieces "
+            "never move between clubs in real life, our simulation packs all of them to Orior white-glove "
+            "standards—zero top-stacking, upright 2-person lifts, +2\" pad clearance & breathable cotton covers."
+        ),
     }
 
 

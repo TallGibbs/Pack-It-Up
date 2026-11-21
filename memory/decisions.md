@@ -201,3 +201,10 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Grounds both the engineering and the 3-minute live demo in real domain constraints discovered directly from the venue team and event film crew in the room.
 - **By:** George.
 - **See:** `data/item_catalog.csv`, `data/penn_zones.csv`, `backend/pack_api.py`, `backend/commerce.py`, `frontend/ui/commerce.js`, `plan/PITCH_NOTES.md`, `frontend/pitch.html`
+
+## 2026-11-21 14:16 · Reframe Orior mode as White-Glove Care tribute (keep all pieces in the move simulation)
+- **Decision:** Default the venue Orior feature to **✨ Orior White-Glove Care (`orior_white_glove=True`)** rather than excluding Orior furniture from the move: keep every piece in the simulation as a respectful proof of concept for venues/homes that *do* move, clearly note that The Malin's bespoke Orior pieces (Newry, Ireland) would never leave the club in real life, and pay tribute to Orior's standards by forbidding any stacking on stone/upholstery (`stackable="no"`), adding +2" breathable pad/crate clearance, requiring upright 2-person handling, and including cotton covers & stone corner guards in the `shop.dev` kit.
+- **Why:** Keeps the full-room move simulation intact while warmly honoring The Malin and Orior's craftsmanship without implying their curated pieces would ever be moved out.
+- **By:** George.
+- **Replaces:** The `orior_curated_stays` UI default in `2026-11-21 13:58 · Integrate on-site Malin × Orior (Ireland) & Cinema Rental (Adorama / ARRI) domain rules`.
+- **See:** `backend/pack_api.py`, `frontend/ui/commerce.js`, `plan/PITCH_NOTES.md`, `frontend/pitch.html`

@@ -830,19 +830,19 @@
       });
     }
 
-    // 4. Inject real-world Venue & Production What-If toggles (Malin x Orior + PVO / ARRI Cinema Rig)
-    let oriorStays = false;
+    // 4. Inject real-world Orior White-Glove Tribute & Production What-If toggles
+    let oriorWhiteGlove = true;
     let addCinemaRig = false;
     let policyBanner = null;
     const whatIfToggles = document.querySelector("#whatif-panel .whatif-toggles");
-    if (whatIfToggles && !document.getElementById("tog-orior-stays")) {
+    if (whatIfToggles && !document.getElementById("tog-orior-wg")) {
       const oriorBtn = document.createElement("button");
       oriorBtn.type = "button";
-      oriorBtn.id = "tog-orior-stays";
+      oriorBtn.id = "tog-orior-wg";
       oriorBtn.className = "chip-toggle";
-      oriorBtn.setAttribute("aria-pressed", "false");
-      oriorBtn.title = "The Malin (parent: Orior, Ireland) curates bespoke stone & upholstery per club and never moves furniture between locations.";
-      oriorBtn.textContent = "🇮🇪 Malin Rule: Orior Stays";
+      oriorBtn.setAttribute("aria-pressed", "true");
+      oriorBtn.title = "Proof-of-concept tribute to Orior (Newry, Ireland) & The Malin: packs every bespoke stone & upholstery piece with zero top-stacking, +2\" pad clearance, upright team lifts & breathable cotton covers.";
+      oriorBtn.textContent = "✨ Orior White-Glove Care";
 
       const cinemaBtn = document.createElement("button");
       cinemaBtn.type = "button";
@@ -858,7 +858,7 @@
       policyBanner = document.createElement("div");
       policyBanner.id = "venue-policy-note";
       policyBanner.className = "small hidden";
-      policyBanner.style.cssText = "margin-top:8px;padding:7px 10px;border-radius:9px;background:var(--accent-soft);color:var(--ink);line-height:1.35;";
+      policyBanner.style.cssText = "margin-top:8px;padding:7px 10px;border-radius:9px;background:var(--accent-soft);color:var(--ink);line-height:1.38;";
       whatIfToggles.insertAdjacentElement("afterend", policyBanner);
 
       const triggerResolve = () => {
@@ -866,8 +866,8 @@
         if (btn) btn.click();
       };
       oriorBtn.addEventListener("click", () => {
-        oriorStays = !oriorStays;
-        oriorBtn.setAttribute("aria-pressed", String(oriorStays));
+        oriorWhiteGlove = !oriorWhiteGlove;
+        oriorBtn.setAttribute("aria-pressed", String(oriorWhiteGlove));
         triggerResolve();
       });
       cinemaBtn.addEventListener("click", () => {
@@ -905,7 +905,7 @@
         try {
           const parsed = JSON.parse(args[1].body);
           parsed.strategy = parsed.strategy || {};
-          if (oriorStays) parsed.strategy.orior_curated_stays = true;
+          if (oriorWhiteGlove) parsed.strategy.orior_white_glove = true;
           parsed.extra_items = [...(parsed.extra_items || []), ...(addCinemaRig ? CINEMA_EXTRA_ITEMS : [])];
           effectiveExtras = parsed.extra_items;
           args = [args[0], { ...args[1], body: JSON.stringify(parsed) }];
@@ -917,8 +917,8 @@
           res.clone().json().then((planJson) => {
             if (policyBanner) {
               const notes = [];
-              if (planJson.venue_policy?.kept_in_venue_units) {
-                notes.push(`<b>🇮🇪 Malin × Orior Rule:</b> ${planJson.venue_policy.kept_in_venue_units} bespoke Irish stone/upholstery pieces (${planJson.venue_policy.kept_in_venue_cuft} cu ft) stay in-situ at The Malin.`);
+              if (planJson.venue_policy?.white_glove_units) {
+                notes.push(`<b>✨ Orior White-Glove Care (${planJson.venue_policy.white_glove_units} pieces):</b> Zero top-stacking, +2" pad clearance, upright team-lifts &amp; breathable cotton covers. <i>(Proof-of-concept simulation — in real life The Malin's bespoke Irish Orior furniture stays curated per club.)</i>`);
               }
               if (addCinemaRig) {
                 notes.push(`<b>🎬 PVO / ARRI Cinema Rig:</b> 2× Pelican 1650 floor cases, 2× unstacked 1510 lens cases &amp; 1× locked C-stand cart routed to Penn Tech Hub w/ outward QR labels.`);

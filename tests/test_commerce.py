@@ -269,11 +269,13 @@ def test_malin_orior_venue_policy_and_cinema_production_rig() -> None:
     assert full_resp.status_code == 200
     full_items = full_resp.json()["summary"]["total_items"]
 
-    orior_resp = http.post(
+    # 1. Full venue solve with Orior White-Glove Care (`orior_white_glove=True`) keeps EVERY piece in the move
+    #    while upgrading bespoke stone/upholstery to `stackable="no"` + +2" pad clearance + cinema rig
+    wg_resp = http.post(
         "/solve",
         json={
             "run_id": "sample_venue",
-            "strategy": {"orior_curated_stays": True},
+            "strategy": {"orior_white_glove": True},
             "extra_items": [
                 {"id": "judge_p1650", "catalog_id": "pelican_1650", "quantity": 2},
                 {"id": "judge_p1510", "catalog_id": "pelican_1510", "quantity": 2},
@@ -281,14 +283,23 @@ def test_malin_orior_venue_policy_and_cinema_production_rig() -> None:
             ],
         },
     )
-    assert orior_resp.status_code == 200
-    orior_plan = orior_resp.json()
-    assert orior_plan["venue_policy"]["kept_in_venue_units"] > 10
-    assert orior_plan["summary"]["total_items"] < full_items
-    assert orior_plan["score"]["valid"] is True
+    assert wg_resp.status_code == 200
+    wg_plan = wg_resp.json()
+    assert wg_plan["venue_policy"]["policy"] == "orior_white_glove"
+    assert wg_plan["venue_policy"]["white_glove_units"] > 10
+    assert wg_plan["summary"]["total_items"] == full_items + 5
+    assert wg_plan["score"]["valid"] is True
 
-    # 2. Verify commerce BOM includes ARRI/Adorama E-Track kit for the cinema rig
+    # Verify bespoke sofas in white-glove mode have stackable == 'no' (nothing stacked on Orior upholstery!)
+    sofas = [
+        it for t in wg_plan["trucks"] for it in t["items"]
+        if it.get("catalog_id") == "sofa_3seat"
+    ]
+    assert sofas and all(s["stackable"] == "no" for s in sofas)
+
+    # 2. Verify commerce BOM includes BOTH Orior stone/mohair covers AND ARRI/Adorama E-Track kit
     sample = json.loads((ROOT / "data" / "sample_venue.json").read_text(encoding="utf-8"))
-    bom = commerce.compute_supply_needs(sample, orior_plan, tier="standard")
+    bom = commerce.compute_supply_needs(sample, wg_plan, tier="standard")
     need_ids = {n["need_id"] for n in bom["needs"]}
+    assert "supply_orior_covers" in need_ids
     assert "supply_cinema_etrack" in need_ids
