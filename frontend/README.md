@@ -4,6 +4,8 @@ The phone pages for Track A: film or pick photos and clips, watch them being pro
 
 **Edits here are live.** `backend/app.py` serves this folder at `/app` straight from the working tree, so a saved file is on the demo address at once. Try changes with `?mock=1` first.
 
+**Caching.** The server sends `Cache-Control: no-cache` with every file here, so Cloudflare and phones check for a newer copy on each load. Before that header existed, Cloudflare kept `.js` and `.css` for hours and a new page loaded old scripts (FAILURES.md, 12:40). The `?v=2` on the script and stylesheet addresses in the two pages was a one-off to get past those old copies; it doesn't need changing when a file changes. After a deploy, check file contents through the public address, not just that they answer.
+
 ## Files
 
 | File | What it does |

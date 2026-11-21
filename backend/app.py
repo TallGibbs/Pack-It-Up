@@ -30,6 +30,21 @@ def root():
     return RedirectResponse("/app/capture.html")
 
 
+class LiveStatic(StaticFiles):
+    """frontend/ served so that a saved edit is what every phone gets next.
+
+    With no Cache-Control header, Cloudflare keeps .js and .css at its edge for hours (it never
+    caches .html), and phones keep them too. A new page then loads old scripts and breaks
+    (FAILURES.md 12:40). "no-cache" means: keep a copy if you like, but check it with the server
+    every time; unchanged files cost one small 304 reply.
+    """
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 # Phone pages (frontend/capture.html, review.html, index.html) on the same port as the API,
 # so one tunnel address serves both: open /app/capture.html. Mounted last so the API routes win.
-app.mount("/app", StaticFiles(directory=Path(__file__).resolve().parent.parent / "frontend", html=True), name="app")
+app.mount("/app", LiveStatic(directory=Path(__file__).resolve().parent.parent / "frontend", html=True), name="app")
