@@ -75,13 +75,17 @@ def audio_clip(path: Path, start_s: float, end_s: float) -> bytes:
 
 def frame_at(path: Path, t: float, max_side: int = 1280) -> Image.Image:
     """One frame of a video at time t (seconds), as a PIL image."""
-    cmd = [FFMPEG, "-v", "error", "-ss", f"{max(t, 0):.3f}", "-i", str(path), "-frames:v", "1",
-           "-vf", f"scale='min({max_side},iw)':-2", "-f", "image2pipe", "-vcodec", "mjpeg", "-q:v", "3", "-"]
-    out = subprocess.run(cmd, capture_output=True, check=True).stdout
-    if not out:  # t past the end: take the last frame
-        cmd[cmd.index("-ss") + 1] = "0"
-        cmd[3:3] = ["-sseof", "-0.5"]
-        out = subprocess.run(cmd, capture_output=True, check=True).stdout
+    def grab(seek: list[str], check: bool) -> bytes:
+        cmd = [FFMPEG, "-v", "error", *seek, "-i", str(path), "-frames:v", "1",
+               "-vf", f"scale='min({max_side},iw)':-2", "-f", "image2pipe", "-vcodec", "mjpeg", "-q:v", "3", "-"]
+        done = subprocess.run(cmd, capture_output=True, check=check)
+        return done.stdout if done.returncode == 0 else b""
+
+    # A time past the end gives no frame, and this ffmpeg build also exits with an error for it
+    # (FAILURES.md 15:15), so the first try must not raise: take a frame from the last half second.
+    out = grab(["-ss", f"{max(t, 0):.3f}"], check=False)
+    if not out:
+        out = grab(["-sseof", "-0.5"], check=True)
     return Image.open(io.BytesIO(out)).convert("RGB")
 
 
