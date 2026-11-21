@@ -111,18 +111,34 @@ def media_for(rd: Path, entry: dict) -> Media:
     return Media(rd / entry["path"], entry["kind"], entry["mime"], entry["sha256"])
 
 
-def perceive_file(run_id: str, entry: dict, job_name: str = "perceive") -> dict:
+def _still_in_run(rd: Path, name: str) -> bool:
+    manifest = read_json(rd / "manifest.json") or {}
+    return any(f["name"] == name for f in manifest.get("files", []))
+
+
+def perceive_file(run_id: str, entry: dict, job_name: str = "perceive") -> dict | None:
     rd = run_dir(run_id)
     name = entry["name"]
+    if not _still_in_run(rd, name):
+        return None
     update_status(rd, files={name: {"perceive": "running"}})
     t0 = time.time()
     job = for_job(job_name, run_dir=rd)
     try:
         out = job.generate_json(build_prompt(entry), media=[media_for(rd, entry)], schema=PERCEPTION_SCHEMA,
                                 prompt_version=PROMPT_VERSION, label=name)
+    except (FileNotFoundError, OSError) as e:
+        if not _still_in_run(rd, name):
+            return None
+        update_status(rd, files={name: {"perceive": "failed", "error": str(e)[:300]}}, error=f"perceive {name}: {e}")
+        raise LLMError(str(e)) from e
     except LLMError as e:
+        if not _still_in_run(rd, name):
+            return None
         update_status(rd, files={name: {"perceive": "failed", "error": str(e)[:300]}}, error=f"perceive {name}: {e}")
         raise
+    if not _still_in_run(rd, name):
+        return None
     known = catalog.load()
     for it in out["items"]:
         it["label"] = clean_label(it["label"])
@@ -182,10 +198,13 @@ def perceive_all(run_id: str, room_id: str | None = None, job_name: str = "perce
             futs = {pool.submit(perceive_file, run_id, e, job_name): e for e in entries}
             for fut in as_completed(futs):
                 try:
-                    results.append(fut.result())
+                    res = fut.result()
                 except LLMError:
                     failed.append(futs[fut]["name"])
                     continue
+                if res is None:
+                    continue
+                results.append(res)
                 if on_file_done:
                     try:
                         on_file_done(results[-1])

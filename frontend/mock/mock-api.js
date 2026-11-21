@@ -274,15 +274,17 @@
 
   window.PIU_MOCK = {
     DEMO_RUN,
-    async upload(files, room, runId, onProgress, who) {
+    async upload(files, room, runId, onProgress, who, signal) {
       await getFixture();
       const total = files.reduce((a, f) => a + (f.size || 0), 0);
       const ms = Math.min(4000, 600 + total / 4e4); // pretend: about 40 MB/s, capped at 4 s
       const t0 = Date.now();
       while (Date.now() - t0 < ms) {
+        if (signal && signal.aborted) throw Object.assign(new Error("Upload cancelled."), { aborted: true });
         onProgress && onProgress((Date.now() - t0) / ms);
         await sleep(100);
       }
+      if (signal && signal.aborted) throw Object.assign(new Error("Upload cancelled."), { aborted: true });
       onProgress && onProgress(1);
       const state = load();
       const id = runId || "mock-" + Date.now().toString(36);
@@ -298,6 +300,20 @@
       return { run_id: id, room_id: rid, files: files.map((f) => f.name), skipped: [] };
     },
     getRun: (runId) => withRun(runId, (run) => build(run, Date.now())),
+    async deleteFile(runId, fileName) {
+      await sleep(120);
+      return withRun(runId, (run) => {
+        let found = false;
+        run.rooms.forEach((r) => {
+          const before = r.files.length;
+          r.files = r.files.filter((f) => f.name !== fileName);
+          if (r.files.length < before) found = true;
+        });
+        if (!found) { const e = new Error(`no file '${fileName}' in run ${runId}`); e.status = 404; throw e; }
+        run.rooms = run.rooms.filter((r) => r.files.length > 0 || (run.added || []).some((a) => a.room === r.id));
+        return build(run, Date.now());
+      });
+    },
     async answer(runId, questionId, answer) {
       await sleep(350);
       return withRun(runId, (run) => {

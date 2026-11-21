@@ -40,6 +40,11 @@ def end_pipeline(run_id: str) -> bool:
         return _active[run_id] == 0
 
 
+def is_pipeline_active(run_id: str) -> bool:
+    with _active_guard:
+        return _active[run_id] > 0
+
+
 def rebuild(run_id: str, questions: bool = False) -> dict:
     """Merge -> re-apply answers -> (questions) -> resolve. No perceive calls."""
     from . import gaps  # late import: gaps imports resolve
