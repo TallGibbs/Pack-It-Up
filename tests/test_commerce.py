@@ -250,3 +250,45 @@ def test_shopping_agent_and_fastapi_routes(monkeypatch) -> None:
     body = resp.json()
     assert body["run_id"] == "mock-demo"
     assert body["kit"]["totals"]["line_count"] >= 3
+
+
+def test_malin_orior_venue_policy_and_cinema_production_rig() -> None:
+    from backend import catalog
+
+    catalog.load.cache_clear()
+    catalog.load_penn_zones.cache_clear()
+
+    # Verify new Orior & ARRI/Adorama production catalog entries
+    assert catalog.lookup("pelican_1650") is not None
+    assert catalog.lookup("pelican_1510")["stackable"] == "no"
+    assert catalog.lookup("orior_travertine_table")["fragile"] is True
+
+    http = TestClient(app)
+    # 1. Full venue solve vs Malin x Orior rule (`orior_curated_stays=True`)
+    full_resp = http.post("/solve", json={"run_id": "sample_venue"})
+    assert full_resp.status_code == 200
+    full_items = full_resp.json()["summary"]["total_items"]
+
+    orior_resp = http.post(
+        "/solve",
+        json={
+            "run_id": "sample_venue",
+            "strategy": {"orior_curated_stays": True},
+            "extra_items": [
+                {"id": "judge_p1650", "catalog_id": "pelican_1650", "quantity": 2},
+                {"id": "judge_p1510", "catalog_id": "pelican_1510", "quantity": 2},
+                {"id": "judge_cstand", "catalog_id": "c_stand_cart", "quantity": 1},
+            ],
+        },
+    )
+    assert orior_resp.status_code == 200
+    orior_plan = orior_resp.json()
+    assert orior_plan["venue_policy"]["kept_in_venue_units"] > 10
+    assert orior_plan["summary"]["total_items"] < full_items
+    assert orior_plan["score"]["valid"] is True
+
+    # 2. Verify commerce BOM includes ARRI/Adorama E-Track kit for the cinema rig
+    sample = json.loads((ROOT / "data" / "sample_venue.json").read_text(encoding="utf-8"))
+    bom = commerce.compute_supply_needs(sample, orior_plan, tier="standard")
+    need_ids = {n["need_id"] for n in bom["needs"]}
+    assert "supply_cinema_etrack" in need_ids

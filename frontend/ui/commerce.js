@@ -659,8 +659,9 @@
             </div>
             <div class="shop-chips">
               <button type="button" class="shop-chip" data-prompt="Upgrade to heavy-duty double-wall boxes and pro pads">📦 Heavy-duty double-wall</button>
+              <button type="button" class="shop-chip" data-prompt="Add breathable cotton covers and stone corner guards for Orior bespoke furniture">🇮🇪 Orior stone &amp; mohair kit</button>
+              <button type="button" class="shop-chip" data-prompt="Add E-track ratchet straps and Pelican pick-and-pluck case foam for cinema camera gear">🎬 ARRI/Adorama camera kit</button>
               <button type="button" class="shop-chip" data-prompt="Swap plastic bubble wrap for eco-friendly honeycomb kraft paper">🌿 Eco kraft paper</button>
-              <button type="button" class="shop-chip" data-prompt="Add a heavy-duty folding hand truck dolly for moving">🛞 + Hand truck dolly</button>
               <button type="button" class="shop-chip" data-prompt="Ask the store what their return policy is on unused moving boxes">💬 Ask store return policy</button>
             </div>
             <form class="shop-chat-row" id="shop-agent-form">
@@ -829,7 +830,60 @@
       });
     }
 
-    // 4. Mount widget & sync automatically whenever /solve completes (including judge What-If re-solves!)
+    // 4. Inject real-world Venue & Production What-If toggles (Malin x Orior + PVO / ARRI Cinema Rig)
+    let oriorStays = false;
+    let addCinemaRig = false;
+    let policyBanner = null;
+    const whatIfToggles = document.querySelector("#whatif-panel .whatif-toggles");
+    if (whatIfToggles && !document.getElementById("tog-orior-stays")) {
+      const oriorBtn = document.createElement("button");
+      oriorBtn.type = "button";
+      oriorBtn.id = "tog-orior-stays";
+      oriorBtn.className = "chip-toggle";
+      oriorBtn.setAttribute("aria-pressed", "false");
+      oriorBtn.title = "The Malin (parent: Orior, Ireland) curates bespoke stone & upholstery per club and never moves furniture between locations.";
+      oriorBtn.textContent = "🇮🇪 Malin Rule: Orior Stays";
+
+      const cinemaBtn = document.createElement("button");
+      cinemaBtn.type = "button";
+      cinemaBtn.id = "tog-cinema-rig";
+      cinemaBtn.className = "chip-toggle";
+      cinemaBtn.setAttribute("aria-pressed", "false");
+      cinemaBtn.title = "PVO Media / Adorama & ARRI Rental camera-truck loadout: Pelican 1650 floor bases, unstacked 1510 lens cases & upright C-stand cart.";
+      cinemaBtn.textContent = "🎬 + PVO / ARRI Cinema Rig";
+
+      whatIfToggles.appendChild(oriorBtn);
+      whatIfToggles.appendChild(cinemaBtn);
+
+      policyBanner = document.createElement("div");
+      policyBanner.id = "venue-policy-note";
+      policyBanner.className = "small hidden";
+      policyBanner.style.cssText = "margin-top:8px;padding:7px 10px;border-radius:9px;background:var(--accent-soft);color:var(--ink);line-height:1.35;";
+      whatIfToggles.insertAdjacentElement("afterend", policyBanner);
+
+      const triggerResolve = () => {
+        const btn = document.getElementById("btn-resolve");
+        if (btn) btn.click();
+      };
+      oriorBtn.addEventListener("click", () => {
+        oriorStays = !oriorStays;
+        oriorBtn.setAttribute("aria-pressed", String(oriorStays));
+        triggerResolve();
+      });
+      cinemaBtn.addEventListener("click", () => {
+        addCinemaRig = !addCinemaRig;
+        cinemaBtn.setAttribute("aria-pressed", String(addCinemaRig));
+        triggerResolve();
+      });
+    }
+
+    const CINEMA_EXTRA_ITEMS = [
+      { id: "judge_pelican_1650", label: "Pelican 1650 ARRI Build Case (floor tier)", catalog_id: "pelican_1650", quantity: 2, dims_in: [32, 21, 13], weight_lb: 62, fragile: true, must_stay_upright: true, two_person: true, stackable: "light_only" },
+      { id: "judge_pelican_1510", label: "Pelican 1510 Master Prime Lens Case", catalog_id: "pelican_1510", quantity: 2, dims_in: [22, 14, 9], weight_lb: 26, fragile: true, must_stay_upright: true, two_person: false, stackable: "no" },
+      { id: "judge_cstand_cart", label: "PVO / Adorama C-Stand & Grip Cart (locked)", catalog_id: "c_stand_cart", quantity: 1, dims_in: [48, 26, 68], weight_lb: 135, fragile: false, must_stay_upright: true, two_person: true, stackable: "no" },
+    ];
+
+    // 5. Mount widget & sync automatically whenever /solve completes (including judge What-If re-solves!)
     const widget = mountCommerceWidget(shopPane, {
       runId: rawRunId,
       autoFetch: piu.MOCK,
@@ -845,19 +899,37 @@
 
     const origFetch = window.fetch.bind(window);
     window.fetch = async function (...args) {
+      let url = String(typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || "");
+      let effectiveExtras = [];
+      if (/\/solve(\b|\/|\?)/.test(url) && args[1] && typeof args[1].body === "string") {
+        try {
+          const parsed = JSON.parse(args[1].body);
+          parsed.strategy = parsed.strategy || {};
+          if (oriorStays) parsed.strategy.orior_curated_stays = true;
+          parsed.extra_items = [...(parsed.extra_items || []), ...(addCinemaRig ? CINEMA_EXTRA_ITEMS : [])];
+          effectiveExtras = parsed.extra_items;
+          args = [args[0], { ...args[1], body: JSON.stringify(parsed) }];
+        } catch (e) { /* ignore */ }
+      }
       const res = await origFetch(...args);
       try {
-        const url = String(typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || "");
         if (res.ok && /\/solve(\b|\/|\?)/.test(url)) {
-          let reqBody = {};
-          if (args[1] && typeof args[1].body === "string") {
-            try { reqBody = JSON.parse(args[1].body); } catch (e) { /* ignore */ }
-          }
           res.clone().json().then((planJson) => {
+            if (policyBanner) {
+              const notes = [];
+              if (planJson.venue_policy?.kept_in_venue_units) {
+                notes.push(`<b>🇮🇪 Malin × Orior Rule:</b> ${planJson.venue_policy.kept_in_venue_units} bespoke Irish stone/upholstery pieces (${planJson.venue_policy.kept_in_venue_cuft} cu ft) stay in-situ at The Malin.`);
+              }
+              if (addCinemaRig) {
+                notes.push(`<b>🎬 PVO / ARRI Cinema Rig:</b> 2× Pelican 1650 floor cases, 2× unstacked 1510 lens cases &amp; 1× locked C-stand cart routed to Penn Tech Hub w/ outward QR labels.`);
+              }
+              policyBanner.innerHTML = notes.join("<br>");
+              policyBanner.classList.toggle("hidden", notes.length === 0);
+            }
             widget.refreshFromPlan({
               runId: planJson.run_id || rawRunId,
               plan: planJson,
-              extraItems: reqBody.extra_items || [],
+              extraItems: effectiveExtras,
             });
           }).catch(() => {});
         }

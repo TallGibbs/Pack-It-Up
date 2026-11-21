@@ -182,6 +182,24 @@ PROTECTION_SPECS: dict[str, dict[str, Any]] = {
         "unit_word": "set",
         "default_unit_est_cents": 1999,
     },
+    "supply_orior_covers": {
+        "title": "Breathable Canvas Furniture Covers & Foam Stone Corner Guards",
+        "short_title": "Orior Stone & Mohair Kit",
+        "category": "white_glove",
+        "query_standard": "cotton canvas drop cloth furniture dust cover moving",
+        "query_pro": "foam edge corner protectors stone glass moving",
+        "unit_word": "kit",
+        "default_unit_est_cents": 1699,
+    },
+    "supply_cinema_etrack": {
+        "title": "E-Track Ratchet Tie-Down Straps & Pick-and-Pluck Case Foam",
+        "short_title": "Camera Truck E-Track Kit",
+        "category": "cinema_rig",
+        "query_standard": "e-track ratchet straps cargo tie down van",
+        "query_pro": "pick and pluck foam insert camera case pelican",
+        "unit_word": "set",
+        "default_unit_est_cents": 2299,
+    },
 }
 
 # Verified snapshot fallback ONLY used when venue Wi-Fi has no internet access (`offline_fallback`).
@@ -738,11 +756,14 @@ def compute_supply_needs(
     fragile_items: list[str] = []
     two_person_items: list[str] = []
     disassemble_items: list[str] = []
+    orior_bespoke_items: list[str] = []
+    cinema_rig_items: list[str] = []
     mattress_count = 0
 
     for p in pieces:
         cid = str(p.get("catalog_id") or "")
         label = str(p.get("label") or "item")
+        low_lbl = label.lower()
         rname = str(p.get("room_name") or "Room")
         if p.get("is_box") or cid.startswith("box_"):
             bkey = cid if cid in BOX_SUPPLY_SPECS else "box_medium"
@@ -758,6 +779,10 @@ def compute_supply_needs(
                 disassemble_items.append(label)
             if cid.startswith("mattress_") or cid.startswith("box_spring_"):
                 mattress_count += 1
+            if cid.startswith("orior_") or any(w in low_lbl for w in ("travertine", "marble", "stone", "boucle", "bouclé", "mohair", "velvet", "orior")):
+                orior_bespoke_items.append(label)
+            if cid in ("pelican_1650", "pelican_1510", "c_stand_cart", "magliner_camera_cart", "projector", "projector_screen") or any(w in low_lbl for w in ("pelican", "camera", "cinema", "c-stand", "arri", "adorama", "lens")):
+                cinema_rig_items.append(label)
 
     # Guarantee starter hardware/cable moving boxes if a room has movable furniture/AV gear
     # but closed/unfilmed cabinets initially resolved to 0 container boxes.
@@ -896,6 +921,38 @@ def compute_supply_needs(
             "query": sp_spec["query_pro"] if tier == "pro_heavy_duty" else sp_spec["query_standard"],
             "default_unit_est_cents": sp_spec["default_unit_est_cents"],
             "reason": f"{len(two_person_items)} two-person lift(s) (>50 lb): {heavy_sample}",
+        })
+
+    if tier != "essential" and "supply_orior_covers" not in excluded and len(orior_bespoke_items) > 0:
+        oc_qty = overrides.get("supply_orior_covers", max(1, math.ceil(len(orior_bespoke_items) / 6)))
+        oc_spec = PROTECTION_SPECS["supply_orior_covers"]
+        orior_sample = ", ".join(dict.fromkeys(orior_bespoke_items))[:65]
+        needs.append({
+            "need_id": "supply_orior_covers",
+            "title": oc_spec["title"],
+            "short_title": oc_spec["short_title"],
+            "category": oc_spec["category"],
+            "qty_needed": oc_qty,
+            "raw_plan_qty": oc_qty,
+            "query": oc_spec["query_pro"] if tier == "pro_heavy_duty" else oc_spec["query_standard"],
+            "default_unit_est_cents": oc_spec["default_unit_est_cents"],
+            "reason": f"Orior white-glove protection ({len(orior_bespoke_items)} stone/velvet/bouclé pieces): {orior_sample}",
+        })
+
+    if "supply_cinema_etrack" not in excluded and len(cinema_rig_items) > 0:
+        ce_qty = overrides.get("supply_cinema_etrack", max(1, math.ceil(len(cinema_rig_items) / 4)))
+        ce_spec = PROTECTION_SPECS["supply_cinema_etrack"]
+        cin_sample = ", ".join(dict.fromkeys(cinema_rig_items))[:65]
+        needs.append({
+            "need_id": "supply_cinema_etrack",
+            "title": ce_spec["title"],
+            "short_title": ce_spec["short_title"],
+            "category": ce_spec["category"],
+            "qty_needed": ce_qty,
+            "raw_plan_qty": ce_qty,
+            "query": ce_spec["query_pro"] if tier == "pro_heavy_duty" else ce_spec["query_standard"],
+            "default_unit_est_cents": ce_spec["default_unit_est_cents"],
+            "reason": f"ARRI / Adorama camera-truck rule ({len(cinema_rig_items)} rig/AV items): {cin_sample}",
         })
 
     for idx, extra in enumerate(custom_additions or [], start=1):

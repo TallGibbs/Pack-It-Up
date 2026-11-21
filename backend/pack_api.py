@@ -325,6 +325,52 @@ def _inject_extra_items(inv: dict[str, Any], extra_items: list[dict[str, Any]]) 
     return cloned
 
 
+_ORIOR_CURATED_CIDS = {
+    "sofa_3seat", "sofa_loveseat", "sofa_sectional_piece", "armchair", "recliner",
+    "coffee_table", "end_table", "sideboard", "console_table", "counter_table",
+    "ottoman", "bookshelf_tall", "bookshelf_short", "area_rug_rolled",
+    "table_lamp", "floor_lamp", "framed_art", "mirror_floor",
+    "orior_travertine_table", "orior_boucle_chair",
+}
+_ORIOR_KEYWORDS = ("orior", "travertine", "marble", "stone", "boucle", "bouclé", "mohair", "velvet", "credenza", "sideboard")
+
+
+def _apply_orior_venue_policy(inv: dict[str, Any], strategy: dict[str, Any]) -> dict[str, Any] | None:
+    """Malin × Orior rule: bespoke Irish-crafted lounge & stone furniture never moves between Malin clubs."""
+    if not strategy.get("orior_curated_stays"):
+        return None
+    cloned_counts = 0
+    kept_cuft = 0.0
+    kept_labels: list[str] = []
+    for rb in inv.get("rooms", []):
+        for it in rb.get("items", []):
+            disp = str(it.get("disposition") or "undecided").lower()
+            if disp not in ("keep", "undecided"):
+                continue
+            cid = str(it.get("catalog_id") or "").lower()
+            lbl = str(it.get("label") or "").lower()
+            mat = str((it.get("size") or {}).get("material") or "").lower()
+            is_orior = (
+                cid in _ORIOR_CURATED_CIDS
+                or mat in ("stone", "upholstered")
+                or any(k in lbl for k in _ORIOR_KEYWORDS)
+            )
+            if is_orior and not str(it.get("id") or "").startswith("judge_"):
+                qty = max(1, int(it.get("quantity") or 1))
+                vol = float((it.get("size") or {}).get("volume_cuft_total") or 0.0)
+                it["disposition"] = "stays"
+                cloned_counts += qty
+                kept_cuft += vol
+                kept_labels.append(str(it.get("label") or cid))
+    return {
+        "policy": "malin_orior_curated_stays",
+        "kept_in_venue_units": cloned_counts,
+        "kept_in_venue_cuft": round(kept_cuft, 1),
+        "sample_items": list(dict.fromkeys(kept_labels))[:5],
+        "note": "The Malin (parent: Orior, Newry, Ireland) curates bespoke stone & upholstery per club and never moves furniture between locations—packing event & production gear only.",
+    }
+
+
 @router.get("/trucks")
 def get_trucks_and_zones() -> dict[str, Any]:
     return {
@@ -378,10 +424,14 @@ def post_solve(body: dict[str, Any] | None = None) -> dict[str, Any]:
         rid, inv = _load_inventory_for_run(payload.get("run_id"))
 
     inv_to_solve = _inject_extra_items(inv, extra_items)
+    venue_policy = _apply_orior_venue_policy(inv_to_solve, strategy)
     try:
         plan = solver.solve(inv_to_solve, strategy=strategy)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+    if venue_policy:
+        plan["venue_policy"] = venue_policy
 
     plan["run_id"] = rid
     plan["rooms"] = [

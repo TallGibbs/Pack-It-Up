@@ -33,10 +33,12 @@ Open on phone: `/app/pitch.html` (`?who=george` or `?who=chris`).
 - **Smallest U-Haul that fits (`26 → 20 → 15 → 10 ft`):** Snug so nothing slides like Chris's move, nimble enough for Manhattan blocks like mine.
 - **Care checks (`0 violations`):** `>=75%` base support, balanced left-to-right weight, nothing heavy crushing fragile pieces.
 - **Antigravity Managed Agents + Neon:** Test packing strategies in parallel sandboxes until everything fits safely.
-- **At Penn Station:** Our room's chairs, tables & shelves stock **6 real corners** (café, bookshop, lounge, concourse) in exact back-to-front unload order + **offline QR box scan** + warm arrival preview.
+- **At Penn Station:** Our room's chairs, tables & shelves stock **6 real corners** (café, bookshop, lounge, concourse) in exact back-to-front unload order + **offline QR box scan** + **live Shopify `shop.dev` (`mcp.shop.com`) Move Supply Kit** that buys the exact boxes, pads & straps you need.
 
-### 3. Invite a Judge In + Warm Close (`1:55 – 2:25` & `2:45 – 3:00`)
-- **At `1:55` (Bring a judge into the move):** Gesture to the room — *"Pick something right here: leave a table behind, bring an upright piano, or try a 10-ft van?"* → 1-tap re-solve → **Move Plan Judge (`Decision 1 → Neon`)** checks if it holds up.
+### 3. Invite the Room In + Warm Close (`1:55 – 2:25` & `2:45 – 3:00`)
+- **At `1:55` (Real stories from this building today + Judge What-If):**
+  - **The Malin × Orior (Ireland) insight:** *"We talked to the team running The Malin today — their parent company is **Orior**, the 47-year-old bespoke Irish furniture house in Newry. Every stone table and bouclé chair here is custom-curated and **never** moves between locations."* → Tap **`🇮🇪 Malin Rule: Orior Stays`** to pack *only* event gear (or leave off for white-glove breathable covers & stone corner guards in the `shop.dev` cart!).
+  - **Cinema crew insight (Adorama / ARRI Rental):** *"We also spoke with the 2-person film crew shooting this room today — they pointed straight to **Adorama Rental** and **ARRI Rental**, where crews pack \$250k of Pelican 1650/1510 lens cases and C-stand carts into trucks every shoot."* → Tap **`🎬 + PVO / ARRI Cinema Rig`** or let a judge add a piano / 10-ft van!
 - **At `2:45` (Warm Antigravity close):**
   - *"I actually downloaded **Google Antigravity** this morning just to build this here in this room with all of you."*
   - **Hydrogen** listens as you walk · **Antigravity Agents + Neon** pack with care · **Decision 1** double-checks the load — getting everything in this space safely to the next one.
@@ -49,6 +51,7 @@ Open on phone: `/app/pitch.html` (`?who=george` or `?who=chris`).
 - **What was built today vs brought in?** Every line of code written after 10:30 AM (in git); starter item sizes & Penn Station reference photos openly listed under *Brought in* in `README.md`.
 - **Why multiple models?** Hydrogen watches & hears fast; Decision 1 answers yes/no & rubrics in ~200 ms (0 output tokens); Neon + Antigravity Agents reason through 3D packing fixes.
 - **Is the arrival image the plan?** No — the 3D coordinates & physics verifier are the real plan; Nano Banana is clearly badged as an illustrative preview.
+- **Who uses this every week (beyond home moves)?** **1)** Production crews checking out cinema packages from **Adorama Rental Co.** & **ARRI Rental** (Pelican 1650 floor cases, unstacked 1510 lens cases, outward QR barcodes). **2)** White-glove design houses like **Orior** (Newry, Ireland — parent company of **The Malin**) shipping bespoke travertine marble & mohair installs into new clubs, plus live supply procurement via **Shopify `shop.dev` (`mcp.shop.com`)**.
 
 ---
 

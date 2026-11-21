@@ -77,3 +77,9 @@ espresso_machine,Commercial espresso machine,cafe,28,22,20,no,yes,no,yes,yes
 pastry_display,Glass pastry display case,cafe,36,20,24,no,yes,no,yes,yes
 merch_rack,Retail garment / merch rack,retail,48,22,64,no,yes,no,no,no
 pos_kiosk,POS register stand,retail,22,18,44,no,yes,no,yes,no
+pelican_1650,Pelican 1650 camera build case (floor base),production,32,21,13,light_only,yes,no,yes,yes
+pelican_1510,Pelican 1510 cinema lens case (carry-on),production,22,14,9,no,yes,no,yes,no
+c_stand_cart,C-stand & grip cart (nested / wheels locked),production,48,26,68,no,yes,no,no,yes
+magliner_camera_cart,Magliner camera cart (E-track locked),production,52,26,42,no,yes,no,yes,yes
+orior_travertine_table,Orior bespoke travertine table (crated stone),living,84,40,30,no,yes,no,yes,yes
+orior_boucle_chair,Orior bespoke mohair / boucle lounge chair,living,36,34,30,no,yes,no,yes,yes
