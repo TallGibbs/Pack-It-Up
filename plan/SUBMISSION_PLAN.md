@@ -6,12 +6,13 @@ Draft written at 14:05 on Nov 21 for Chris and George to agree. Nothing here is 
 
 | Built and live on `main` | Not built |
 |---|---|
-| Phone capture page: photos and clips per room, progress per file | Neon planning loop and competing agents (B6, B7) |
+| Phone capture page: photos and clips per room, progress per file | Competing agents (B7) |
 | Inventory from Gemini 4 Hydrogen, with sizes, weights and box estimates | Penn Station arrival render (B9) |
 | Gap questions answered by the Decisions API, and by the person on the phone | QR box labels print page (B10) |
 | Review page: quantity, Move / Stays / Sell / Toss, add an item | Baselines and `eval/RESULTS.md` |
 | 3D truck view from the Python solver, with the verifier's violation count and a what-if re-solve | |
 | Model-use page: which model did which call | |
+| "Plan with Neon" (since 14:14): Gemini 4 Neon reads the checker's result and changes the solver settings | |
 | `FAILURES.md` with 60 rows; one hand count (Malin, recall 67-75%) | |
 
 The video and the live demo show only the left column.
@@ -29,7 +30,7 @@ The video and the live demo show only the left column.
 
 **Description draft (about 90 words):**
 
-> Pack It Up turns a phone walk-through of your home into a move plan. Film each room; Gemini 4 Hydrogen reads the footage and lists every item with its size, weight and handling needs. The Gemini Decisions API settles what the footage leaves unclear (is this the same sofa, is that cabinet full) and asks you only what it can't answer. A 3D packing solver then loads the trucks and a verifier checks every placement, so you get the truck count, box count and load order. Judges can try it on their own phone: packitup.temperedanalytics.com
+> Pack It Up turns a phone walk-through of your home into a move plan. Film each room; Gemini 4 Hydrogen reads the footage and lists every item with its size, weight and handling needs. The Gemini Decisions API settles what the footage leaves unclear (is this the same sofa, is that cabinet full) and asks you only what it can't answer. A 3D packing solver then loads the trucks, a checker scores every placement, and Gemini 4 Neon reads that score and improves the plan, so you get the truck count, box count and load order. Judges can try it on their own phone: packitup.temperedanalytics.com
 
 Cut the last sentence if the laptop will be off when the form is read.
 
@@ -42,7 +43,7 @@ Screen recording of the phone and the laptop, with one voice. Everything on scre
 | 0:00-0:08 | Phone filming a corner of the venue | Self-movers guess their truck size. We count instead |
 | 0:08-0:22 | Capture page: files uploading, items appearing | Hydrogen reads each photo and clip into an inventory |
 | 0:22-0:32 | A gap question answered on the phone | The Decisions API answers what it can and asks about the rest |
-| 0:32-0:48 | Review edit, "Plan the truck load", trucks loading in 3D, 0 violations | A solver packs it and a verifier checks every placement |
+| 0:32-0:48 | Review edit, "Plan the truck load", "Plan with Neon", trucks loading in 3D, 0 violations | A solver packs it, a checker scores it, and Neon improves the plan |
 | 0:48-0:55 | Model-use page, then the results table | Which model did which job, and how accurate it was |
 | 0:55-1:00 | End card: repo address and the QR code | |
 
@@ -82,10 +83,10 @@ If the tunnel or wifi fails, open a move from earlier today on the laptop and sa
 ## Before we submit, in order of points at stake
 
 1. **Results table (proof, 25%).** `eval/RESULTS.md` does not exist. Smallest version: the Malin hand count, the Decisions API grading (4 of 4 applied answers right), the verifier result for every move in `runs/`, and the bedroom-count truck size as the baseline. A single-model-call packing plan through the verifier is the second baseline if there is time.
-2. **A model in Track B (model use, 20%).** Track B makes no model calls. B6 (Neon reads the verifier result and changes the strategy) is the smallest way to show a second Gemini 4 model. George.
+2. **A model in Track B (model use, 20%).** Done at 14:14: "Plan with Neon" is live (decisions.md 14:14). On move 133201 it goes from two 26 ft trucks (91.5) to one (95.2).
 3. **README.** Status still says Track B is being built. Add what the app does now, the results table, and whether `data/trucks.csv`, `penn_zones.csv` and `sample_venue.json` were brought in.
 4. **Tunnel restart** in `run_demo.ps1`.
-5. **Slides and QR image.** Drafted at 14:25, four slides: cover with the code, how it works, what we measured, try it yourself. Chris has them as a private Claude deck that downloads as PowerPoint or PDF. The baseline line on the "what we measured" slide is a placeholder until the results table exists.
+5. **Slides and QR image.** Eight slides since 14:55: cover with the code, how it works, four "in action" slides with screenshots of move 133201 (film, check the list, Neon plans the load, which model did what), what we measured, try it yourself. The code is bottom right on every slide between the cover and the close. The screenshots are in the deck only, not in git. Chris has them as a private Claude deck that downloads as PowerPoint or PDF. The baseline line on the "what we measured" slide is a placeholder until the results table exists.
 
 ## Timeline
 
