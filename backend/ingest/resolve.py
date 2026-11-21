@@ -111,6 +111,8 @@ def resolve_item(item: dict) -> dict:
         for dim, inches in item["speech_size"].items():
             dims[idx.get(dim, 0)] = inches
         dims, size_source, size_check = _orient(dims), "speech", None
+    if item.get("user_added") and size_source == "vision_estimate":
+        size_source, size_check = "user", None  # typed on the review screen, not estimated from footage
     dims = [round(d, 1) for d in dims]
     vol_each = round(dims[0] * dims[1] * dims[2] / 1728, 2)
     material = item.get("material") or "mixed"
@@ -165,6 +167,8 @@ def resolve_item(item: dict) -> dict:
     }
     if size_check:
         out["size_check"] = size_check
+    if item.get("user_added"):
+        out["source"] = "user_added"  # added on the review screen (gaps.add_item); evidence.kind is "user"
     return out
 
 

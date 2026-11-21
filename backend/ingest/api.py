@@ -5,6 +5,9 @@ GET  /runs/{run_id}                   rooms, stage status per file, then invento
 GET  /inventory/{run_id}              inventory.json
 POST /answer/{run_id}                 {question_id, answer} -> updated inventory
 PATCH /inventory/{run_id}/items/{id}  {quantity?, disposition?, catalog_id?} -> updated inventory
+POST /inventory/{run_id}/items        {room, catalog_id, quantity, label?} or {room, label, dims_in, quantity}
+                                      -> updated inventory, with the added item marked source "user_added"
+GET  /catalog                         items the "Add an item" list offers: {items: [{id, name, category, dims_in}]}
 GET  /media/{run_id}/{file_hash}/crop?box=ymin,xmin,ymax,xmax&t=4.0  -> JPEG crop
 GET  /media/{run_id}/{file_hash}/audio?start=2.5&end=3.8           -> MP3 of a quote
 """
@@ -18,6 +21,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
+from backend import catalog
 from backend.llm import media as mu
 
 from . import gaps
@@ -128,6 +132,28 @@ def patch_item(run_id: str, item_id: str, body: dict):
         except ValueError as e:
             raise HTTPException(400, str(e))
         return rebuild(run_id)
+
+
+@router.post("/inventory/{run_id}/items")
+def add_item(run_id: str, body: dict):
+    """Add something the camera didn't see. See gaps.add_item for the body."""
+    _rd(run_id)
+    with run_lock(run_id):
+        try:
+            gaps.add_item(run_id, body)
+        except KeyError:
+            raise HTTPException(404, f"no room {body.get('room')!r} in this run's inventory yet")
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return rebuild(run_id)
+
+
+@router.get("/catalog")
+def get_catalog():
+    """What the review page's "Add an item" list offers: every catalog row but the boxes."""
+    return {"items": [{"id": r["catalog_id"], "name": r["name"], "category": r["category"],
+                       "dims_in": [r["length_in"], r["width_in"], r["height_in"]]}
+                      for r in catalog.load().values() if r.get("category") != "box"]}
 
 
 @router.get("/media/{run_id}/{file_hash}/audio")

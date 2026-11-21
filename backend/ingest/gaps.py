@@ -33,6 +33,12 @@ def _find_item(merged: dict, item_id: str) -> tuple[dict, dict] | tuple[None, No
 def _apply(merged: dict, ans: dict) -> str | None:
     """Apply one stored answer to merged.json in memory. Returns an error string or None."""
     kind = ans["kind"]
+    if kind == "add_item":
+        room = next((r for r in merged["rooms"] if r["id"] == ans["room_id"]), None)
+        if room is None:
+            return f"no room {ans['room_id']}"
+        room["items"].append(_added_item(ans))
+        return None
     if kind == "edit":
         room, it = _find_item(merged, ans["item_id"])
         if it is None:
@@ -123,6 +129,61 @@ def edit_item(run_id: str, item_id: str, changes: dict) -> dict:
     return store_answer(run_id, {"kind": "edit", "item_id": item_id, "changes": changes})
 
 
+# ---------------------------------------------------------------- items the user adds
+
+ADDED_MAX_IN = 240   # longest side accepted for a typed size (20 ft)
+ADDED_MAX_QTY = 500
+
+
+def add_item(run_id: str, body: dict) -> dict:
+    """Review screen "Add an item": something the camera didn't see ("add a piano").
+
+    body: {room, catalog_id, quantity, label?} for a catalog item, or {room, label, dims_in: [L, W, H],
+    quantity} for one that isn't in the catalog. Stored as an answer, so it survives every rebuild();
+    resolve gives it its size, weight and handling flags like any other item. Later quantity and
+    disposition edits use the normal PATCH route with the item id returned here.
+    Call with the run lock held: the item id counts the answers already stored."""
+    rd = run_dir(run_id)
+    merged = read_json(rd / "merged.json")
+    room_id = body.get("room")
+    if merged is None or not any(r["id"] == room_id for r in merged["rooms"]):
+        raise KeyError(room_id)
+    cid = str(body.get("catalog_id") or "unknown").strip()
+    row = catalog.get(cid) if cid != "unknown" else None
+    if cid != "unknown" and row is None:
+        raise ValueError(f"no catalog item {cid!r}; GET /catalog lists them")
+    qty = body.get("quantity", 1)
+    if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= ADDED_MAX_QTY:
+        raise ValueError(f"quantity must be a whole number from 1 to {ADDED_MAX_QTY}")
+    label = " ".join(str(body.get("label") or (row or {}).get("name") or "").split())[:80]
+    dims = None  # a catalog item takes the catalog's size
+    if row is None:
+        dims = body.get("dims_in")
+        if not label:
+            raise ValueError("an item that isn't in the catalog needs a label")
+        if not (isinstance(dims, list) and len(dims) == 3
+                and all(isinstance(d, (int, float)) and not isinstance(d, bool) and 0 < d <= ADDED_MAX_IN for d in dims)):
+            raise ValueError(f"an item that isn't in the catalog needs dims_in: [length, width, height] in inches, "
+                             f"each above 0 and at most {ADDED_MAX_IN}")
+    answers = read_json(rd / "answers.json", {"answers": []})["answers"]
+    n = sum(1 for a in answers if a.get("kind") == "add_item" and a.get("room_id") == room_id) + 1
+    return store_answer(run_id, {"kind": "add_item", "room_id": room_id, "item_id": f"{room_id}_added_{n:02d}",
+                                 "item": {"catalog_id": cid, "label": label, "quantity": qty, "dims_in": dims}})
+
+
+def _added_item(ans: dict) -> dict:
+    """The merged.json line for a user-added item, in the shape merge.py gives a seen one."""
+    it = ans["item"]
+    return {"id": ans["item_id"], "group_key": "added:" + canon_key(it["label"]), "label": it["label"],
+            "catalog_id": it["catalog_id"], "quantity": it["quantity"], "stack_count": 1, "confidence": 1.0,
+            "move_class": "movable", "material": "mixed", "est_dims_in": it.get("dims_in") or [], "est_weight_lb": 0,
+            "fragile": False, "must_stay_upright": False, "disassemble": False, "two_person": False,
+            "stackable": False, "partially_visible": False,
+            "evidence": {"source": None, "sha256": None, "kind": "user", "timestamp_s": None, "box_2d": None},
+            "also_seen_in": [], "per_file_counts": {}, "variants": [it["label"]], "members": [],
+            "disposition": "keep", "notes": "added on the review screen", "user_added": True}
+
+
 # ---------------------------------------------------------------- questions
 
 AUTO_APPLY = 0.7       # Decisions API answers at or above this confidence are applied automatically
@@ -171,6 +232,8 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
         for it in inv_room["items"]:
             if it["disposition"] in ("stays", "trash", "sell", "donate") or it.get("heard_only"):
                 continue  # not going on the truck, or only heard (unfilmed_area covers it)
+            if it.get("source") == "user_added":
+                continue  # the user typed it in: nothing to check against footage
             s, ev = it["size"], it["evidence"]
             crop = lambda tag, it=it, ev=ev: _crop_media(rd, files_by_name, ev["source"], ev.get("box_2d"),
                                                           ev.get("timestamp_s"), tag)
