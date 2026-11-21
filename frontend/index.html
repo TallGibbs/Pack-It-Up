@@ -754,9 +754,95 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
   });
 
   const rawMode = strategy.packer_engine === "raw_py3dbp";
+  const MAX_REACH_SETBACK = 24.0;
+
+  const computeStandX = (items) => {
+    const n = items.length;
+    const standX = items.map((it) => it.pos_in[0] + it.size_in[0]);
+    const zOrder = items.map((_, k) => k).sort((a, b) =>
+      items[a].pos_in[2] - items[b].pos_in[2] ||
+      (items[a].pos_in[2] + items[a].size_in[2]) - (items[b].pos_in[2] + items[b].size_in[2])
+    );
+    for (const i of zOrder) {
+      const [ax, ay, az] = items[i].pos_in, [adx, ady] = items[i].size_in;
+      if (az <= 0.25) continue;
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue;
+        const [bx, by, bz] = items[j].pos_in, [bdx, bdy, bdz] = items[j].size_in;
+        if (bz + bdz <= az + 0.25) {
+          const ox = Math.min(ax + adx, bx + bdx) - Math.max(ax, bx);
+          const oy = Math.min(ay + ady, by + bdy) - Math.max(ay, by);
+          if (ox > 1e-3 && oy > 1e-3 && standX[j] > standX[i]) standX[i] = standX[j];
+        }
+      }
+    }
+    return standX;
+  };
+
+  const assignWalkInLoadSeq = (placed) => {
+    const n = placed.length;
+    if (!n) return;
+    const standX = computeStandX(placed);
+    const deps = Array.from({ length: n }, () => new Set());
+    const rdeps = Array.from({ length: n }, () => []);
+    for (let i = 0; i < n; i++) {
+      const [ax, ay, az] = placed[i].pos_in, [adx, ady] = placed[i].size_in;
+      if (az <= 0.25) continue;
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue;
+        const [bx, by, bz] = placed[j].pos_in, [bdx, bdy, bdz] = placed[j].size_in;
+        if (bz + bdz <= az + 0.25) {
+          const ox = Math.min(ax + adx, bx + bdx) - Math.max(ax, bx);
+          const oy = Math.min(ay + ady, by + bdy) - Math.max(ay, by);
+          if (ox > 1e-3 && oy > 1e-3) {
+            deps[i].add(j);
+            rdeps[j].push(i);
+          }
+        }
+      }
+    }
+    const cmp = (a, b) => {
+      const sa = Math.round(standX[a] * 100), sb = Math.round(standX[b] * 100);
+      if (sa !== sb) return sa - sb;
+      const x2a = Math.round((placed[a].pos_in[0] + placed[a].size_in[0]) * 100);
+      const x2b = Math.round((placed[b].pos_in[0] + placed[b].size_in[0]) * 100);
+      if (x2a !== x2b) return x2a - x2b;
+      const x1a = Math.round(placed[a].pos_in[0] * 100), x1b = Math.round(placed[b].pos_in[0] * 100);
+      if (x1a !== x1b) return x1a - x1b;
+      const za = Math.round(placed[a].pos_in[2] * 100), zb = Math.round(placed[b].pos_in[2] * 100);
+      if (za !== zb) return za - zb;
+      const ya = Math.round(placed[a].pos_in[1] * 100), yb = Math.round(placed[b].pos_in[1] * 100);
+      return ya - yb || a - b;
+    };
+    const inDeg = deps.map((s) => s.size);
+    const ready = [];
+    for (let k = 0; k < n; k++) if (inDeg[k] === 0) ready.push(k);
+    const orderedIdx = [];
+    while (ready.length) {
+      ready.sort(cmp);
+      const k = ready.shift();
+      orderedIdx.push(k);
+      for (const m of rdeps[k]) {
+        inDeg[m]--;
+        if (inDeg[m] === 0) ready.push(m);
+      }
+    }
+    if (orderedIdx.length < n) {
+      const seen = new Set(orderedIdx);
+      const rest = [];
+      for (let k = 0; k < n; k++) if (!seen.has(k)) rest.push(k);
+      rest.sort(cmp);
+      orderedIdx.push(...rest);
+    }
+    const reordered = orderedIdx.map((k) => placed[k]);
+    placed.splice(0, placed.length, ...reordered);
+    placed.forEach((it, idx) => { it.load_seq = idx + 1; });
+  };
+
   const packBin = (itemsToPack, dims, maxWt, prefix, balanceY = true) => {
     const [L, W, H] = dims;
     const placed = [];
+    const placedStandX = [];
     const leftovers = [];
     let curWt = 0, wy = 0;
     const ordered = itemsToPack.slice().sort((a, b) => {
@@ -774,16 +860,20 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
           ? [[l, w, h], [w, l, h], [l, h, w], [h, l, w]].filter((o) => Math.abs(o[2] - Math.min(l, w, h)) > 0.2)
           : [[l, w, h], [w, l, h]];
 
-      const anchors = [[0, 0, 0], ...(balanceY && !rawMode ? [[0, Math.max(0, W - orients[0][1]), 0]] : [])];
-      for (const b of placed) {
-        const [bx, by, bz] = b.pos_in, [bdx, bdy, bdz] = b.size_in;
-        anchors.push([bx + bdx, by, bz], [bx + bdx, 0, 0], [bx, by + bdy, bz], [bx, by, bz + bdz]);
-        if (balanceY && !rawMode) anchors.push([bx + bdx, Math.max(0, W - w), 0], [bx, Math.max(0, by - w), bz]);
-      }
-
       let best = null, bestCost = 1e12;
       for (const [dx, dy, dz] of orients) {
         if (dx > L || dy > W || dz > H) continue;
+        const anchors = [[0, 0, 0], ...(balanceY && !rawMode ? [[0, Math.max(0, W - dy), 0]] : [])];
+        for (const b of placed) {
+          const [bx, by, bz] = b.pos_in, [bdx, bdy, bdz] = b.size_in;
+          anchors.push([bx + bdx, by, bz], [bx + bdx, 0, 0], [bx, by + bdy, bz], [bx, by, bz + bdz]);
+          if (!rawMode && bz > 1e-3 && bx - dx >= -1e-3) anchors.push([Math.max(0, bx - dx), by, bz]);
+          if (balanceY && !rawMode) anchors.push([bx + bdx, Math.max(0, W - dy), 0], [bx, Math.max(0, by - dy), bz]);
+          if (!rawMode && b.stackable !== "no" && bx + bdx - dx >= bx - 1e-3) {
+            const fx = Math.max(0, bx + bdx - dx);
+            anchors.push([fx, by, bz + bdz], [fx, Math.max(0, by + bdy - dy), bz + bdz]);
+          }
+        }
         for (const [ax, ay, az] of anchors) {
           if (ax < 0 || ay < 0 || az < 0 || ax + dx > L + 1e-3 || ay + dy > W + 1e-3 || az + dz > H + 1e-3) continue;
           let hit = false;
@@ -792,24 +882,46 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
             if (ax + dx > bx + 1e-3 && bx + bdx > ax + 1e-3 && ay + dy > by + 1e-3 && by + bdy > ay + 1e-3 && az + dz > bz + 1e-3 && bz + bdz > az + 1e-3) { hit = true; break; }
           }
           if (hit) continue;
+          let reqStandX = ax + dx;
+          if (!rawMode) {
+            let badAbove = false;
+            for (const b of placed) {
+              const [bx, by, bz] = b.pos_in, [bdx, bdy] = b.size_in;
+              if (bz + 1e-3 < az + dz) continue;
+              if (Math.min(ax + dx, bx + bdx) - Math.max(ax, bx) <= 1e-3 || Math.min(ay + dy, by + bdy) - Math.max(ay, by) <= 1e-3) continue;
+              if ((ax + dx) - (bx + bdx) > MAX_REACH_SETBACK + 1e-3) { badAbove = true; break; }
+            }
+            if (badAbove) continue;
+          }
           if (!rawMode && az > 1e-3) {
             let sup = 0, badStack = false;
-            for (const b of placed) {
+            for (let si = 0; si < placed.length; si++) {
+              const b = placed[si];
               const [bx, by, bz] = b.pos_in, [bdx, bdy, bdz] = b.size_in;
-              if (Math.abs(bz + bdz - az) > 0.1) continue;
               const ox = Math.min(ax + dx, bx + bdx) - Math.max(ax, bx);
               const oy = Math.min(ay + dy, by + bdy) - Math.max(ay, by);
-              if (ox > 1e-3 && oy > 1e-3) {
-                if (b.stackable === "no" || ((b.stackable === "light_only" || b.fragile) && p.weight_lb > 30)) { badStack = true; break; }
-                sup += ox * oy;
-              }
+              if (ox <= 1e-3 || oy <= 1e-3) continue;
+              if (bz + bdz <= az + 0.25 && placedStandX[si] > reqStandX) reqStandX = placedStandX[si];
+              if (Math.abs(bz + bdz - az) > 0.1) continue;
+              if (b.stackable === "no" || ((b.stackable === "light_only" || b.fragile) && p.weight_lb > 30)) { badStack = true; break; }
+              sup += ox * oy;
             }
-            if (badStack || sup < 0.75 * dx * dy) continue;
+            if (badStack || sup < 0.75 * dx * dy || reqStandX - (ax + dx) > MAX_REACH_SETBACK + 1e-3) continue;
           }
           const nextCom = (wy + p.weight_lb * (ay + 0.5 * dy)) / (curWt + p.weight_lb);
           const balPen = balanceY && !rawMode ? Math.abs(nextCom - 0.5 * W) * 1.6 : 0;
-          const cost = ax * 3 + az * 1.8 + balPen;
-          if (cost < bestCost) { bestCost = cost; best = { pos: [ax, ay, az], sz: [dx, dy, dz] }; }
+          const zCost = (!rawMode && az > 1e-3 && (p.weight_lb <= 30 || (p.stackable === "yes" && p.weight_lb <= 80))) ? az * 0.10 : az * 0.55;
+          let sameBonus = 0;
+          if (!rawMode && az > 1e-3 && p.stackable === "yes") {
+            for (const b of placed) {
+              if (Math.abs(b.pos_in[2] + b.size_in[2] - az) <= 0.1 && Math.abs(b.pos_in[0] - ax) <= 0.5 && Math.abs(b.pos_in[1] - ay) <= 0.5 && b.catalog_id === p.catalog_id) {
+                sameBonus = -28;
+                break;
+              }
+            }
+          }
+          const cost = ax * 1.0 + zCost + balPen + ay * 0.01 + sameBonus;
+          if (cost < bestCost) { bestCost = cost; best = { pos: [ax, ay, az], sz: [dx, dy, dz], standX: reqStandX }; }
         }
       }
       if (best) {
@@ -819,13 +931,13 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
           ...p, id: `${prefix}_${p.id}`, pos_in: best.pos.map((v) => Math.round(v * 10) / 10),
           size_in: best.sz.map((v) => Math.round(v * 10) / 10), load_seq: placed.length + 1,
         });
+        placedStandX.push(best.standX);
       } else {
         leftovers.push(p);
       }
     }
     if (!rawMode) {
-      placed.sort((a, b) => a.pos_in[2] - b.pos_in[2] || a.pos_in[0] - b.pos_in[0] || a.pos_in[1] - b.pos_in[1]);
-      placed.forEach((it, idx) => { it.load_seq = idx + 1; });
+      assignWalkInLoadSeq(placed);
     }
     return { placed, leftovers };
   };
@@ -876,7 +988,9 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
   const violations = [];
   unplaced.forEach((u) => violations.push({ rule: "unplaced_item", item_ids: [u.id], detail: `${u.label}: ${u.reason}` }));
   trucks.forEach((t) => {
-    for (const it of t.items) {
+    const tStandX = computeStandX(t.items);
+    for (let idx = 0; idx < t.items.length; idx++) {
+      const it = t.items[idx];
       if (it.must_stay_upright && Math.abs(it.size_in[2] - it.orig_dims_in[2]) > 0.5) {
         violations.push({ rule: "upright", truck_index: t.index, item_ids: [it.id], detail: `${it.label} tipped on its side (${it.size_in.join("×")} in)` });
       }
@@ -894,6 +1008,15 @@ function solveInBrowser(inv, strategy = {}, extraItems = []) {
         }
         if (sup < 0.75 * it.size_in[0] * it.size_in[1]) {
           violations.push({ rule: "support", truck_index: t.index, item_ids: [it.id], detail: `${it.label} has only ${Math.round((sup / (it.size_in[0] * it.size_in[1])) * 100)}% base support (<75%)` });
+        }
+        const ax2 = it.pos_in[0] + it.size_in[0];
+        if (tStandX[idx] - ax2 > 25.0) {
+          violations.push({ rule: "walk_in_access", truck_index: t.index, item_ids: [it.id], detail: `${it.label} sits ${Math.round(tStandX[idx] - ax2)}" behind support front — unreachable without stepping on lower cargo` });
+        } else {
+          const blocker = t.items.find((b) => b !== it && b.load_seq < it.load_seq && b.pos_in[0] >= tStandX[idx] - 0.05 && (b.pos_in[0] + b.size_in[0]) > tStandX[idx] + 0.5);
+          if (blocker) {
+            violations.push({ rule: "walk_in_access", truck_index: t.index, item_ids: [it.id, blocker.id], detail: `${it.label} (Load #${it.load_seq}) loaded after door-side ${blocker.label} (Load #${blocker.load_seq})` });
+          }
         }
       }
     }
@@ -1795,6 +1918,7 @@ function renderPanels() {
     ["Fit & Payload", (byRule.fit || 0) + (byRule.unplaced_item || 0) + (byRule.unplaced || 0) + (byRule.truck_overweight || 0)],
     ["No Overlap", (byRule.overlap || 0) + (byRule.zone_overlap || 0)],
     ["≥75% Base Support", (byRule.support || 0) + (byRule.load_seq_support || 0)],
+    ["Walk-In Tier Order", byRule.walk_in_access || 0],
     ["Upright & On-Edge", (byRule.upright || 0) + (byRule.load_on_edge || 0)],
     ["Stack & Fragile", (byRule.no_stack || 0) + (byRule.light_only_on_top || 0) + (byRule.fragile_crushed || 0)],
     ["L/R Balance", byRule.weight_balance || 0],

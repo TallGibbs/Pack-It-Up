@@ -17,6 +17,7 @@ Run from CLI:
 from __future__ import annotations
 
 import argparse
+import heapq
 import json
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ from backend import catalog, verify
 from backend.expand import can_pass_door, expand_inventory
 
 EPS = 1e-4
+MAX_REACH_SETBACK_IN = 24.0
 
 
 def valid_orientations(piece: dict, *, allow_all_rotations: bool = False) -> list[tuple[float, float, float]]:
@@ -134,47 +136,58 @@ def _check_support_and_stacking(
     piece_fragile: bool,
     placed: list[dict],
     placed_boxes: list[tuple[float, float, float, float, float, float]],
+    placed_stand_x: list[float],
     *,
     min_support: float,
     light_max_lb: float,
-) -> bool:
+) -> tuple[bool, float]:
     x2, y2, z2 = x1 + dx, y1 + dy, z1 + dz
 
     # Guard against sliding a `no_stack` / `light_only` / `fragile` item directly underneath
-    # the overhanging bottom face (`bz1 == z2`) of an already-placed heavy item above it.
-    if piece_stackable != "yes" or piece_fragile:
-        for i, above in enumerate(placed):
-            bx1, by1, bz1, bx2, by2, _ = placed_boxes[i]
-            if abs(bz1 - z2) > verify.SUPPORT_Z_TOL:
-                continue
-            if min(x2, bx2) - max(x1, bx1) <= EPS or min(y2, by2) - max(y1, by1) <= EPS:
-                continue
+    # the overhanging bottom face (`bz1 == z2`) of an already-placed item above it, or extending
+    # `x2` so far past `above`'s front face `bx2` that `above` becomes unreachable without climbing.
+    for i, above in enumerate(placed):
+        bx1, by1, bz1, bx2, by2, _ = placed_boxes[i]
+        if bz1 + EPS < z2:
+            continue
+        if min(x2, bx2) - max(x1, bx1) <= EPS or min(y2, by2) - max(y1, by1) <= EPS:
+            continue
+        if x2 - bx2 > MAX_REACH_SETBACK_IN + EPS:
+            return False, x2
+        if abs(bz1 - z2) <= verify.SUPPORT_Z_TOL:
             if piece_stackable == "no":
-                return False
+                return False, x2
             if (piece_stackable == "light_only" or piece_fragile) and above["weight_lb"] > light_max_lb + EPS:
-                return False
+                return False, x2
 
     if z1 <= EPS:
-        return True
+        return True, x2
+
     sup_area = 0.0
+    req_stand_x = x2
     for i, sup in enumerate(placed):
         bx1, by1, bz1, bx2, by2, bz2 = placed_boxes[i]
-        if abs(bz2 - z1) > 0.05:
-            continue
         ox = min(x2, bx2) - max(x1, bx1)
         if ox <= EPS:
             continue
         oy = min(y2, by2) - max(y1, by1)
         if oy <= EPS:
             continue
+        if bz2 <= z1 + verify.SUPPORT_Z_TOL and placed_stand_x[i] > req_stand_x:
+            req_stand_x = placed_stand_x[i]
+        if abs(bz2 - z1) > 0.05:
+            continue
         bstack = sup["stackable"]
         if bstack == "no":
-            return False
+            return False, req_stand_x
         if (bstack == "light_only" or sup.get("fragile")) and wt > light_max_lb + EPS:
-            return False
+            return False, req_stand_x
         # Placed items in a valid truck are pairwise non-overlapping, so top faces at height z1 are disjoint.
         sup_area += ox * oy
-    return sup_area >= min_support * (dx * dy) - 1e-4
+
+    if req_stand_x - x2 > MAX_REACH_SETBACK_IN + EPS:
+        return False, req_stand_x
+    return sup_area >= min_support * (dx * dy) - 1e-4, req_stand_x
 
 
 def _candidate_anchors(
@@ -193,19 +206,26 @@ def _candidate_anchors(
 
     for i, b in enumerate(placed):
         bx1, by1, bz1, bx2, by2, bz2 = placed_boxes[i]
-        # Advance along truck length (+x) on floor and at b's level
+        # Advance along truck length (+x) on floor and at b's level, or tuck right behind an elevated column
         pts.append((bx2, by1, bz1))
+        if bz1 > EPS and bx1 - dx >= -EPS:
+            pts.append((max(0.0, bx1 - dx), by1, bz1))
         pts.append((bx2, 0.0, 0.0))
         pts.append((bx2, max(0.0, W - dy), 0.0))
         # Adjacent across width (+y from left, -y from right)
         pts.append((bx1, by2, bz1))
         if by1 - dy >= -EPS:
             pts.append((bx1, max(0.0, by1 - dy), bz1))
-        # Stack on top of b if allowed
+        # Stack on top of b if allowed (both back-aligned for box columns and door-flush for deeper bases)
         if b["stackable"] != "no":
             pts.append((bx1, by1, bz2))
             if by2 - dy >= -EPS:
                 pts.append((bx1, max(0.0, by2 - dy), bz2))
+            if bx2 - dx >= bx1 - EPS:
+                fx = max(0.0, bx2 - dx)
+                pts.append((fx, by1, bz2))
+                if by2 - dy >= -EPS:
+                    pts.append((fx, max(0.0, by2 - dy), bz2))
 
     seen: set[tuple[int, int, int]] = set()
     uniq: list[tuple[float, float, float]] = []
@@ -237,6 +257,72 @@ def _recenter_sparse_y(placed: list[dict], W: float, balance_band: tuple[float, 
             it["pos_in"][1] = round(it["pos_in"][1] + shift, 2)
 
 
+def _assign_walk_in_load_seq(placed: list[dict]) -> None:
+    """Order `placed` wall/tier-by-tier from cab wall (`x=0`) toward rear door (`x=L`).
+
+    Uses Kahn's min-heap topological sort over vertical support dependencies so:
+      1. Every supporting item loads strictly before anything resting on top of it (`load_seq_support`).
+      2. Each vertical column/tier is built bottom-to-top while the truck floor from `stand_x`
+         to the rear door is still completely empty (`walk_in_access` — no stepping on boxes).
+    """
+    n = len(placed)
+    if n == 0:
+        return
+    boxes = [
+        (
+            float(it["pos_in"][0]),
+            float(it["pos_in"][1]),
+            float(it["pos_in"][2]),
+            float(it["pos_in"][0] + it["size_in"][0]),
+            float(it["pos_in"][1] + it["size_in"][1]),
+            float(it["pos_in"][2] + it["size_in"][2]),
+        )
+        for it in placed
+    ]
+    stand_x = verify.compute_stand_x(boxes)
+
+    deps: list[set[int]] = [set() for _ in range(n)]
+    rdeps: list[list[int]] = [[] for _ in range(n)]
+    for i in range(n):
+        ax1, ay1, az1, ax2, ay2, _ = boxes[i]
+        if az1 <= verify.SUPPORT_Z_TOL:
+            continue
+        for j in range(n):
+            if i == j:
+                continue
+            bx1, by1, _, bx2, by2, bz2 = boxes[j]
+            if bz2 <= az1 + verify.SUPPORT_Z_TOL:
+                if min(ax2, bx2) - max(ax1, bx1) > EPS and min(ay2, by2) - max(ay1, by1) > EPS:
+                    deps[i].add(j)
+                    rdeps[j].append(i)
+
+    def _prio(k: int) -> tuple[float, float, float, float, float, int]:
+        x1, y1, z1, x2, _, _ = boxes[k]
+        return (round(stand_x[k], 2), round(x2, 2), round(x1, 2), round(z1, 2), round(y1, 2), k)
+
+    in_deg = [len(deps[k]) for k in range(n)]
+    heap = [_prio(k) for k in range(n) if in_deg[k] == 0]
+    heapq.heapify(heap)
+    ordered_indices: list[int] = []
+    while heap:
+        *_, k = heapq.heappop(heap)
+        ordered_indices.append(k)
+        for m in rdeps[k]:
+            in_deg[m] -= 1
+            if in_deg[m] == 0:
+                heapq.heappush(heap, _prio(m))
+
+    if len(ordered_indices) < n:
+        seen = set(ordered_indices)
+        rest = sorted((k for k in range(n) if k not in seen), key=_prio)
+        ordered_indices.extend(rest)
+
+    reordered = [placed[k] for k in ordered_indices]
+    placed[:] = reordered
+    for seq, it in enumerate(placed, start=1):
+        it["load_seq"] = seq
+
+
 def _pack_single_bin_constrained(
     pieces: list[dict],
     bin_dims: list[float],
@@ -258,6 +344,7 @@ def _pack_single_bin_constrained(
 
     placed: list[dict] = []
     placed_boxes: list[tuple[float, float, float, float, float, float]] = []
+    placed_stand_x: list[float] = []
     leftovers: list[dict] = []
     cur_wt = 0.0
     weighted_y = 0.0
@@ -269,7 +356,7 @@ def _pack_single_bin_constrained(
             continue
 
         orients = valid_orientations(piece, allow_all_rotations=allow_all_rot)
-        best_choice: tuple[float, float, float, float, float, float, float] | None = None
+        best_choice: tuple[float, float, float, float, float, float, float, float] | None = None
 
         for dx, dy, dz in orients:
             if dx > L + EPS or dy > W + EPS or dz > H + EPS:
@@ -282,13 +369,14 @@ def _pack_single_bin_constrained(
                     continue
                 if _overlaps_3d(x, y, z, x + dx, y + dy, z + dz, placed_boxes):
                     continue
-                if not _check_support_and_stacking(
+                ok_sup, req_stand_x = _check_support_and_stacking(
                     x, y, z, dx, dy, dz, wt,
                     str(piece.get("stackable", "no")),
                     bool(piece.get("fragile", False)),
-                    placed, placed_boxes,
+                    placed, placed_boxes, placed_stand_x,
                     min_support=min_support, light_max_lb=light_max_lb,
-                ):
+                )
+                if not ok_sup:
                     continue
 
                 new_wt = cur_wt + wt
@@ -319,28 +407,24 @@ def _pack_single_bin_constrained(
 
                 cost = x * 1.0 + z_cost + bal_cost + y * 0.01 + same_stack_bonus
                 if best_choice is None or cost < best_choice[0]:
-                    best_choice = (cost, x, y, z, dx, dy, dz)
+                    best_choice = (cost, x, y, z, dx, dy, dz, req_stand_x)
 
         if best_choice is None:
             leftovers.append(piece)
             continue
 
-        _, x, y, z, dx, dy, dz = best_choice
+        _, x, y, z, dx, dy, dz, chosen_stand_x = best_choice
         placed_item = _build_placed_record(piece, prefix, len(placed) + 1, [x, y, z], [dx, dy, dz])
         placed.append(placed_item)
         placed_boxes.append((x, y, z, x + dx, y + dy, z + dz))
+        placed_stand_x.append(chosen_stand_x)
         cur_wt += wt
         weighted_y += wt * (y + 0.5 * dy)
 
     if balance_width:
         _recenter_sparse_y(placed, W, verify.DEFAULT_BALANCE_BAND)
 
-    # Number loading steps bottom-up (z), then front-to-back (x), then left-to-right (y)
-    # so every supporting item is guaranteed to load before anything resting on top of it.
-    placed.sort(key=lambda it: (round(it["pos_in"][2], 2), round(it["pos_in"][0], 2), round(it["pos_in"][1], 2)))
-    for seq, it in enumerate(placed, start=1):
-        it["load_seq"] = seq
-
+    _assign_walk_in_load_seq(placed)
     return placed, leftovers
 
 
