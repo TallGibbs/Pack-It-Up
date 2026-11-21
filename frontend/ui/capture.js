@@ -372,8 +372,19 @@
 
   // ---------- coming back to a move ----------
   // Take `id` as this page's move: remember it, and put it in the address so a reload returns to it.
+  // The steps line at the top: "2 Check" and "3 Pack" lead to this move's list and plan once the page
+  // knows a move, its own or the one it offers to pick up. With no move they are plain text (FAILURES.md 14:54).
+  function setStepLinks(id) {
+    const pages = { "#step-check": "review.html", "#step-pack": "index.html" };
+    Object.entries(pages).forEach(([sel, page]) => {
+      if (id) $(sel).href = link(page, { run_id: id });
+      else $(sel).removeAttribute("href");
+    });
+  }
+
   function adoptRun(id) {
     runId = id;
+    setStepLinks(id);
     window.PIU.rememberRun(id);
     try { history.replaceState(null, "", link("capture.html", { run_id: id })); } catch (e) { /* file:// */ }
     $("#footer").classList.remove("hidden");
@@ -452,8 +463,12 @@
       run.inventory ? foundText(run.inventory) : "still being listed"].filter(Boolean).join(" · ");
     $("#resume-yes").href = link("capture.html", { run_id: id });
     $("#resume").classList.remove("hidden");
+    setStepLinks(id);
   }
-  $("#resume-no").addEventListener("click", () => $("#resume").classList.add("hidden"));
+  $("#resume-no").addEventListener("click", () => {
+    $("#resume").classList.add("hidden");
+    if (!runId) setStepLinks(null); // "Not now" means a new move, which has no list or plan yet
+  });
 
   // ---------- QR code for opening this page on a phone (laptop only) ----------
   function setupQr() {

@@ -52,7 +52,7 @@ p { margin: 6px 0; }
 
 .steps { font-size: 13px; color: var(--muted); margin-top: 14px; }
 .steps b { color: var(--ink); }
-.steps a.to-capture { color: var(--accent); font-weight: 600; text-decoration: none; }
+.steps a.to-capture, .steps a.step[href] { color: var(--accent); font-weight: 600; text-decoration: none; }
 .steps .who { float: right; }
 .steps .who a { color: var(--accent); }
 .signin .btn { margin-top: 12px; }

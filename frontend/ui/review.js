@@ -36,6 +36,7 @@
   }
   window.PIU.rememberRun(runId);
   $("#handoff").href = link("index.html", { run_id: runId });
+  $("#step-pack").href = link("index.html", { run_id: runId }); // the steps line goes forward as well as back
 
   // ---------- data ----------
   async function load() {

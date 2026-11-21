@@ -615,7 +615,8 @@ if (MOCK) $("#mock-banner").classList.remove("hidden");
 const rawRunId = params.get("run_id") || (MOCK ? window.PIU_MOCK.DEMO_RUN : (window.PIU.lastRun() || "sample_venue"));
 if (rawRunId && rawRunId !== "sample_venue") window.PIU.rememberRun(rawRunId);
 
-$("#nav-capture").href = link("capture.html");
+// With the move's id, so step 1 opens this move (with its links on to steps 2 and 3) and not a blank one.
+$("#nav-capture").href = link("capture.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
 $("#nav-review").href = link("review.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
 $("#nav-models").href = link("models.html", { run_id: rawRunId !== "sample_venue" ? rawRunId : "all" });
 $("#btn-edit-inv").href = link("review.html", rawRunId !== "sample_venue" ? { run_id: rawRunId } : {});
