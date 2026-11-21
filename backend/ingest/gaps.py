@@ -329,7 +329,7 @@ def _candidates(rd: Path, inv: dict, merged: dict, files_by_name: dict) -> list[
             ev = c.get("evidence") or {}
             qs.append({"id": _qid("hidden_contents", inv_room["room"]["id"], c["label"]), "kind": "hidden_contents",
                        "refers_to": c["label"], "always_show": True,
-                       "text": f"The {c['label']} was closed, so we've assumed it's empty. About how full is it?",
+                       "text": f"We couldn't see inside the {c['label']}, so we've assumed it's empty. About how full is it?",
                        "options": {f: f.replace("_", " ") for f in FULLNESS}, "ask": "user",
                        "volume_at_stake": CONTAINER_CUFT.get(c["size"], 15), "confidence": 0.3,
                        "media": [_crop_media(rd, files_by_name, src, ev.get("box_2d"), ev.get("timestamp_s"), "")]})
@@ -423,6 +423,11 @@ def build_questions(run_id: str) -> list[dict]:
         if q["id"] in answered:
             a = answered[q["id"]]
             q.update(status="answered", answer=a["answer"], answered_by=a["source"], confidence=a.get("confidence", 1.0))
+            # Every upload rebuilds every question. Keep what the Decisions API said the first time, or a
+            # second room wipes the first room's model answers and confidences (FAILURES.md 13:10).
+            for k in ("model_answer", "low_confidence", "suggested"):
+                if k in old.get(q["id"], {}):
+                    q[k] = old[q["id"]][k]
             continue
         if "speech" in q:  # already applied in merge; nothing to store
             s = q.pop("speech")

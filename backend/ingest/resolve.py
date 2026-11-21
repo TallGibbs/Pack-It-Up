@@ -250,6 +250,13 @@ def resolve(run_id: str) -> dict:
     rd = run_dir(run_id)
     merged = read_json(rd / "merged.json")
     rooms = [resolve_room(r) for r in merged["rooms"]]
+    by_name = {f["name"]: f for f in (read_json(rd / "manifest.json") or {}).get("files", [])}
+    for room in rooms:  # container evidence names its file; add the hash and kind the crop route needs
+        for c in room["containers"]:
+            f = by_name.get((c.get("evidence") or {}).get("source"))
+            if f:
+                c["evidence"].setdefault("sha256", f["sha256"])
+                c["evidence"].setdefault("kind", f["kind"])
     questions = read_json(rd / "questions.json", {}).get("questions", [])
     inv = {
         "schema_version": "inventory_v2",

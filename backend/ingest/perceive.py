@@ -5,7 +5,9 @@ Writes runs/<run_id>/perception/<file>.json for each file.
 from __future__ import annotations
 
 import re
+import threading
 import time
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -148,27 +150,50 @@ def perceive_file(run_id: str, entry: dict, job_name: str = "perceive") -> dict:
     return result
 
 
+# Files a pipeline in this process is reading right now, per run. See perceive_all(only_new=True).
+_reading: dict[str, set[str]] = defaultdict(set)
+_reading_guard = threading.Lock()
+
+
 def perceive_all(run_id: str, room_id: str | None = None, job_name: str = "perceive",
-                 on_file_done=None) -> list[dict]:
-    """Perceive every file in the manifest (optionally one room). Clips go first: their upload is the slow part."""
+                 on_file_done=None, only_new: bool = False) -> list[dict]:
+    """Perceive every file in the manifest (optionally one room). Clips go first: their upload is the slow part.
+
+    `only_new` is for the upload route. Each upload to a room starts its own pipeline, and without it
+    a second upload (three photos after a clip, or a retry) read the room's earlier files again: a
+    second model call for a clip still being watched, and finished rows going back to "looking".
+    With it, a file already read, or being read by another pipeline, is left alone.
+    """
     rd = run_dir(run_id)
     manifest = read_json(rd / "manifest.json")
     entries = [f for f in manifest["files"] if room_id is None or f["room_id"] == room_id]
+    if only_new:
+        with _reading_guard:
+            seen = (read_json(rd / "status.json", {}) or {}).get("files", {})
+            entries = [f for f in entries if f["name"] not in _reading[run_id]
+                       and not (seen.get(f["name"], {}).get("perceive") == "done"
+                                and (rd / "perception" / f"{f['name']}.json").exists())]
+            _reading[run_id].update(f["name"] for f in entries)
     entries.sort(key=lambda f: f["kind"] != "video")
     update_status(rd, stage="perceive")
     results, failed = [], []
-    with ThreadPoolExecutor(max_workers=MAX_PARALLEL) as pool:
-        futs = {pool.submit(perceive_file, run_id, e, job_name): e for e in entries}
-        for fut in as_completed(futs):
-            try:
-                results.append(fut.result())
-            except LLMError:
-                failed.append(futs[fut]["name"])
-                continue
-            if on_file_done:
+    try:
+        with ThreadPoolExecutor(max_workers=MAX_PARALLEL) as pool:
+            futs = {pool.submit(perceive_file, run_id, e, job_name): e for e in entries}
+            for fut in as_completed(futs):
                 try:
-                    on_file_done(results[-1])
-                except Exception as e:  # a partial rebuild must not stop the run
-                    update_status(rd, error=f"partial rebuild after {results[-1]['file']}: {e}")
+                    results.append(fut.result())
+                except LLMError:
+                    failed.append(futs[fut]["name"])
+                    continue
+                if on_file_done:
+                    try:
+                        on_file_done(results[-1])
+                    except Exception as e:  # a partial rebuild must not stop the run
+                        update_status(rd, error=f"partial rebuild after {results[-1]['file']}: {e}")
+    finally:
+        if only_new:
+            with _reading_guard:
+                _reading[run_id].difference_update(f["name"] for f in entries)
     update_status(rd, stage="perceive_done", perceive_failed=failed)
     return sorted(results, key=lambda r: r["file"])

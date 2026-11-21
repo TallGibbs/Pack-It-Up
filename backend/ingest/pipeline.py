@@ -71,7 +71,8 @@ def run_pipeline(run_id: str, room_id: str | None = None, questions: bool = True
     if not counted:
         begin_pipeline(run_id)
     try:
-        perceive_all(run_id, room_id, on_file_done=lambda _r: rebuild(run_id))
+        # counted = started by an upload: read only the files this upload added (see perceive_all)
+        perceive_all(run_id, room_id, on_file_done=lambda _r: rebuild(run_id), only_new=counted)
         update_status(rd, stage="questions" if questions else "resolve")
         inv = rebuild(run_id, questions=questions)
     except Exception as e:

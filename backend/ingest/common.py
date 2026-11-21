@@ -60,6 +60,17 @@ def write_json(path: Path, data) -> None:
     _retry_locked(lambda: os.replace(tmp, path))
 
 
+def scrub(text) -> str:
+    """Error text safe to show: this laptop's folders (and the user name in them) taken out.
+    GET /runs returns status.json to anyone with the address."""
+    text = str(text)
+    for path, short in ((RUNS_DIR, "runs"), (ROOT, "."), (Path.home(), "~")):
+        plain = str(path)
+        for form in (plain, plain.replace("\\", "\\\\"), path.as_posix()):  # as is, repr()-doubled, forward slashes
+            text = text.replace(form, short)
+    return text
+
+
 def update_status(rd: Path, **changes) -> dict:
     """Merge into runs/<id>/status.json. `files={name: {...}}` merges per file."""
     with _status_lock:
@@ -67,10 +78,12 @@ def update_status(rd: Path, **changes) -> dict:
         files = changes.pop("files", None)
         if files:
             for k, v in files.items():
+                if "error" in v:
+                    v = {**v, "error": scrub(v["error"])}
                 st["files"].setdefault(k, {}).update(v)
         err = changes.pop("error", None)
         if err:
-            st["errors"].append(err)
+            st["errors"].append(scrub(err))
         st.update(changes)
         st["updated"] = dt.datetime.now().isoformat(timespec="seconds")
         write_json(rd / "status.json", st)

@@ -14,7 +14,7 @@ from PIL import Image, ImageOps
 
 from backend.llm import media as mu
 
-from .common import read_json, run_dir, slug, update_status, write_json
+from .common import read_json, run_dir, scrub, slug, update_status, write_json
 
 ACCEPTED = set(mu.IMAGE_EXT) | set(mu.VIDEO_EXT)
 MAX_SIDE = 2048
@@ -88,7 +88,7 @@ def intake(paths: list[Path], room_name: str | None, run_id: str, original_names
                     entry["audio_path"] = str(wav.relative_to(rd)).replace("\\", "/")
             entry["path"] = str(dst.relative_to(rd)).replace("\\", "/")
         except Exception as e:  # one bad file must not sink the run
-            manifest["skipped"].append({"name": name, "reason": f"{type(e).__name__}: {e}"})
+            manifest["skipped"].append({"name": name, "reason": scrub(f"{type(e).__name__}: {e}")})
             update_status(rd, error=f"intake {name}: {e}")
             continue
         manifest["files"].append(entry)
