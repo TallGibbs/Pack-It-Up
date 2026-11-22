@@ -1,0 +1,10 @@
+# Named Cloudflare tunnel config for the server. Copy to /etc/cloudflared/config.yml.
+# Copy the tunnel's credentials file (<TUNNEL-ID>.json, from ~/.cloudflared/ on the laptop)
+# to /etc/cloudflared/ and chmod 600. Never commit the credentials file. See DEPLOY.md, step 5.
+tunnel: <TUNNEL-ID>
+credentials-file: /etc/cloudflared/<TUNNEL-ID>.json
+
+ingress:
+  - hostname: packitup.temperedanalytics.com
+    service: http://localhost:8000
+  - service: http_status:404

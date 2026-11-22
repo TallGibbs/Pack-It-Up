@@ -1,0 +1,18 @@
+# Deletes old moves and cache files. Run daily by packitup-cleanup.timer. See deploy/cleanup.sh.
+[Unit]
+Description=Pack It Up cleanup of old runs and cache
+
+[Service]
+Type=oneshot
+User=packitup
+Group=packitup
+WorkingDirectory=/opt/pack-it-up
+# Days to keep a move after its last change, and days to keep model-call cache files.
+Environment=RUNS_KEEP_DAYS=30
+Environment=CACHE_KEEP_DAYS=14
+ExecStart=/opt/pack-it-up/deploy/cleanup.sh /opt/pack-it-up
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/pack-it-up
