@@ -342,3 +342,10 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Decision:** `main` is the only branch. `origin/track-b` (tip 9e3ae29) was deleted; every commit on it was already in `main`. This replaces the 16:16 entry's "`track-b` stays". George pulls `main` and pushes there from now on.
 - **Why:** Chris wanted all parallel work on one branch before final testing.
 - **By:** Chris.
+
+## 2026-11-21 21:58 · Home footage removed from git history; `main` force-pushed
+- **Decision:** Rewrite `main` without the five files in `data/Inputs/Malin/` that 80e7578 added (two clips, three photos), and force-push it. `main` went from 4118686 to 46abb77 (255 commits; the upload commit held only those files, so it is gone). Every file in `main` is otherwise unchanged.
+- **Why:** The repo is public and the files are footage of a home.
+- **Left:** Every checkout made before 21:58 must re-clone, or run `git fetch origin && git reset --hard origin/main` with no local work, before pushing again; a plain push would bring the old history back. GitHub still serves the old commit by its ID until GitHub Support clears its cache (Chris to ask).
+- **By:** Chris.
+

@@ -1,0 +1,27 @@
+# Pack It Up API as a system service (Linux, systemd). Installed by deploy/setup.sh.
+# One process only (--workers 1): upload locks and pipeline threads live in memory.
+# The API listens on localhost; cloudflared publishes it. See DEPLOY.md.
+[Unit]
+Description=Pack It Up API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=packitup
+Group=packitup
+WorkingDirectory=/opt/pack-it-up
+ExecStart=/opt/pack-it-up/.venv/bin/uvicorn backend.app:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+# Hardening: the service can write only inside the checkout (runs/, .cache/, .history/).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/pack-it-up
+
+[Install]
+WantedBy=multi-user.target

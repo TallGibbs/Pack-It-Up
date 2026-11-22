@@ -46,3 +46,7 @@ Move an item to [decisions.md](decisions.md) once it is decided, and delete it h
 ## Left by the branch audit session (16:18)
 - **George has not seen the merge of his `track-b` QR work** (2f26c31): `main`'s `labels.py` kept, his helpers added on top, `encode_qr_matrix` returning bools instead of 0/1, and in `frontend/index.html` his side taken for the print rule, `qrPayloadText` and the tape seam. (Track B)
 - **Not checked:** scanning a box QR code from the truck page or a printed label with a phone.
+
+## Running it full time (21:45)
+- **Which server and which Gemini key.** DEPLOY.md assumes one Linux VM; no provider is chosen. The event key's account is temporary, so a personal key with billing is needed, and nobody has checked it reaches every model in `models.toml`. (Chris)
+- **Who may use the public address.** There is no real login. DEPLOY.md suggests Cloudflare Access; not decided. Also how long to keep uploads (`cleanup.sh` keeps 30 days). (Chris and George)

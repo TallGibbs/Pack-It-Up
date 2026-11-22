@@ -14,6 +14,14 @@ media/
 *.mov
 *.m4v
 *.wav
+# Same, in capitals (phones name files IMG_1234.MP4 / .JPEG; Linux and GitHub match case)
+*.JPG
+*.JPEG
+*.HEIC
+*.MP4
+*.MOV
+*.M4V
+*.WAV
 
 # Dependencies / builds
 node_modules/
