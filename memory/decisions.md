@@ -343,9 +343,16 @@ Entries before 11:00 on Nov 21 were written up afterwards from session notes, so
 - **Why:** Chris wanted all parallel work on one branch before final testing.
 - **By:** Chris.
 
-## 2026-11-21 21:58 · Home footage removed from git history; `main` force-pushed
+## 2026-11-21 21:38 · Home footage removed from git history; `main` force-pushed
 - **Decision:** Rewrite `main` without the five files in `data/Inputs/Malin/` that 80e7578 added (two clips, three photos), and force-push it. `main` went from 4118686 to 46abb77 (255 commits; the upload commit held only those files, so it is gone). Every file in `main` is otherwise unchanged.
 - **Why:** The repo is public and the files are footage of a home.
-- **Left:** Every checkout made before 21:58 must re-clone, or run `git fetch origin && git reset --hard origin/main` with no local work, before pushing again; a plain push would bring the old history back. GitHub still serves the old commit by its ID until GitHub Support clears its cache (Chris to ask).
+- **Left:** Every checkout made before 21:38 must re-clone, or run `git fetch origin && git reset --hard origin/main` with no local work, before pushing again; a plain push would bring the old history back. GitHub still serves the old commit by its ID until GitHub Support clears its cache (Chris to ask).
 - **By:** Chris.
+
+## 2026-11-21 21:52 · Keep the Decisions model after the event, on Chris's own key
+- **Decision:** The `decide` and `judge` jobs stay on `gemini-decision-1` when the app moves to Chris's own Gemini key. No move to a chat model (Claude or Gemini) for these jobs.
+- **Why:** It costs $0.10 per 1M input tokens and nothing for output, and a request's shared input is billed once however many questions it asks (`backend/analysis/prices.toml`): a fifteenth of Hydrogen's input price, a thirtieth of Neon's. It returns a probability per option, which the 0.7 auto-apply line (`gaps.py`) and the judge's escalation lines (`judge_plan.py`) depend on; a chat model's confidence is text it writes. In the one graded room, answers at 0.7 or more were 4 of 4 right, those below 2 of 5 (`eval/RESULTS.md`, section 5). Open one-pass models (Jev-like, e.g. Nimble) work the same way if we ever leave Gemini.
+- **Budget note:** the Decisions model is a small part of a move's cost; Hydrogen reading clips and Neon planning are most of it (move 133201: about $1.20). The Usage page has no price for the Omni video, TTS or robotics models, so it counts them as $0 and understates. Argon's price doubles on Dec 1, 2026.
+- **By:** Chris.
+- **See:** open-questions.md, 'Using the cheap Decisions model more'
 

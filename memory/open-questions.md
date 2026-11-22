@@ -41,12 +41,17 @@ Move an item to [decisions.md](decisions.md) once it is decided, and delete it h
 - **Not looked at:** `frontend/labels.html` and the `/labels` routes beyond answering 200, the cargo-van and shake-physics changes beyond the tests passing, and anything on a phone since 14:12. README status, models table and Brought-in list are still behind the code (FAILURES.md has no row for this; SUBMISSION_PLAN.md item 3). `pitch.html` is public at `/app/pitch.html`. (Chris)
 
 ## Ideas proposed, not decided
+- **Using the cheap Decisions model more** (21:52; follows the decision of that time; none built, Chris to choose):
+  - *Batch questions that share media.* `gaps.py` sends one `decide()` call per question, so the same picture is paid for once per question. Questions about the same crop or clip could go in one `decide_batch` call, where shared input is billed once. Questions with different crops gain nothing.
+  - *More yes/no and choice checks instead of Hydrogen or Neon calls:* a suggested Move / Stays / Sell / Toss per item, fragile, needs two people, needs taking apart, fits through a door. Answers at 0.7 or more are applied; the rest are suggested on the review page, as now. Closed containers still skip it (FAILURES.md 11:30).
+  - *A cheap gate before a dear call:* ask it whether Hydrogen's reading of a file is weak before paying for the Argon fallback, or whether a plan needs another Neon round.
+  - *Not checked:* the up-to-1,000-questions-per-request limit (from articles, not tried); the API version our own key gets (the event key needed `v1alpha`, FAILURES.md 11:06). Re-grade answers before relying on new kinds of question.
 - *(Moved lifting guidance, truck-mode reminder, and live route/parking warnings to active Track B decisions — see `decisions.md`.)*
 
 ## Left by the branch audit session (16:18)
 - **George has not seen the merge of his `track-b` QR work** (2f26c31): `main`'s `labels.py` kept, his helpers added on top, `encode_qr_matrix` returning bools instead of 0/1, and in `frontend/index.html` his side taken for the print rule, `qrPayloadText` and the tape seam. (Track B)
 - **Not checked:** scanning a box QR code from the truck page or a printed label with a phone.
 
-## Running it full time (21:45)
+## Running it full time (21:35)
 - **Which server and which Gemini key.** DEPLOY.md assumes one Linux VM; no provider is chosen. The event key's account is temporary, so a personal key with billing is needed, and nobody has checked it reaches every model in `models.toml`. (Chris)
 - **Who may use the public address.** There is no real login. DEPLOY.md suggests Cloudflare Access; not decided. Also how long to keep uploads (`cleanup.sh` keeps 30 days). (Chris and George)
